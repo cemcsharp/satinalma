@@ -1,7 +1,3 @@
-# 🏛️ PİRİ REİS ÜNİVERSİTESİ — SATİNALMA TAKİP SİSTEMİ
-## 📋 Kurulum, Kullanım ve Sunucu Dağıtım Kılavuzu
-
-Bu belge, **Piri Reis Üniversitesi Satınalma Takip Uygulaması**'nın yerel kullanımını, çoklu ofis erişimini ve Bilgi İşlem Daire Başkanlığı sunucu kurulum adımlarını içeren tek resmi kılavuzdur.
 
 ---
 
