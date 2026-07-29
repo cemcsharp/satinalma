@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Satınalma Takip Sistemi — Piri Reis Üniversitesi</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <!-- Chart.js for data visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- Fullscreen Login Screen -->
+  <div id="login-screen" class="login-screen-overlay">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">🛒</div>
+        <h2>Satınalma Takip Girişi</h2>
+        <p>Piri Reis Üniversitesi Kurum İçi Sistem</p>
+      </div>
+
+      <form id="form-login-screen">
+        <div class="form-group" style="margin-bottom: 1.2rem;">
+          <label>Kullanıcı Seçin</label>
+          <select id="login-screen-user-select" required></select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label>Şifre</label>
+          <input type="password" id="login-screen-password" placeholder="Şifrenizi girin" required>
+        </div>
+
+        <div id="login-error-msg" style="color: var(--status-rejected); font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; display: none;">
+          ⚠️ Şifre hatalı! Lütfen tekrar deneyin.
+        </div>
+
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.85rem;">
+          🚀 Sistem Girişi Yap
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" style="display: none;">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">🛒</div>
+        <div class="brand-text">
+          <h1>Satınalma Takip</h1>
+          <p>Piri Reis Üniversitesi</p>
+        </div>
+      </div>
+
+      <ul class="nav-menu">
+        <li class="nav-section-title">📊 Geneller</li>
+        <li class="nav-item active" data-view="dashboard">
+          <button><span class="nav-icon">📊</span><span>Dashboard</span></button>
+        </li>
+        <li class="nav-item" data-view="my-requests">
+          <button><span class="nav-icon">👤</span><span>Taleplerim</span></button>
+        </li>
+
+        <li class="nav-section-title">📋 Operasyon</li>
+        <li class="nav-item" data-view="requests">
+          <button><span class="nav-icon">📋</span><span>Talep Yönetimi</span></button>
+        </li>
+        <li class="nav-item" data-view="workload">
+          <button><span class="nav-icon">⚖️</span><span>İş Yükü & Devir</span></button>
+        </li>
+        <li class="nav-item" data-view="contracts">
+          <button><span class="nav-icon">📑</span><span>Sözleşmeler</span></button>
+        </li>
+        <li class="nav-item" data-view="invoices">
+          <button><span class="nav-icon">🧾</span><span>Faturalar</span></button>
+        </li>
+
+        <li class="nav-section-title">📈 Analizler</li>
+        <li class="nav-item" data-view="unit-analysis">
+          <button><span class="nav-icon">🏢</span><span>Birim Analizi</span></button>
+        </li>
+        <li class="nav-item" data-view="supplier-analysis">
+          <button><span class="nav-icon">🏭</span><span>Tedarikçi Analizi</span></button>
+        </li>
+        <li class="nav-item" data-view="yearly-report">
+          <button><span class="nav-icon">📅</span><span>Yıllık Rapor</span></button>
+        </li>
+
+        <li class="nav-section-title">⚙️ Sistem</li>
+        <li class="nav-item" data-view="activity-logs">
+          <button><span class="nav-icon">📜</span><span>Aktivite Logu</span></button>
+        </li>
+        <li class="nav-item" data-view="settings">
+          <button><span class="nav-icon">⚙️</span><span>Ayarlar</span></button>
+        </li>
+      </ul>
+
+      <!-- User Profile Card & Logout Button -->
+      <div class="user-profile-card">
+        <div class="user-info-row">
+          <div class="user-avatar" id="user-avatar">MA</div>
+          <div class="user-details">
+            <h4 id="user-name">Merih AVCI</h4>
+            <p id="user-role-label">Satınalma Müdürü (ADMIN)</p>
+          </div>
+        </div>
+        <button class="btn-secondary" id="btn-logout" style="width:100%; justify-content:center; margin-top:0.4rem; padding:0.4rem; font-size:0.78rem;">
+          🚪 Oturumu Kapat
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-title">
+          <h2 id="view-title">Dashboard</h2>
+          <p id="view-subtitle">Genel yönetim özeti ve canlı performans metrikleri</p>
+        </div>
+
+        <div class="header-controls">
+          <!-- Theme Switcher Button -->
+          <button class="btn-theme-toggle" id="btn-toggle-theme">
+            <span id="theme-icon">☀️</span> <span id="theme-text">Açık Tema</span>
+          </button>
+
+          <!-- Global Academic Year Selector -->
+          <div class="year-selector-box">
+            <label for="global-year-select">Akademik Yıl:</label>
+            <select id="global-year-select">
+              <option value="ALL">Tüm Yıllar</option>
+              <option value="2025-2026" selected>2025-2026</option>
+              <option value="2024-2025">2024-2025</option>
+              <option value="2023-2024">2023-2024</option>
+            </select>
+          </div>
+
+          <button class="btn-primary" id="btn-open-new-request">
+            <span>➕</span> Yeni Talep Oluştur
+          </button>
+        </div>
+      </header>
+
+      <!-- View Containers -->
+
+      <!-- 1. DASHBOARD VIEW -->
+      <section id="view-dashboard" class="view-section">
+        <div class="grid-4">
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon blue">📋</div>
+            <div class="kpi-data">
+              <h3 id="kpi-total-demands">0</h3>
+              <p>Toplam Talep</p>
+              <div class="kpi-sub" id="kpi-total-sub">Seçili Akademik Yıl</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon green">✅</div>
+            <div class="kpi-data">
+              <h3 id="kpi-completed-demands">0</h3>
+              <p>Tamamlanan Talep</p>
+              <div class="kpi-sub" id="kpi-completed-rate">%0 Tamamlanma</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon yellow">⏳</div>
+            <div class="kpi-data">
+              <h3 id="kpi-open-demands">0</h3>
+              <p>Açık / Devam Eden</p>
+              <div class="kpi-sub" id="kpi-open-sub">Bekleyen İşler</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon purple">💰</div>
+            <div class="kpi-data">
+              <h3 id="kpi-total-spend">0 ₺</h3>
+              <p>Gerçekleşen Harcama</p>
+              <div class="kpi-sub" id="kpi-savings-sub">0 ₺ Tasarruf</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>📊 Talep Durum Dağılımı</h3>
+            </div>
+            <div style="height: 260px; position: relative;">
+              <canvas id="chart-status-pie"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>📈 Aylık Talep Trendi</h3>
+            </div>
+            <div style="height: 260px; position: relative;">
+              <canvas id="chart-monthly-trend"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>🏢 Birim Bazlı Talep Yoğunluğu (Top 8)</h3>
+            </div>
+            <div style="height: 260px; position: relative;">
+              <canvas id="chart-unit-bar"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>⚖️ Aktif Personel İş Yükü Dağılımı</h3>
+            </div>
+            <div style="height: 260px; position: relative;">
+              <canvas id="chart-personnel-bar"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Summary Tables -->
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>🏢 En Çok Talep Gönderen Birimler</h3>
+            </div>
+            <div class="table-container">
+              <table class="custom-table" id="table-top-units">
+                <thead>
+                  <tr>
+                    <th>Birim Adı</th>
+                    <th>Talep</th>
+                    <th>Tamamlanan</th>
+                    <th>Açık</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>🏭 En Yüksek Harcamalı Tedarikçiler</h3>
+            </div>
+            <div class="table-container">
+              <table class="custom-table" id="table-top-suppliers">
+                <thead>
+                  <tr>
+                    <th>Tedarikçi Adı</th>
+                    <th>Harcama (TRY)</th>
+                    <th>Talep Sayısı</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. REQUESTS MANAGEMENT VIEW -->
+      <section id="view-requests" class="view-section" style="display: none;">
+        <!-- Filters Toolbar -->
+        <div class="filter-bar">
+          <div class="search-input-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-search" placeholder="Barkod, konu, açıklama, tedarikçi ile ara...">
+          </div>
+
+          <select class="filter-select" id="filter-status">
+            <option value="ALL">Tüm Durumlar</option>
+            <option value="Açık">🔵 Açık / Devam Eden</option>
+            <option value="Tamamlandı">✅ Tamamlandı</option>
+            <option value="Reddedildi">❌ Reddedildi</option>
+          </select>
+
+          <select class="filter-select" id="filter-unit">
+            <option value="ALL">Tüm Birimler</option>
+          </select>
+
+          <select class="filter-select" id="filter-person">
+            <option value="ALL">Tüm Personel (Aktif + Geçmiş)</option>
+          </select>
+
+          <select class="filter-select" id="filter-priority">
+            <option value="ALL">Tüm Öncelikler</option>
+            <option value="Kritik">🔴 Kritik</option>
+            <option value="Yüksek">🟠 Yüksek</option>
+            <option value="Orta">🟡 Orta</option>
+          </select>
+
+          <button class="btn-secondary" id="btn-export-excel">
+            <span>📥</span> Excel İndir
+          </button>
+        </div>
+
+        <!-- Requests Data Table -->
+        <div class="table-container">
+          <table class="custom-table" id="table-requests">
+            <thead>
+              <tr>
+                <th>Sıra</th>
+                <th>Talep Barkod</th>
+                <th>Konu</th>
+                <th>Talep Eden Birim</th>
+                <th>İlgili Kişi</th>
+                <th>Tarih</th>
+                <th>Öncelik</th>
+                <th>Durum</th>
+                <th>Tutar</th>
+                <th>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+
+          <div class="pagination-bar">
+            <span id="pagination-info">Gösterilen: 1-15 / 883</span>
+            <div class="pagination-btns">
+              <button id="btn-prev-page">◀ Önceki</button>
+              <span id="page-num" style="align-self: center; font-weight: 700;">1</span>
+              <button id="btn-next-page">Sonraki ▶</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. WORKLOAD & DELEGATION VIEW -->
+      <section id="view-workload" class="view-section" style="display: none;">
+        <div class="card-header" style="margin-bottom: 1.5rem;">
+          <h3>⚖️ Satınalma Personeli İş Yükü Matrisi ve Delegasyon</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Aktif personellerin iş yüklerini görün, dengeli iş dağıtımı yapın</p>
+        </div>
+
+        <div class="grid-3" id="workload-cards-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+          <!-- Active personnel cards injected dynamically -->
+        </div>
+
+        <!-- Delegation Section -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3>⚡ Talepleri Hızlı Atama / Yönlendirme (Delegasyon)</h3>
+          </div>
+          <div class="filter-bar" style="background: transparent; border: none; padding: 0;">
+            <select class="filter-select" id="delegate-from-person">
+              <option value="Açık">Tüm Açık Talepler</option>
+              <option value="Atanmadı">Atanmamış Talepler</option>
+            </select>
+
+            <span style="color: var(--text-muted); font-size: 0.9rem;">➡️ şuna ata:</span>
+
+            <select class="filter-select" id="delegate-to-person"></select>
+
+            <button class="btn-primary" id="btn-execute-delegation">
+              <span>👉</span> Seçilen Talepleri Devret
+            </button>
+          </div>
+
+          <div class="table-container" style="margin-top: 1rem;">
+            <table class="custom-table" id="table-delegation-requests">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" id="chk-select-all-delegation"></th>
+                  <th>Barkod</th>
+                  <th>Konu</th>
+                  <th>Birim</th>
+                  <th>Mevcut Kişi</th>
+                  <th>Tarih</th>
+                  <th>Öncelik</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. MY REQUESTS (PERSONNEL VIEW) -->
+      <section id="view-my-requests" class="view-section" style="display: none;">
+        <div class="card-header" style="margin-bottom: 1.5rem;">
+          <div>
+            <h3>👤 Kendime Atanan Talepler ve Sipariş Girişi</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Takip ettiğiniz taleplere sipariş bilgilerini girin ve durum güncelleyin</p>
+          </div>
+          <button class="btn-secondary" id="btn-export-my-requests">
+            <span>📥</span> Taleplerimi İndir (Excel)
+          </button>
+        </div>
+
+        <!-- Filters Toolbar for My Requests -->
+        <div class="filter-bar">
+          <div class="search-input-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-my-search" placeholder="Barkod, konu, sipariş no, tedarikçi ile ara...">
+          </div>
+
+          <select class="filter-select" id="filter-my-status">
+            <option value="ALL">Tüm Durumlar</option>
+            <option value="Açık">🔵 Açık / Devam Eden</option>
+            <option value="Tamamlandı">✅ Tamamlandı</option>
+            <option value="Reddedildi">❌ Reddedildi</option>
+          </select>
+
+          <select class="filter-select" id="filter-my-unit">
+            <option value="ALL">Tüm Birimler</option>
+          </select>
+
+          <select class="filter-select" id="filter-my-priority">
+            <option value="ALL">Tüm Öncelikler</option>
+            <option value="Kritik">🔴 Kritik</option>
+            <option value="Yüksek">🟠 Yüksek</option>
+            <option value="Orta">🟡 Orta</option>
+            <option value="Düşük">🟢 Düşük</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table class="custom-table" id="table-my-requests">
+            <thead>
+              <tr>
+                <th>Barkod</th>
+                <th>Konu</th>
+                <th>Birim</th>
+                <th>Geliş Tarihi</th>
+                <th>Durum</th>
+                <th>Sipariş Barkodu</th>
+                <th>Sipariş Tarihi</th>
+                <th>Tedarikçi</th>
+                <th>Tutar</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5. CONTRACT MANAGEMENT VIEW (YENİ) -->
+      <section id="view-contracts" class="view-section" style="display: none;">
+        <div class="card-header" style="margin-bottom: 1.5rem;">
+          <div>
+            <h3>📑 Sözleşme Takip ve Teminat Yönetimi</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Üniversite sözleşmelerinin başlangıç/bitiş tarihleri, yüklenici tedarikçiler ve kalan süre takibi</p>
+          </div>
+          <button class="btn-primary" id="btn-open-add-contract">
+            <span>➕</span> Yeni Sözleşme Ekle
+          </button>
+        </div>
+
+        <!-- Contract KPI Cards -->
+        <div class="grid-4">
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon blue">📜</div>
+            <div class="kpi-data">
+              <h3 id="contract-kpi-total">0</h3>
+              <p>Aktif Sözleşme</p>
+              <div class="kpi-sub">Devam Eden Anlaşmalar</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon purple">💰</div>
+            <div class="kpi-data">
+              <h3 id="contract-kpi-amount">0 ₺</h3>
+              <p>Toplam Sözleşme Bedeli</p>
+              <div class="kpi-sub">Taahhüt Edilen Hacim</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon red">⏰</div>
+            <div class="kpi-data">
+              <h3 id="contract-kpi-expiring">0</h3>
+              <p>Son 30 Gün Kalanlar</p>
+              <div class="kpi-sub" style="color:var(--status-rejected);">Yenileme Uyarıları</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon green">🛡️</div>
+            <div class="kpi-data">
+              <h3 id="contract-kpi-guarantee">0 ₺</h3>
+              <p>Teminat Mektubu Hacmi</p>
+              <div class="kpi-sub">Güvence Altındaki Tutar</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <div class="search-input-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-contract-search" placeholder="Sözleşme no, konu, tedarikçi ile ara...">
+          </div>
+
+          <select class="filter-select" id="filter-contract-status">
+            <option value="ALL">Tüm Durumlar</option>
+            <option value="Aktif">🟢 Aktif Sözleşmeler</option>
+            <option value="Expiring">🔴 Bitişine 30 Gün Kalanlar</option>
+            <option value="Tamamlandı">⚪ Tamamlananlar</option>
+            <option value="İptal">❌ İptal Edilenler</option>
+          </select>
+
+          <select class="filter-select" id="filter-contract-unit">
+            <option value="ALL">Tüm Birimler</option>
+          </select>
+        </div>
+
+        <!-- Contracts Table -->
+        <div class="table-container">
+          <table class="custom-table" id="table-contracts">
+            <thead>
+              <tr>
+                <th>Sözleşme No</th>
+                <th>Sözleşme Konusu</th>
+                <th>Tedarikçi / Yüklenici</th>
+                <th>Birim</th>
+                <th>Sözleşme Bedeli</th>
+                <th>Başlangıç - Bitiş</th>
+                <th>Kalan Süre</th>
+                <th>Teminat Tutarı</th>
+                <th>Durum</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6. INVOICES & WEEKLY PAYMENT SCHEDULE VIEW (YENİ) -->
+      <section id="view-invoices" class="view-section" style="display: none;">
+        <div class="card-header" style="margin-bottom: 1.5rem;">
+          <div>
+            <h3>🧾 Fatura Takip ve Haftalık Ödeme Listesi</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Muhasebeye teslim edilen faturalar, vadesi gelen ödemeler ve haftalık nakit akış planı</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-secondary" id="btn-export-weekly-payments">
+              <span>📥</span> Haftalık Liste (Excel)
+            </button>
+            <button class="btn-primary" id="btn-open-add-invoice">
+              <span>➕</span> Yeni Fatura Kaydı
+            </button>
+          </div>
+        </div>
+
+        <!-- Invoice KPI Cards -->
+        <div class="grid-4">
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon blue">🧾</div>
+            <div class="kpi-data">
+              <h3 id="invoice-kpi-total">0 ₺</h3>
+              <p>Toplam Kayıtlı Fatura</p>
+              <div class="kpi-sub">Tüm Muhasebe Faturaları</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon yellow">⚡</div>
+            <div class="kpi-data">
+              <h3 id="invoice-kpi-this-week">0 ₺</h3>
+              <p>Bu Hafta Vadesi Gelenler</p>
+              <div class="kpi-sub">Haftalık Nakit İhtiyacı</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon red">⚠️</div>
+            <div class="kpi-data">
+              <h3 id="invoice-kpi-overdue">0 ₺</h3>
+              <p>Gecikmiş Ödemeler</p>
+              <div class="kpi-sub" style="color:var(--status-rejected);">Vadesi Geçen Faturalar</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon green">✅</div>
+            <div class="kpi-data">
+              <h3 id="invoice-kpi-paid">0 ₺</h3>
+              <p>Ödenen Toplam Fatura</p>
+              <div class="kpi-sub">Tamamlanan Ödemeler</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Smart Date Filter Toolbar for Weekly Payment Schedule -->
+        <div class="filter-bar">
+          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;" id="invoice-date-tabs">
+            <button class="btn-secondary active-date-tab" data-period="ALL" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              Tüm Faturalar
+            </button>
+            <button class="btn-secondary" data-period="THIS_WEEK" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:var(--status-open);">
+              ⚡ Bu Hafta Vadesi Gelenler
+            </button>
+            <button class="btn-secondary" data-period="NEXT_WEEK" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              🔜 Gelecek Hafta Vadesi Gelenler
+            </button>
+            <button class="btn-secondary" data-period="OVERDUE" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:var(--status-rejected);">
+              ⚠️ Gecikmiş Ödemeler
+            </button>
+            <button class="btn-secondary" data-period="THIS_MONTH" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              📅 Bu Ay Vadesi Gelenler
+            </button>
+          </div>
+
+          <div class="search-input-box" style="min-width:200px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-invoice-search" placeholder="Fatura no, tedarikçi, talep no ile ara...">
+          </div>
+
+          <select class="filter-select" id="filter-invoice-status">
+            <option value="ALL">Tüm Durumlar</option>
+            <option value="Ödeme Bekliyor">⏳ Ödeme Bekliyor</option>
+            <option value="Gecikmede">🔴 Gecikmede</option>
+            <option value="Ödendi">🟢 Ödendi</option>
+          </select>
+        </div>
+
+        <!-- Invoices Table -->
+        <div class="table-container">
+          <table class="custom-table" id="table-invoices">
+            <thead>
+              <tr>
+                <th>Fatura No</th>
+                <th>Tedarikçi</th>
+                <th>Fatura Tarihi</th>
+                <th>Vade Tarihi</th>
+                <th>Kalan Gün / Durum</th>
+                <th>Fatura Tutarı</th>
+                <th>Ödeme Durumu</th>
+                <th>İlişkili Talep/Sözleşme</th>
+                <th>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 7. UNIT ANALYSIS VIEW -->
+      <section id="view-unit-analysis" class="view-section" style="display: none;">
+        <div class="filter-bar">
+          <label style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Birim Seçin:</label>
+          <select class="filter-select" id="select-unit-analysis">
+            <option value="ALL">Tüm Birimler Özeti</option>
+          </select>
+        </div>
+
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>🏢 Birim Harcama ve Talep Tablosu</h3>
+            </div>
+            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+              <table class="custom-table" id="table-unit-detailed">
+                <thead>
+                  <tr>
+                    <th>Birim Adı</th>
+                    <th>Talep</th>
+                    <th>Tamamlanan</th>
+                    <th>Açık</th>
+                    <th>Harcama (TRY)</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>📊 Birim Bazlı Harcama Dağılımı</h3>
+            </div>
+            <div style="height: 350px; position: relative;">
+              <canvas id="chart-unit-spend-pie"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. SUPPLIER ANALYSIS VIEW -->
+      <section id="view-supplier-analysis" class="view-section" style="display: none;">
+        <div class="glass-card">
+          <div class="card-header">
+            <h3>🏭 Tedarikçi Bazlı Harcama ve İş Hacmi</h3>
+          </div>
+          <div class="table-container">
+            <table class="custom-table" id="table-supplier-detailed">
+              <thead>
+                <tr>
+                  <th>Sıra</th>
+                  <th>Tedarikçi Adı</th>
+                  <th>Talep Adedi</th>
+                  <th>Toplam Harcama (TRY)</th>
+                  <th>Tamamlanan Talep</th>
+                  <th>Bütçe Payı %</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. YEARLY REPORT VIEW -->
+      <section id="view-yearly-report" class="view-section" style="display: none;">
+        <div class="card-header" style="margin-bottom: 1.5rem;">
+          <div>
+            <h3>📅 Yıllık Satınalma Faaliyet ve Karşılaştırma Raporu</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Yıllar arası performans, süreç hızı (SLA), yönetmelik ve ay bazlı bütçe kırılımları</p>
+          </div>
+          <button class="btn-primary" id="btn-print-yearly-report">
+            <span>🖨️</span> Faaliyet Raporunu PDF / Yazdır
+          </button>
+        </div>
+
+        <!-- YoY Comparison KPI Cards -->
+        <div class="grid-4">
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon blue">📊</div>
+            <div class="kpi-data">
+              <h3 id="yoy-kpi-total">0</h3>
+              <p>Yıllık Talep Hacmi</p>
+              <div class="kpi-sub" id="yoy-kpi-total-sub">%0 Değişim</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon purple">💰</div>
+            <div class="kpi-data">
+              <h3 id="yoy-kpi-spend">0 ₺</h3>
+              <p>Yıllık Toplam Harcama</p>
+              <div class="kpi-sub" id="yoy-kpi-spend-sub">%0 Değişim</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon yellow">⚡</div>
+            <div class="kpi-data">
+              <h3 id="yoy-kpi-turnaround">0 Gün</h3>
+              <p>Ort. Temin / Kapanma Süresi</p>
+              <div class="kpi-sub" id="yoy-kpi-turnaround-sub">Süreç Performansı</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon green">🎯</div>
+            <div class="kpi-data">
+              <h3 id="yoy-kpi-completion-rate">%0</h3>
+              <p>Tamamlanma Başarı Oranı</p>
+              <div class="kpi-sub" id="yoy-kpi-completed-count">0 İş Kapatıldı</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>📈 Ay-Ay Harcama ve Talep Hacmi Grafiği</h3>
+            </div>
+            <div style="height: 280px; position: relative;">
+              <canvas id="chart-yearly-combo"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>⏱️ Süreç Tamamlanma Hızı Analizi (Bekleme Gün Sayısı)</h3>
+            </div>
+            <div style="height: 280px; position: relative;">
+              <canvas id="chart-yearly-sla"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>📜 Yönetmelik Maddeleri Bazlı Dağılım</h3>
+            </div>
+            <div style="height: 260px; position: relative;">
+              <canvas id="chart-yearly-regulations"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>💱 Harcama Para Birimi Payı</h3>
+            </div>
+            <div style="height: 260px; position: relative;">
+              <canvas id="chart-yearly-currency"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Month-by-Month Table -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3>📅 Akademik Yıl Ay Bazlı Detaylı Tablo</h3>
+          </div>
+          <div class="table-container">
+            <table class="custom-table" id="table-yearly-monthly">
+              <thead>
+                <tr>
+                  <th>Ay</th>
+                  <th>Açılan Talep</th>
+                  <th>Kapanan Talep</th>
+                  <th>Açık Kalan</th>
+                  <th>Ort. Bekleme (Gün)</th>
+                  <th>Harcama Tutar (TRY)</th>
+                  <th>Bütçe Payı %</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Regulation Clause Spending Comparison Table -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3>📜 Yönetmelik Maddesi Bazlı Harcama ve Yıllar Arası Karşılaştırma</h3>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Her yönetmelik maddesinin bu yılki ve bir önceki yılki harcama tutarları ile yüzdesel değişim oranı gösterilmektedir.
+          </p>
+          <div class="table-container">
+            <table class="custom-table" id="table-yearly-regulations">
+              <thead>
+                <tr>
+                  <th>Yönetmelik Maddesi</th>
+                  <th>Talep Adedi</th>
+                  <th>Bu Yıl Harcama (TRY)</th>
+                  <th>Geçen Yıl Harcama (TRY)</th>
+                  <th>Değişim (TRY)</th>
+                  <th>Değişim %</th>
+                  <th>Bütçe Payı %</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. SETTINGS VIEW (COMPREHENSIVE USER MANAGEMENT) -->
+      <section id="view-settings" class="view-section" style="display: none;">
+        <div class="grid-2">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>👤 Personel Yönetimi</h3>
+              <button class="btn-primary" id="btn-open-add-user" style="padding:0.4rem 0.8rem; font-size:0.8rem;">
+                <span>➕</span> Yeni Personel Ekle
+              </button>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Personel ekleyebilir, unvan/şifre güncelleyebilir veya ayrılan personelleri <strong>Pasif</strong> duruma getirebilirsiniz. Pasif personellerin geçmiş verileri korunur.
+            </p>
+            <div class="table-container">
+              <table class="custom-table" id="table-users-settings">
+                <thead>
+                  <tr>
+                    <th>Ad Soyad</th>
+                    <th>Unvan</th>
+                    <th>Rol</th>
+                    <th>Durum</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>💱 Canlı Döviz Kuru Ayarları (Merkez Bankası - TCMB)</h3>
+              <span id="rate-last-updated" style="font-size:0.78rem; color:var(--accent-primary); font-weight:600;">Son Güncelleme: -</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Dolar ve Euro cinsinden olan sözleşme ve faturaların TL karşılıklarını hesaplamak için kurları Merkez Bankası'ndan otomatik çekin veya manuel güncelleyin.
+            </p>
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="form-group">
+                <label>💵 USD Kuru (₺)</label>
+                <input type="number" step="0.0001" id="setting-rate-usd" value="36.50">
+              </div>
+              <div class="form-group">
+                <label>💶 EUR Kuru (₺)</label>
+                <input type="number" step="0.0001" id="setting-rate-eur" value="39.80">
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+              <button class="btn-primary" id="btn-fetch-tcmb-rates">
+                <span>⚡</span> TCMB'den Kurları Otomatik Çek
+              </button>
+              <button class="btn-secondary" id="btn-save-rates">
+                <span>💾</span> Manuel Kaydet
+              </button>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>⚙️ Veri Yönetimi & Sunucu Durumu</h3>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Sistem veritabanı JSON formatında kayıtlıdır. Excel dosyasından istediğiniz zaman veriyi yeniden senkronize edebilirsiniz.
+            </p>
+            <button class="btn-secondary" id="btn-reimport-excel">
+              <span>🔄</span> Excel'den Verileri Yeniden Yükle
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. ACTIVITY LOGS VIEW (İŞLEM GEÇMİŞİ) -->
+      <section id="view-activity-logs" class="view-section" style="display: none;">
+        <div class="glass-card">
+          <div class="card-header" style="margin-bottom: 1.5rem;">
+            <div>
+              <h3>📜 Sistem İşlem ve Aktivite Geçmişi (Audit Logs)</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">Sistemde gerçekleştirilen tüm ekleme, silme, devir ve onay işlemlerinin kronolojik dökümü</p>
+            </div>
+            <div class="search-input-box" style="width: 320px;">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="filter-log-search" placeholder="İşlem veya personel ara...">
+            </div>
+          </div>
+
+          <div class="table-container" style="max-height: 550px; overflow-y: auto;">
+            <table class="custom-table" id="table-activity-logs">
+              <thead>
+                <tr>
+                  <th>Tarih / Saat</th>
+                  <th>İşlemi Yapan</th>
+                  <th>İşlem Türü</th>
+                  <th>Detay ve Açıklama</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Modal 1: User Add / Edit Modal -->
+  <div class="modal-overlay" id="modal-user-form">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 id="user-modal-title">👤 Personel Düzenle</h3>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <form id="form-user-manage">
+        <input type="hidden" id="um-id">
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label>Ad Soyad <span class="required">*</span></label>
+          <input type="text" id="um-name" required placeholder="ör: Ahmet YILMAZ">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label>Unvan <span class="required">*</span></label>
+          <input type="text" id="um-title" required placeholder="ör: Satınalma Uzmanı">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label>Sistem Rolü <span class="required">*</span></label>
+          <select id="um-role">
+            <option value="STAFF">STAFF (Satınalma Personeli)</option>
+            <option value="ADMIN">ADMIN (Satınalma Müdürü / Yrd.)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label>Giriş Şifresi <span class="required">*</span></label>
+          <input type="text" id="um-password" required placeholder="ör: 123">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label>Durum</label>
+          <select id="um-is-active">
+            <option value="true">🟢 Aktif Çalışan</option>
+            <option value="false">🔴 Pasif (Aramızdan Ayrıldı)</option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: New Request -->
+  <div class="modal-overlay" id="modal-new-request">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>➕ Yeni Satınalma Talebi Oluştur</h3>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <form id="form-new-request">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Talep Barkodu <span class="required">*</span></label>
+            <input type="text" id="nr-barcode" required placeholder="ör: 249001">
+          </div>
+
+          <div class="form-group">
+            <label>Satınalmaya Geliş Tarihi <span class="required">*</span></label>
+            <input type="date" id="nr-arrival-date" required>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Talep Konusu <span class="required">*</span></label>
+            <input type="text" id="nr-subject" required placeholder="ör: Bilgisayar Malzemeleri Alımı Hk">
+          </div>
+
+          <div class="form-group full-width">
+            <label>Açıklama</label>
+            <textarea id="nr-description" rows="3" placeholder="Detaylı talep açıklaması..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Talep Eden Birim <span class="required">*</span></label>
+            <select id="nr-unit" required></select>
+          </div>
+
+          <div class="form-group">
+            <label>İlgili Kişi (Atama) <span class="required">*</span></label>
+            <select id="nr-assigned-to" required></select>
+          </div>
+
+          <div class="form-group">
+            <label>Öncelik <span class="required">*</span></label>
+            <select id="nr-priority" required>
+              <option value="Orta" selected>🟡 Orta</option>
+              <option value="Kritik">🔴 Kritik</option>
+              <option value="Yüksek">🟠 Yüksek</option>
+              <option value="Düşük">🟢 Düşük</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Yönetmelik Maddesi</label>
+            <select id="nr-regulation"></select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary">Kaydet ve Atama Yap</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 3: Edit Request / Order Entry -->
+  <div class="modal-overlay" id="modal-edit-request">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="edit-modal-title">✏️ Talep ve Sipariş Düzenle</h3>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <form id="form-edit-request">
+        <input type="hidden" id="er-id">
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Talep Durumu</label>
+            <select id="er-status">
+              <option value="Açık">🔵 Açık / Devam Eden</option>
+              <option value="Tamamlandı">✅ Tamamlandı</option>
+              <option value="Reddedildi">❌ Reddedildi</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>İlgili Kişi (Atama)</label>
+            <select id="er-assigned-to"></select>
+          </div>
+
+          <div class="form-group">
+            <label>Sipariş Barkodu</label>
+            <input type="text" id="er-order-barcode" placeholder="ör: SIP-9921">
+          </div>
+
+          <div class="form-group">
+            <label>Sipariş Tarihi</label>
+            <input type="date" id="er-order-date">
+          </div>
+
+          <div class="form-group">
+            <label>Tedarikçi Adı</label>
+            <input type="text" id="er-supplier" placeholder="ör: Kılıç Kırtasiye">
+          </div>
+
+          <div class="form-group">
+            <label>Gerçekleşen Tutar</label>
+            <input type="number" step="0.01" id="er-actual-amount" placeholder="0.00">
+          </div>
+
+          <div class="form-group">
+            <label>Para Birimi</label>
+            <select id="er-currency">
+              <option value="TRY">TRY (₺)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Yönetmelik Maddesi</label>
+            <select id="er-regulation"></select>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Açıklama / Güncelleme Notu</label>
+            <textarea id="er-description" rows="3"></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary">Değişiklikleri Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 4: New / Edit Contract Modal (YENİ) -->
+  <div class="modal-overlay" id="modal-contract-form">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="contract-modal-title">📑 Yeni Sözleşme Oluştur</h3>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <form id="form-contract-manage">
+        <input type="hidden" id="cm-id">
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Sözleşme No / Kodu <span class="required">*</span></label>
+            <input type="text" id="cm-no" required placeholder="ör: SOZ-2025-001">
+          </div>
+
+          <div class="form-group">
+            <label>Tedarikçi / Yüklenici <span class="required">*</span></label>
+            <input type="text" id="cm-supplier" required placeholder="ör: Pronet Güvenlik A.Ş.">
+          </div>
+
+          <div class="form-group full-width">
+            <label>Sözleşme Konusu <span class="required">*</span></label>
+            <input type="text" id="cm-title" required placeholder="ör: Kampüs Güvenlik Hizmet Alımı Sözleşmesi">
+          </div>
+
+          <div class="form-group">
+            <label>İlgili Birim <span class="required">*</span></label>
+            <select id="cm-unit" required></select>
+          </div>
+
+          <div class="form-group">
+            <label>Takip Eden Personel <span class="required">*</span></label>
+            <select id="cm-assigned-to" required></select>
+          </div>
+
+          <div class="form-group">
+            <label>Başlangıç Tarihi <span class="required">*</span></label>
+            <input type="date" id="cm-start-date" required>
+          </div>
+
+          <div class="form-group">
+            <label>Bitiş Tarihi <span class="required">*</span></label>
+            <input type="date" id="cm-end-date" required>
+          </div>
+
+          <div class="form-group">
+            <label>Sözleşme Bedeli <span class="required">*</span></label>
+            <input type="number" step="0.01" id="cm-amount" required placeholder="0.00">
+          </div>
+
+          <div class="form-group">
+            <label>Para Birimi <span class="required">*</span></label>
+            <select id="cm-currency">
+              <option value="TRY">TRY (₺)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Teminat Mektubu Tutarı</label>
+            <input type="number" step="0.01" id="cm-guarantee-amount" placeholder="0.00">
+          </div>
+
+          <div class="form-group">
+            <label>Teminat Bitiş Tarihi</label>
+            <input type="date" id="cm-guarantee-expiry">
+          </div>
+
+          <div class="form-group">
+            <label>Sözleşme Durumu</label>
+            <select id="cm-status">
+              <option value="Aktif" selected>🟢 Aktif</option>
+              <option value="Tamamlandı">⚪ Tamamlandı</option>
+              <option value="İptal">❌ İptal</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Açıklama / Özel Şartlar</label>
+            <textarea id="cm-notes" rows="3" placeholder="Sözleşme taksit, ceza veya uzatım notları..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary">Sözleşmeyi Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 5: New / Edit Invoice Modal (YENİ) -->
+  <div class="modal-overlay" id="modal-invoice-form">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="invoice-modal-title">🧾 Yeni Fatura / Muhasebe Teslim Kaydı</h3>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <form id="form-invoice-manage">
+        <input type="hidden" id="im-id">
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Fatura No <span class="required">*</span></label>
+            <input type="text" id="im-no" required placeholder="ör: FAT-2025-8841">
+          </div>
+
+          <div class="form-group">
+            <label>Tedarikçi Firma <span class="required">*</span></label>
+            <input type="text" id="im-supplier" required placeholder="ör: Kılıç Kırtasiye Ltd.">
+          </div>
+
+          <div class="form-group">
+            <label>Fatura Tarihi <span class="required">*</span></label>
+            <input type="date" id="im-date" required>
+          </div>
+
+          <div class="form-group">
+            <label>Vade Tarihi <span class="required">*</span></label>
+            <input type="date" id="im-due-date" required>
+          </div>
+
+          <div class="form-group">
+            <label>Fatura Tutarı <span class="required">*</span></label>
+            <input type="number" step="0.01" id="im-amount" required placeholder="0.00">
+          </div>
+
+          <div class="form-group">
+            <label>Para Birimi <span class="required">*</span></label>
+            <select id="im-currency">
+              <option value="TRY">TRY (₺)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Ödeme Durumu <span class="required">*</span></label>
+            <select id="im-status">
+              <option value="Ödeme Bekliyor" selected>⏳ Ödeme Bekliyor</option>
+              <option value="Gecikmede">🔴 Gecikmede</option>
+              <option value="Ödendi">🟢 Ödendi</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Muhasebeye Teslim Tarihi</label>
+            <input type="date" id="im-delivery-date">
+          </div>
+
+          <div class="form-group">
+            <label>Bağlı Talep / Sözleşme No</label>
+            <input type="text" id="im-related-barcode" placeholder="ör: 249001 veya SOZ-2025-001">
+          </div>
+
+          <div class="form-group">
+            <label>Ödeme Yapılma Tarihi</label>
+            <input type="date" id="im-payment-date">
+          </div>
+
+          <div class="form-group full-width">
+            <label>Açıklama / Notlar</label>
+            <textarea id="im-notes" rows="3" placeholder="Fatura teslim notları veya banka detayları..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary">Faturayı Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- GENERAL VIEW DETAILS MODAL (GÖRÜNTÜLE) -->
+  <div class="modal-overlay" id="modal-view-details">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3 id="view-details-title">👁️ Detay Görünümü</h3>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <div class="modal-body" id="view-details-body" style="padding: 1.25rem 0;">
+        <!-- Dynamic detail cards injected here -->
+      </div>
+
+      <div class="form-actions" style="justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+        <button type="button" class="btn-secondary" onclick="window.print()">
+          <span>🖨️</span> Yazdır / PDF
+        </button>
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="button" class="btn-primary" id="btn-edit-from-view">
+            <span>✏️</span> Düzenle
+          </button>
+          <button type="button" class="btn-secondary close-modal">Kapat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFICIAL PRINTABLE REPORT TEMPLATE (@media print only) -->
+  <div id="printable-official-document" class="print-only">
+    <div class="print-header" style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+      <div style="font-size: 1.4rem; font-weight: 800; color: #000;">T.C. PİRİ REİS ÜNİVERSİTESİ</div>
+      <div style="font-size: 1.1rem; font-weight: 700; color: #333; margin-top: 0.25rem;">SATİNALMA MÜDÜRLÜĞÜ FAALİYET VE HARCAMA RAPORU</div>
+      <div style="font-size: 0.85rem; color: #666; margin-top: 0.35rem;" id="print-doc-date">Tarih: 29.07.2026</div>
+    </div>
+    
+    <div id="print-doc-body" style="margin: 1.5rem 0;"></div>
+
+    <div class="print-signatures" style="margin-top: 3.5rem; display: flex; justify-content: space-between; text-align: center;">
+      <div style="width: 200px;">
+        <strong>Hazırlayan</strong><br><br><br><br>
+        <span>Satınalma Uzmanı</span>
+      </div>
+      <div style="width: 200px;">
+        <strong>Kontrol Eden</strong><br><br><br><br>
+        <span>Satınalma Müdürü</span>
+      </div>
+      <div style="width: 200px;">
+        <strong>Onaylayan</strong><br><br><br><br>
+        <span>Genel Sekreter</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
