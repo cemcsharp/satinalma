@@ -17,7 +17,40 @@ try {
 }
 
 $publicDir = Join-Path $pwd "public"
-$dbPath = Join-Path (Join-Path $pwd "data") "db.json"
+$dbDir = Join-Path $pwd "data"
+$dbPath = Join-Path $dbDir "db.json"
+$backupsDir = Join-Path $dbDir "backups"
+
+if (-not (Test-Path $backupsDir)) {
+    New-Item -ItemType Directory -Path $backupsDir -Force | Out-Null
+}
+
+function New-DatabaseBackup {
+    param([string]$reason = "auto")
+    try {
+        if (-not (Test-Path $dbPath)) { return $null }
+        if (-not (Test-Path $backupsDir)) { New-Item -ItemType Directory -Path $backupsDir -Force | Out-Null }
+        $timestamp = (Get-Date -Format "yyyy-MM-dd_HHmm")
+        $backupName = "db_$timestamp.json"
+        $backupPath = Join-Path $backupsDir $backupName
+        
+        Copy-Item -Path $dbPath -Destination $backupPath -Force
+        Write-Host ("[" + (Get-Date -Format "HH:mm:ss") + "] 💾 Backup created: " + $backupName + " (" + $reason + ")")
+        
+        # Keep latest 30 backups
+        $existing = Get-ChildItem -Path $backupsDir -Filter "db_*.json" | Sort-Object CreationTime -Descending
+        if ($existing.Count -gt 30) {
+            $existing | Select-Object -Skip 30 | Remove-Item -Force
+        }
+        return $backupName
+    } catch {
+        Write-Host "Backup failed: $_"
+        return $null
+    }
+}
+
+# Create initial backup on server startup if db.json exists
+New-DatabaseBackup -reason "startup"
 
 function Get-ContentType($filePath) {
     $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
@@ -118,6 +151,43 @@ while ($listener.IsListening) {
             } else {
                 $response.StatusCode = 400
             }
+            $response.Close()
+            continue
+        }
+
+        # GET /api/backups (List all backups)
+        if ($urlPath -eq "/api/backups" -and $request.HttpMethod -eq "GET") {
+            $response.ContentType = "application/json; charset=utf-8"
+            $list = @()
+            if (Test-Path $backupsDir) {
+                $files = Get-ChildItem -Path $backupsDir -Filter "db_*.json" | Sort-Object CreationTime -Descending
+                foreach ($f in $files) {
+                    $list += @{
+                        filename = $f.Name
+                        sizeKB = [math]::Round($f.Length / 1KB, 1)
+                        created = $f.CreationTime.ToString("dd.MM.yyyy HH:mm")
+                    }
+                }
+            }
+            $resJson = $list | ConvertTo-Json -Compress
+            if (-not $resJson) { $resJson = "[]" }
+            $resBytes = [System.Text.Encoding]::UTF8.GetBytes($resJson)
+            $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            $response.Close()
+            continue
+        }
+
+        # POST /api/backup-now (Manual Trigger Backup)
+        if ($urlPath -eq "/api/backup-now" -and $request.HttpMethod -eq "POST") {
+            $response.ContentType = "application/json; charset=utf-8"
+            $bName = New-DatabaseBackup -reason "manual"
+            if ($bName) {
+                $resJson = "{`"success`":true,`"filename`":`"$bName`"}"
+            } else {
+                $resJson = "{`"success`":false,`"error`":`"Yedek alınamadı.`"}"
+            }
+            $resBytes = [System.Text.Encoding]::UTF8.GetBytes($resJson)
+            $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
             $response.Close()
             continue
         }

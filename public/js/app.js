@@ -316,14 +316,24 @@ const App = {
     // Delegation Execution
     document.getElementById('btn-execute-delegation')?.addEventListener('click', () => this.handleDelegation());
 
-    // Print Yearly Report
+    // Print & Export Event Listeners
     document.getElementById('btn-print-yearly-report')?.addEventListener('click', () => window.print());
+    document.getElementById('btn-export-yearly-excel')?.addEventListener('click', () => this.exportTableToExcel('table-yearly-monthly', 'Yillik_Faaliyet_Raporu.csv'));
+
+    document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportToCSV());
+    document.getElementById('btn-export-requests-pdf')?.addEventListener('click', () => this.printSection('view-requests'));
+
+    document.getElementById('btn-export-contracts-excel')?.addEventListener('click', () => this.exportTableToExcel('table-contracts', 'Sozlesme_Listesi.csv'));
+    document.getElementById('btn-export-contracts-pdf')?.addEventListener('click', () => this.printSection('view-contracts'));
+
+    document.getElementById('btn-export-invoices-excel')?.addEventListener('click', () => this.exportTableToExcel('table-invoices', 'Fatura_Listesi.csv'));
+    document.getElementById('btn-export-invoices-pdf')?.addEventListener('click', () => this.printSection('view-invoices'));
+
+    // Manual Backup Button
+    document.getElementById('btn-trigger-backup-now')?.addEventListener('click', () => this.triggerManualBackup());
 
     // Export Weekly Payment Schedule to CSV
     document.getElementById('btn-export-weekly-payments')?.addEventListener('click', () => this.exportWeeklyPaymentsToCSV());
-
-    // Excel Export Requests
-    document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportToCSV());
 
     // Re-import Excel
     document.getElementById('btn-reimport-excel')?.addEventListener('click', async () => {
@@ -441,6 +451,10 @@ const App = {
     if (titles[viewName]) {
       document.getElementById('view-title').innerText = titles[viewName].title;
       document.getElementById('view-subtitle').innerText = titles[viewName].sub;
+    }
+
+    if (viewName === 'settings') {
+      this.fetchBackups();
     }
 
     this.render();
@@ -2225,18 +2239,92 @@ const App = {
   },
 
   exportToCSV() {
-    const requests = this.getFilteredRequests();
-    let csv = "Barkod;Konu;Birim;İlgili Kişi;Geliş Tarihi;Durum;Öncelik;Tedarikçi;Gerçekleşen Tutar\n";
+    this.exportTableToExcel('table-requests', `Satinalma_Talepleri_${this.state.selectedYear}.csv`);
+  },
 
-    requests.forEach(r => {
-      csv += `"${r.requestBarcode}";"${r.subject}";"${r.unit}";"${r.assignedTo}";"${r.arrivalDate}";"${r.status}";"${r.priority}";"${r.supplier || ''}";"${r.actualAmount || 0}"\n`;
+  exportTableToExcel(tableId, filename = 'Export.csv') {
+    const table = document.getElementById(tableId);
+    if (!table) {
+      alert("Dışa aktarılacak tablo bulunamadı.");
+      return;
+    }
+
+    let csv = '\uFEFF'; // Add UTF-8 BOM for Microsoft Excel Turkish character compatibility
+    const rows = table.querySelectorAll('tr');
+
+    rows.forEach(row => {
+      const cols = row.querySelectorAll('th, td');
+      const rowData = [];
+      cols.forEach(col => {
+        if (col.querySelector('.action-btns') || col.classList.contains('no-export')) return;
+        let text = col.innerText.replace(/\n/g, ' ').replace(/"/g, '""').trim();
+        rowData.push(`"${text}"`);
+      });
+      if (rowData.length > 0) {
+        csv += rowData.join(';') + '\n';
+      }
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `Satinalma_Talepleri_${this.state.selectedYear}.csv`;
+    link.download = filename;
     link.click();
+    this.logAction('Excel Dışa Aktarıldı', `Tablo: ${tableId}, Dosya: ${filename}`);
+  },
+
+  printSection(sectionId) {
+    window.print();
+  },
+
+  async fetchBackups() {
+    try {
+      const tbody = document.getElementById('tbody-backups-list');
+      if (!tbody) return;
+      
+      const res = await fetch('/api/backups');
+      if (res.ok) {
+        const backups = await res.json();
+        if (!backups || backups.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Henüz yedek dosyası yok.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = backups.map(b => `
+          <tr>
+            <td style="font-weight:600;">💾 ${b.filename}</td>
+            <td>${b.created}</td>
+            <td><span class="badge priority-orta">${b.sizeKB} KB</span></td>
+          </tr>
+        `).join('');
+      }
+    } catch (err) {
+      console.error("Error fetching backups:", err);
+    }
+  },
+
+  async triggerManualBackup() {
+    try {
+      const btn = document.getElementById('btn-trigger-backup-now');
+      if (btn) btn.innerHTML = '<span>⌛</span> Yedek Alınıyor...';
+
+      const res = await fetch('/api/backup-now', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Otomatik Veri Yedeği Başarıyla Oluşturuldu!\n\n📂 Dosya Adı: ${data.filename}`);
+          this.logAction('Manuel Veri Yedeği Alındı', `Yedek Dosyası: ${data.filename}`);
+          await this.fetchBackups();
+        } else {
+          alert(`❌ Hata: ${data.error}`);
+        }
+      }
+    } catch (err) {
+      console.error("Backup error:", err);
+      alert("Yedek alınırken sunucu hatası oluştu.");
+    } finally {
+      const btn = document.getElementById('btn-trigger-backup-now');
+      if (btn) btn.innerHTML = '<span>💾</span> Şimdi Manuel Yedek Al';
+    }
   }
 };
 

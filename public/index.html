@@ -299,6 +299,9 @@
           <button class="btn-secondary" id="btn-export-excel">
             <span>📥</span> Excel İndir
           </button>
+          <button class="btn-export-pdf" id="btn-export-requests-pdf">
+            <span>🖨️</span> PDF / Yazdır
+          </button>
         </div>
 
         <!-- Requests Data Table -->
@@ -511,6 +514,13 @@
           <select class="filter-select" id="filter-contract-unit">
             <option value="ALL">Tüm Birimler</option>
           </select>
+
+          <button class="btn-export-excel" id="btn-export-contracts-excel">
+            <span>📥</span> Excel İndir
+          </button>
+          <button class="btn-export-pdf" id="btn-export-contracts-pdf">
+            <span>🖨️</span> PDF / Yazdır
+          </button>
         </div>
 
         <!-- Contracts Table -->
@@ -622,6 +632,13 @@
             <option value="Gecikmede">🔴 Gecikmede</option>
             <option value="Ödendi">🟢 Ödendi</option>
           </select>
+
+          <button class="btn-export-excel" id="btn-export-invoices-excel">
+            <span>📥</span> Excel İndir
+          </button>
+          <button class="btn-export-pdf" id="btn-export-invoices-pdf">
+            <span>🖨️</span> PDF / Yazdır
+          </button>
         </div>
 
         <!-- Invoices Table -->
@@ -717,9 +734,14 @@
             <h3>📅 Yıllık Satınalma Faaliyet ve Karşılaştırma Raporu</h3>
             <p style="font-size: 0.85rem; color: var(--text-muted);">Yıllar arası performans, süreç hızı (SLA), yönetmelik ve ay bazlı bütçe kırılımları</p>
           </div>
-          <button class="btn-primary" id="btn-print-yearly-report">
-            <span>🖨️</span> Faaliyet Raporunu PDF / Yazdır
-          </button>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="btn-export-excel" id="btn-export-yearly-excel">
+              <span>📥</span> Excel'e Aktar
+            </button>
+            <button class="btn-primary" id="btn-print-yearly-report">
+              <span>🖨️</span> Raporu PDF / Yazdır
+            </button>
+          </div>
         </div>
 
         <!-- YoY Comparison KPI Cards -->
@@ -912,11 +934,31 @@
 
           <div class="glass-card">
             <div class="card-header">
-              <h3>⚙️ Veri Yönetimi & Sunucu Durumu</h3>
+              <h3>⚙️ Veri Yönetimi & Otomatik Yedekleme</h3>
+              <button class="btn-primary" id="btn-trigger-backup-now" style="padding:0.4rem 0.8rem; font-size:0.88rem;">
+                <span>💾</span> Şimdi Manuel Yedek Al
+              </button>
             </div>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Sistem veritabanı JSON formatında kayıtlıdır. Excel dosyasından istediğiniz zaman veriyi yeniden senkronize edebilirsiniz.
+              Sistem veritabanı (<code>data/db.json</code>) otomatik korumalı saklanır ve tarih etiketli yedekleri <code>data/backups/</code> dizininde tutulur.
             </p>
+            <div style="margin-bottom: 1.25rem;">
+              <h4 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-main);">📂 Son Alınan Veritabanı Yedekleri</h4>
+              <div class="table-container" style="max-height: 180px; overflow-y: auto;">
+                <table class="custom-table" id="table-backups-list">
+                  <thead>
+                    <tr>
+                      <th>Yedek Dosya Adı</th>
+                      <th>Oluşturulma Tarihi</th>
+                      <th>Boyut</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-backups-list">
+                    <tr><td colspan="3" style="text-align:center;">Yedekler yükleniyor...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
             <button class="btn-secondary" id="btn-reimport-excel">
               <span>🔄</span> Excel'den Verileri Yeniden Yükle
             </button>
