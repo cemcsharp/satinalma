@@ -318,15 +318,15 @@ const App = {
 
     // Print & Export Event Listeners
     document.getElementById('btn-print-yearly-report')?.addEventListener('click', () => window.print());
-    document.getElementById('btn-export-yearly-excel')?.addEventListener('click', () => this.exportTableToExcel('table-yearly-monthly', 'Yillik_Faaliyet_Raporu.csv'));
+    document.getElementById('btn-export-yearly-excel')?.addEventListener('click', () => this.exportTableToExcel('table-yearly-monthly', 'Yillik_Faaliyet_Raporu.xls'));
 
     document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportToCSV());
     document.getElementById('btn-export-requests-pdf')?.addEventListener('click', () => this.printSection('view-requests'));
 
-    document.getElementById('btn-export-contracts-excel')?.addEventListener('click', () => this.exportTableToExcel('table-contracts', 'Sozlesme_Listesi.csv'));
+    document.getElementById('btn-export-contracts-excel')?.addEventListener('click', () => this.exportTableToExcel('table-contracts', 'Sozlesme_Listesi.xls'));
     document.getElementById('btn-export-contracts-pdf')?.addEventListener('click', () => this.printSection('view-contracts'));
 
-    document.getElementById('btn-export-invoices-excel')?.addEventListener('click', () => this.exportTableToExcel('table-invoices', 'Fatura_Listesi.csv'));
+    document.getElementById('btn-export-invoices-excel')?.addEventListener('click', () => this.exportTableToExcel('table-invoices', 'Fatura_Listesi.xls'));
     document.getElementById('btn-export-invoices-pdf')?.addEventListener('click', () => this.printSection('view-invoices'));
 
     // Manual Backup Button
@@ -2239,33 +2239,69 @@ const App = {
   },
 
   exportToCSV() {
-    this.exportTableToExcel('table-requests', `Satinalma_Talepleri_${this.state.selectedYear}.csv`);
+    this.exportTableToExcel('table-requests', `Satinalma_Talepleri_${this.state.selectedYear}.xls`);
   },
 
-  exportTableToExcel(tableId, filename = 'Export.csv') {
+  exportTableToExcel(tableId, filename = 'Export.xls') {
     const table = document.getElementById(tableId);
     if (!table) {
       alert("Dışa aktarılacak tablo bulunamadı.");
       return;
     }
 
-    let csv = '\uFEFF'; // Add UTF-8 BOM for Microsoft Excel Turkish character compatibility
-    const rows = table.querySelectorAll('tr');
+    if (!filename.endsWith('.xls') && !filename.endsWith('.xlsx')) {
+      filename = filename.replace(/\.[^/.]+$/, "") + ".xls";
+    }
 
+    // Build Microsoft Excel XML/HTML Workbook representation
+    let tableHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta http-equiv="content-type" content="text/plain; charset=UTF-8"/>
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Satınalma Takip Raporu</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; width: 100%; font-family: Segoe UI, sans-serif; font-size: 11pt; }
+          th { background-color: #1e293b; color: #ffffff; font-weight: bold; border: 1px solid #94a3b8; padding: 8px; text-align: left; }
+          td { border: 1px solid #cbd5e1; padding: 6px; color: #0f172a; }
+        </style>
+      </head>
+      <body>
+        <table>
+    `;
+
+    const rows = table.querySelectorAll('tr');
     rows.forEach(row => {
+      tableHtml += '<tr>';
       const cols = row.querySelectorAll('th, td');
-      const rowData = [];
       cols.forEach(col => {
         if (col.querySelector('.action-btns') || col.classList.contains('no-export')) return;
-        let text = col.innerText.replace(/\n/g, ' ').replace(/"/g, '""').trim();
-        rowData.push(`"${text}"`);
+        const tag = col.tagName.toLowerCase();
+        let text = col.innerText.replace(/\n/g, ' ').trim();
+        tableHtml += `<${tag}>${text}</${tag}>`;
       });
-      if (rowData.length > 0) {
-        csv += rowData.join(';') + '\n';
-      }
+      tableHtml += '</tr>';
     });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    tableHtml += `
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\uFEFF' + tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;
