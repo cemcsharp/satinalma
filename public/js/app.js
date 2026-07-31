@@ -19,6 +19,7 @@ const App = {
     currentPage: 1,
     pageSize: 15,
     yearlyActiveTab: 'financial',
+    dismissedNotifs: [],
     charts: {}
   },
 
@@ -72,6 +73,7 @@ const App = {
 
         this.populateLoginDropdown();
         this.populateDropdowns();
+        this.populateYearSelect();
 
         // Restore login session from localStorage
         const savedUserId = localStorage.getItem('loggedInUserId');
@@ -106,6 +108,37 @@ const App = {
       const statusLabel = u.isActive !== false ? '' : ' (Pasif/Ayrıldı)';
       loginSelect.innerHTML += `<option value="${u.id}">${u.name} - ${u.title}${statusLabel}</option>`;
     });
+  },
+
+  populateYearSelect() {
+    // Akademik yılı Ağustos 1 başlangıç - Temmuz 31 bitiş olarak hesapla
+    // Bugünün tarihine ve verilerdeki tüm yıllara göre selector'ü otomatik doldur
+    const yearSelect = document.getElementById('global-year-select');
+    if (!yearSelect) return;
+
+    // Sistemdeki tüm kayıtlardaki academicYear değerlerini topla
+    const existingYears = new Set();
+    (this.state.requests || []).forEach(r => { if (r.academicYear) existingYears.add(r.academicYear); });
+    (this.state.contracts || []).forEach(c => { if (c.academicYear) existingYears.add(c.academicYear); });
+    (this.state.invoices || []).forEach(i => { if (i.academicYear) existingYears.add(i.academicYear); });
+
+    // Bugünün tarihine göre mevcut akademik yılı hesapla (Eylül 1 = yeni yıl başlangıcı)
+    const now = new Date();
+    const curCalYear = now.getFullYear();
+    const isNewAcademicYear = now.getMonth() >= 8; // Eylül = 8 (0-indexed)
+    const currentAcademicYear = isNewAcademicYear
+      ? `${curCalYear}-${curCalYear + 1}`
+      : `${curCalYear - 1}-${curCalYear}`;
+    existingYears.add(currentAcademicYear);
+
+    // Sıralı, benzersiz liste
+    const sortedYears = Array.from(existingYears).sort((a, b) => b.localeCompare(a));
+
+    const currentVal = yearSelect.value;
+    yearSelect.innerHTML = '<option value="ALL">Tüm Yıllar</option>' +
+      sortedYears.map(y => `<option value="${y}"${y === (this.state.selectedYear || currentAcademicYear) ? ' selected' : ''}>${y}</option>`).join('');
+    
+    this.state.selectedYear = yearSelect.value;
   },
 
   populateDropdowns() {
@@ -808,17 +841,19 @@ const App = {
     today.setHours(0, 0, 0, 0);
 
     const notifs = [];
+    const dismissed = this.state.dismissedNotifs || [];
 
     // 1. 14+ Day SLA Overdue Requests
-    const overdueRequests = (this.state.requests || []).filter(r => {
-      if (r.status !== 'Açık') return false;
-      const d = new Date(r.arrivalDate || r.requestDate);
-      d.setHours(0, 0, 0, 0);
-      const diff = Math.max(0, Math.ceil((today - d) / (1000 * 60 * 60 * 24)));
-      return diff >= 14;
-    });
+    if (!dismissed.includes('sla')) {
+      const overdueRequests = (this.state.requests || []).filter(r => {
+        if (r.status !== 'Açık') return false;
+        const d = new Date(r.arrivalDate || r.requestDate);
+        d.setHours(0, 0, 0, 0);
+        const diff = Math.max(0, Math.ceil((today - d) / (1000 * 60 * 60 * 24)));
+        return diff >= 14;
+      });
 
-    if (overdueRequests.length > 0) {
+      if (overdueRequests.length > 0) {
       notifs.push({
         type: 'sla',
         icon: '🚨',
@@ -833,58 +868,63 @@ const App = {
           }
         }
       });
+      }
     }
 
     // 2. Contracts Expiring in <= 30 Days or Guarantee Expiry in <= 30 Days
-    const expiringContracts = (this.state.contracts || []).filter(c => {
-      if (c.status !== 'Aktif') return false;
-      let isExpiring = false;
-      if (c.endDate) {
-        const endDt = new Date(c.endDate);
-        const diff = Math.ceil((endDt - today) / (1000 * 60 * 60 * 24));
-        if (diff >= 0 && diff <= 30) isExpiring = true;
-      }
-      if (c.guaranteeExpiry) {
-        const gDt = new Date(c.guaranteeExpiry);
-        const diffG = Math.ceil((gDt - today) / (1000 * 60 * 60 * 24));
-        if (diffG >= 0 && diffG <= 30) isExpiring = true;
-      }
-      return isExpiring;
-    });
-
-    if (expiringContracts.length > 0) {
-      notifs.push({
-        type: 'contract',
-        icon: '📑',
-        title: `${expiringContracts.length} Adet Sözleşme / Teminat Süresi Bitiyor!`,
-        sub: 'Son 30 gün kalan aktif anlaşmaları kontrol edin',
-        action: () => {
-          this.switchView('contracts');
+    if (!dismissed.includes('contract')) {
+      const expiringContracts = (this.state.contracts || []).filter(c => {
+        if (c.status !== 'Aktif') return false;
+        let isExpiring = false;
+        if (c.endDate) {
+          const endDt = new Date(c.endDate);
+          const diff = Math.ceil((endDt - today) / (1000 * 60 * 60 * 24));
+          if (diff >= 0 && diff <= 30) isExpiring = true;
         }
+        if (c.guaranteeExpiry) {
+          const gDt = new Date(c.guaranteeExpiry);
+          const diffG = Math.ceil((gDt - today) / (1000 * 60 * 60 * 24));
+          if (diffG >= 0 && diffG <= 30) isExpiring = true;
+        }
+        return isExpiring;
       });
+
+      if (expiringContracts.length > 0) {
+        notifs.push({
+          type: 'contract',
+          icon: '📑',
+          title: `${expiringContracts.length} Adet Sözleşme / Teminat Süresi Bitiyor!`,
+          sub: 'Son 30 gün kalan aktif anlaşmaları kontrol edin',
+          action: () => {
+            this.switchView('contracts');
+          }
+        });
+      }
     }
 
     // 3. Unpaid Invoices Due in <= 7 Days or Overdue
-    const dueInvoices = (this.state.invoices || []).filter(i => {
-      if (i.paymentStatus === 'Ödendi') return false;
-      if (i.dueDate) {
-        const dDt = new Date(i.dueDate);
-        const diff = Math.ceil((dDt - today) / (1000 * 60 * 60 * 24));
-        return diff <= 7;
-      }
-      return false;
-    });
-
-    if (dueInvoices.length > 0) {
-      notifs.push({
-        type: 'invoice',
-        icon: '⏳',
-        title: `${dueInvoices.length} Adet Faturanın Vadesi Yaklaştı / Geçti!`,
-        sub: 'Vadesi 7 gün içinde gelen faturaları görüntüleyin',
-        action: () => {
-          this.switchView('invoices');
+    if (!dismissed.includes('invoice')) {
+      const dueInvoices = (this.state.invoices || []).filter(i => {
+        if (i.paymentStatus === 'Ödendi') return false;
+        if (i.dueDate) {
+          const dDt = new Date(i.dueDate);
+          const diff = Math.ceil((dDt - today) / (1000 * 60 * 60 * 24));
+          return diff <= 7;
         }
+        return false;
       });
+
+      if (dueInvoices.length > 0) {
+        notifs.push({
+          type: 'invoice',
+          icon: '⏳',
+          title: `${dueInvoices.length} Adet Faturanın Vadesi Yaklaştı / Geçti!`,
+          sub: 'Vadesi 7 gün içinde gelen faturaları görüntüleyin',
+          action: () => {
+            this.switchView('invoices');
+          }
+        });
+      }
     }
 
     const badge = document.getElementById('notif-badge');
@@ -911,17 +951,27 @@ const App = {
         list.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">Şu an için kritik uyarı veya bildiriminiz yok.</div>`;
       } else {
         list.innerHTML = notifs.map((n, idx) => `
-          <div class="notif-item" onclick="App._triggerNotif(${idx})">
-            <div class="notif-item-icon">${n.icon}</div>
-            <div>
-              <div class="notif-item-title">${n.title}</div>
-              <div class="notif-item-sub">${n.sub}</div>
+          <div class="notif-item" style="padding-right: 0.5rem;">
+            <div class="notif-item-icon" onclick="App._triggerNotif(${idx})" style="cursor:pointer; flex:1; display:flex; gap:0.5rem; align-items:flex-start;">
+              <span>${n.icon}</span>
+              <div>
+                <div class="notif-item-title">${n.title}</div>
+                <div class="notif-item-sub">${n.sub}</div>
+              </div>
             </div>
+            <button onclick="App.dismissNotif('${n.type}')" title="Bu uyarıyı kapat" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1.1rem; padding:0.2rem 0.4rem; flex-shrink:0; border-radius:4px;" onmouseover="this.style.color='var(--status-rejected)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
           </div>
         `).join('');
         this._notifActions = notifs.map(n => n.action);
       }
     }
+  },
+
+  dismissNotif(type) {
+    if (!this.state.dismissedNotifs.includes(type)) {
+      this.state.dismissedNotifs.push(type);
+    }
+    this.renderNotifications();
   },
 
   _triggerNotif(idx) {
