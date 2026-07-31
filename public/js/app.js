@@ -688,6 +688,28 @@ const App = {
     document.getElementById('btn-export-chart-currency')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-currency', 'Para_Birimi_Payi_Grafigi.png'));
     document.getElementById('btn-export-chart-top-suppliers')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-top-suppliers', 'Top_Tedarikciler_Grafigi.png'));
 
+    // Personnel Savings Detail View Listeners
+    document.getElementById('btn-back-to-yearly-report')?.addEventListener('click', () => {
+      this.state.yearlyActiveTab = 'savings';
+      this.switchView('yearly-report');
+    });
+
+    ['ps-filter-month', 'ps-filter-unit', 'ps-filter-search'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', () => this.renderPersonnelSavingsDetail());
+        el.addEventListener('change', () => this.renderPersonnelSavingsDetail());
+      }
+    });
+
+    document.getElementById('btn-export-personnel-savings-excel')?.addEventListener('click', () => {
+      const uName = (this.state.currentSavingsUser || 'Personel').replace(/\s+/g, '_');
+      this.exportTableToExcel('table-ps-jobs-list', `${uName}_Pazarlik_Tasarruf_Raporu.xls`);
+    });
+    document.getElementById('btn-export-personnel-savings-pdf')?.addEventListener('click', () => this.printSection('view-personnel-savings-detail'));
+    document.getElementById('btn-export-ps-chart-trend')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-monthly-trend', 'Uzman_Tasarruf_Trendi.png'));
+    document.getElementById('btn-export-ps-chart-unit')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-unit-pie', 'Uzman_Birim_Tasarruf_Payi.png'));
+
     // Filter for Unit Analysis
     document.getElementById('filter-unit-search')?.addEventListener('input', () => this.renderUnitAnalysis());
   },
@@ -775,6 +797,7 @@ const App = {
       'unit-analysis': { title: 'Birim Analizi', sub: 'Üniversite birimlerinin talep ve harcama detayları' },
       'supplier-analysis': { title: 'Tedarikçi Analizi', sub: 'En yüksek harcama yapılan tedarikçilerin sıralaması' },
       'yearly-report': { title: 'Yıllık Rapor', sub: 'Yıllık satınalma faaliyet raporu, YoY metrikleri ve SLA hız analizleri' },
+      'personnel-savings-detail': { title: 'Personel Pazarlık Tasarrufu & KPI Raporu', sub: 'Satınalma uzmanının yıllık pazarlık tasarrufları, ay ve birim kırılımlı grafik ve veri analizleri' },
       'activity-logs': { title: 'Aktivite Logları', sub: 'Sistemdeki ekleme, silme, onay ve devir işlemlerinin audit geçmişi' },
       settings: { title: 'Ayarlar', sub: 'Sistem kullanıcıları (Ekle/Düzenle/Pasif yap), tanımlamalar ve sunucu veri durumu' }
     };
@@ -3290,11 +3313,10 @@ const App = {
       }
     }
 
-    // TAB 4: PERSONEL PAZARLIK TASARRUFU & AYLIK KIRILIM RAPORU (IN-PAGE EXPANDABLE ACCORDION)
+    // TAB 4: PERSONEL PAZARLIK TASARRUFU & AYLIK KIRILIM RAPORU
     else if (activeTab === 'savings') {
       const activeUsers = this.state.users.filter(u => u.isActive !== false);
       const personMap = {};
-      const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
 
       activeUsers.forEach(u => {
         personMap[u.name] = {
@@ -3303,15 +3325,7 @@ const App = {
           savingsCount: 0,
           initialTotal: 0,
           actualTotal: 0,
-          savings: 0,
-          monthlyData: Array.from({ length: 12 }, () => ({
-            completedCount: 0,
-            initialTotal: 0,
-            actualTotal: 0,
-            savings: 0,
-            savingsCount: 0,
-            negotiatedRequests: []
-          }))
+          savings: 0
         };
       });
 
@@ -3330,38 +3344,6 @@ const App = {
             p.savingsCount++;
             p.initialTotal += initAmt;
             p.actualTotal += actAmt;
-
-            const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
-            if (dtStr) {
-              const d = new Date(dtStr);
-              if (!isNaN(d.getTime())) {
-                const monthIdx = d.getMonth();
-                const acadIdx = monthIdx >= 8 ? (monthIdx - 8) : (monthIdx + 4);
-                if (acadIdx >= 0 && acadIdx < 12) {
-                  const m = p.monthlyData[acadIdx];
-                  m.savings += diff;
-                  m.savingsCount++;
-                  m.initialTotal += initAmt;
-                  m.actualTotal += actAmt;
-                  const rate = ((diff / initAmt) * 100).toFixed(1);
-                  m.negotiatedRequests.push({ ...r, initAmt, actAmt, diff, rate });
-                }
-              }
-            }
-          }
-
-          if (r.status === 'Tamamlandı') {
-            const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
-            if (dtStr) {
-              const d = new Date(dtStr);
-              if (!isNaN(d.getTime())) {
-                const monthIdx = d.getMonth();
-                const acadIdx = monthIdx >= 8 ? (monthIdx - 8) : (monthIdx + 4);
-                if (acadIdx >= 0 && acadIdx < 12) {
-                  p.monthlyData[acadIdx].completedCount++;
-                }
-              }
-            }
           }
         }
       });
@@ -3372,63 +3354,19 @@ const App = {
         grandBadge.innerHTML = `💰 Yıllık Toplam Tasarruf: <strong>${grandSavings.toLocaleString('tr-TR')} ₺</strong>`;
       }
 
-      this.state.savingsPersonList = Object.values(personMap).sort((a, b) => b.savings - a.savings);
-
       const tbody = document.querySelector('#table-yearly-personnel-savings tbody');
       if (tbody) {
-        if (this.state.savingsPersonList.length === 0) {
+        const sortedPersons = Object.values(personMap).sort((a, b) => b.savings - a.savings);
+        if (sortedPersons.length === 0) {
           tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:2rem;">Personel verisi bulunamadı.</td></tr>`;
         } else {
-          tbody.innerHTML = this.state.savingsPersonList.map((p, idx) => {
+          tbody.innerHTML = sortedPersons.map(p => {
             const ratePct = p.initialTotal > 0 ? ((p.savings / p.initialTotal) * 100).toFixed(1) : '0.0';
-
-            const monthlyRowsHtml = months.map((mName, mIdx) => {
-              const m = p.monthlyData[mIdx];
-              const mRatePct = m.initialTotal > 0 ? ((m.savings / m.initialTotal) * 100).toFixed(1) : '0.0';
-              return `
-                <tr style="${m.savings > 0 ? 'background: rgba(34, 197, 94, 0.05);' : ''}">
-                  <td><strong style="color:var(--text-main);">${mName}</strong></td>
-                  <td><span class="badge" style="background:var(--bg-card);">${m.completedCount} Biten</span></td>
-                  <td><span class="badge status-open">${m.savingsCount} Pazarlıklı İş</span></td>
-                  <td style="font-family:var(--font-mono); font-size:0.82rem;">${m.initialTotal > 0 ? m.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-                  <td style="font-family:var(--font-mono); font-size:0.82rem;">${m.actualTotal > 0 ? m.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-                  <td style="font-family:var(--font-mono); font-weight:700; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-size:0.88rem;">
-                    ${m.savings > 0 ? '+' + m.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
-                  </td>
-                  <td>
-                    <span class="badge" style="background:${m.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
-                      %${mRatePct}
-                    </span>
-                  </td>
-                  <td>
-                    <button class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="App.filterUserSavingsJobsByMonth(${idx}, ${mIdx})">
-                      🔍 ${m.savingsCount} İş Süz
-                    </button>
-                  </td>
-                </tr>
-              `;
-            }).join('');
-
-            const pillsHtml = `<button class="btn-secondary active-date-tab pill-month-${idx}" data-month="ALL" onclick="App.filterUserSavingsJobsByMonth(${idx}, 'ALL')" style="padding:0.25rem 0.6rem; font-size:0.75rem;">🌟 Tüm Aylar (${p.savingsCount})</button>` +
-              months.map((mName, mIdx) => {
-                const count = p.monthlyData[mIdx].savingsCount;
-                return `<button class="btn-secondary pill-month-${idx}" data-month="${mIdx}" onclick="App.filterUserSavingsJobsByMonth(${idx}, ${mIdx})" style="padding:0.25rem 0.6rem; font-size:0.75rem; ${count > 0 ? 'border-color: var(--status-completed);' : ''}">
-                  ${mName} (${count})
-                </button>`;
-              }).join('');
-
-            const allNegotiated = p.monthlyData.reduce((acc, m) => acc.concat(m.negotiatedRequests), []);
-            const defaultJobsHtml = this._buildJobsTableRowsHtml(allNegotiated);
+            const safeName = p.user.name.replace(/'/g, "\\'");
 
             return `
-              <!-- Main Personnel Summary Row -->
-              <tr class="user-savings-summary-row" id="savings-summary-row-${idx}" onclick="App.toggleUserSavingsDetail(${idx})" style="cursor: pointer; transition: background 0.2s;">
-                <td>
-                  <div style="display:flex; align-items:center; gap:0.5rem;">
-                    <span id="savings-toggle-icon-${idx}" style="font-size:0.8rem; color:var(--accent-primary); transition: transform 0.2s;">▶</span>
-                    <strong style="color:var(--text-main); font-size:0.92rem;">${p.user.name}</strong>
-                  </div>
-                </td>
+              <tr style="cursor: pointer;" onclick="App.openPersonnelSavingsDetailView('${safeName}')" title="Kullanıcıya tıklayarak detaylı tasarruf ve KPI raporunu açın">
+                <td><strong style="color:var(--text-main); font-size:0.92rem;">${p.user.name}</strong></td>
                 <td style="font-size:0.82rem; color:var(--text-muted);">${p.user.title}</td>
                 <td><span class="badge" style="background:var(--bg-card);">${p.total} İş</span></td>
                 <td><span class="badge status-open">${p.savingsCount} Pazarlıklı İş</span></td>
@@ -3443,92 +3381,9 @@ const App = {
                   </span>
                 </td>
                 <td>
-                  <button class="btn-primary" id="savings-toggle-btn-${idx}" style="padding:0.3rem 0.65rem; font-size:0.78rem;" onclick="event.stopPropagation(); App.toggleUserSavingsDetail(${idx})">
-                    🔽 Aylık Kırılım Aç
+                  <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" onclick="event.stopPropagation(); App.openPersonnelSavingsDetailView('${safeName}')">
+                    🔍 Detaylı Raporu Gör
                   </button>
-                </td>
-              </tr>
-
-              <!-- In-Page Expandable Accordion Drawer -->
-              <tr id="savings-detail-drawer-${idx}" style="display: none; background: rgba(15, 23, 42, 0.45);">
-                <td colspan="9" style="padding: 1.25rem; border-left: 4px solid var(--accent-primary);">
-                  <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
-                      <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
-                        📊 <span>${p.user.name}</span> — Ay Bazlı Tasarruf Karnesi (KPI) ve Pazarlıklı İşler
-                      </h4>
-                      <div style="display:flex; gap:0.75rem; font-size:0.82rem;">
-                        <span style="background: rgba(34, 197, 94, 0.12); color: var(--status-completed); font-weight: 700; padding: 0.35rem 0.75rem; border-radius: 4px; font-family: var(--font-mono);">
-                          💰 Yıllık Net Tasarruf: ${p.savings.toLocaleString('tr-TR')} ₺
-                        </span>
-                        <span style="background: rgba(59, 130, 246, 0.12); color: var(--accent-primary); font-weight: 700; padding: 0.35rem 0.75rem; border-radius: 4px;">
-                          🎯 Pazarlıklı İş: ${p.savingsCount} Adet
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- 1. Monthly Summary Table -->
-                    <h5 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-muted); font-weight: 700;">
-                      📅 12 Aylık Tasarruf Karnesi Özet Cetveli (Aya Tıklayarak İşleri Süzün)
-                    </h5>
-                    <div class="table-container" style="max-height: 240px; overflow-y: auto; margin-bottom: 1.25rem;">
-                      <table class="custom-table" style="font-size: 0.82rem;">
-                        <thead>
-                          <tr>
-                            <th>Ay / Dönem</th>
-                            <th>Biten İş</th>
-                            <th>Pazarlıklı İş</th>
-                            <th>Bütçe Tutarı</th>
-                            <th>Gerçekleşen</th>
-                            <th>Aylık Net Tasarruf (₺)</th>
-                            <th>Tasarruf Oranı (%)</th>
-                            <th>İşlemler</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          ${monthlyRowsHtml}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <!-- 2. Interactive Month Filter Pills -->
-                    <div style="margin-bottom: 0.85rem;">
-                      <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.4rem;">
-                        🔍 Ay Filtresi (İş Listesini Süzmek İçin Butonlara Tıklayın):
-                      </div>
-                      <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;" id="savings-month-pills-${idx}">
-                        ${pillsHtml}
-                      </div>
-                    </div>
-
-                    <!-- 3. Negotiated Jobs Detailed Table -->
-                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem;">
-                      <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.75rem;" id="savings-jobs-title-${idx}">
-                        📋 ${p.user.name} — Yıllık Tüm Pazarlıklı İşler Listesi (${allNegotiated.length} Adet)
-                      </div>
-                      <div class="table-container" style="max-height: 260px; overflow-y: auto;">
-                        <table class="custom-table" style="font-size: 0.82rem;">
-                          <thead>
-                            <tr>
-                              <th>Barkod</th>
-                              <th>Talep Konusu</th>
-                              <th>Birim</th>
-                              <th>Tarih</th>
-                              <th>Bütçe (₺)</th>
-                              <th>Gerçekleşen (₺)</th>
-                              <th>Net Tasarruf (₺)</th>
-                              <th>Kazanım (%)</th>
-                            </tr>
-                          </thead>
-                          <tbody id="savings-jobs-tbody-${idx}">
-                            ${defaultJobsHtml}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                  </div>
                 </td>
               </tr>
             `;
@@ -3538,76 +3393,258 @@ const App = {
     }
   },
 
-  toggleUserSavingsDetail(userIndex) {
-    const drawer = document.getElementById(`savings-detail-drawer-${userIndex}`);
-    const icon = document.getElementById(`savings-toggle-icon-${userIndex}`);
-    const btn = document.getElementById(`savings-toggle-btn-${userIndex}`);
-    const row = document.getElementById(`savings-summary-row-${userIndex}`);
-
-    if (!drawer) return;
-
-    const isVisible = drawer.style.display !== 'none';
-    if (isVisible) {
-      drawer.style.display = 'none';
-      if (icon) icon.style.transform = 'rotate(0deg)';
-      if (btn) btn.innerHTML = '🔽 Aylık Kırılım Aç';
-      if (row) row.style.background = '';
-    } else {
-      drawer.style.display = 'table-row';
-      if (icon) icon.style.transform = 'rotate(90deg)';
-      if (btn) btn.innerHTML = '🔼 Detayı Kapat';
-      if (row) row.style.background = 'rgba(59, 130, 246, 0.12)';
+  openPersonnelSavingsDetailView(userName, acadMonthIdx = 'ALL') {
+    if (!userName) {
+      const firstActive = (this.state.users || []).find(u => u.isActive !== false);
+      if (firstActive) userName = firstActive.name;
     }
+    this.state.currentSavingsUser = userName;
+
+    const monthSelect = document.getElementById('ps-filter-month');
+    if (monthSelect) monthSelect.value = acadMonthIdx.toString();
+
+    const requests = this.getFilteredRequests().filter(r => r.assignedTo === userName);
+    const userUnits = new Set();
+    requests.forEach(r => { if (r.unit) userUnits.add(r.unit); });
+
+    const unitSelect = document.getElementById('ps-filter-unit');
+    if (unitSelect) {
+      unitSelect.innerHTML = '<option value="ALL">Tüm Birimler</option>' +
+        Array.from(userUnits).sort().map(u => `<option value="${u}">${u}</option>`).join('');
+    }
+
+    const searchInput = document.getElementById('ps-filter-search');
+    if (searchInput) searchInput.value = '';
+
+    this.switchView('personnel-savings-detail');
+    this.renderPersonnelSavingsDetail();
   },
 
-  filterUserSavingsJobsByMonth(userIndex, acadIdx) {
-    const person = (this.state.savingsPersonList || [])[userIndex];
-    if (!person) return;
+  renderPersonnelSavingsDetail() {
+    const userName = this.state.currentSavingsUser;
+    if (!userName) return;
+
+    const userObj = (this.state.users || []).find(u => u.name === userName);
+    const userTitle = userObj?.title || 'Satınalma Uzmanı';
+
+    const headerName = document.getElementById('personnel-savings-header-name');
+    const headerTitle = document.getElementById('personnel-savings-header-title');
+    if (headerName) headerName.innerHTML = `👤 <strong>${userName}</strong> — Tasarruf ve KPI Detay Raporu`;
+    if (headerTitle) headerTitle.innerText = `${userTitle} | ${this.state.selectedYear === 'ALL' ? 'Tüm Yıllar' : this.state.selectedYear + ' Dönemi'}`;
+
+    const requests = this.getFilteredRequests().filter(r => r.assignedTo === userName);
 
     const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
+    const monthlyData = Array.from({ length: 12 }, () => ({
+      completedCount: 0,
+      initialTotal: 0,
+      actualTotal: 0,
+      savings: 0,
+      savingsCount: 0,
+      negotiatedRequests: []
+    }));
 
-    const pillsContainer = document.getElementById(`savings-month-pills-${userIndex}`);
-    if (pillsContainer) {
-      pillsContainer.querySelectorAll('button').forEach(btn => {
-        const mVal = btn.getAttribute('data-month');
-        if (mVal === acadIdx.toString()) btn.classList.add('active-date-tab');
-        else btn.classList.remove('active-date-tab');
-      });
+    const unitSavingsMap = {};
+    let grandSavings = 0;
+    let grandInitial = 0;
+    let totalNegotiatedCount = 0;
+
+    requests.forEach(r => {
+      const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+      const actAmt = parseFloat(r.actualAmount) || 0;
+
+      const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
+      let acadIdx = -1;
+      if (dtStr) {
+        const d = new Date(dtStr);
+        if (!isNaN(d.getTime())) {
+          const monthIdx = d.getMonth();
+          acadIdx = monthIdx >= 8 ? (monthIdx - 8) : (monthIdx + 4);
+        }
+      }
+
+      if (r.status === 'Tamamlandı' && acadIdx >= 0 && acadIdx < 12) {
+        monthlyData[acadIdx].completedCount++;
+      }
+
+      if (initAmt > 0 && actAmt > 0 && initAmt > actAmt) {
+        const diff = initAmt - actAmt;
+        grandSavings += diff;
+        grandInitial += initAmt;
+        totalNegotiatedCount++;
+
+        const rate = ((diff / initAmt) * 100).toFixed(1);
+        const reqObj = { ...r, initAmt, actAmt, diff, rate, acadIdx };
+
+        if (acadIdx >= 0 && acadIdx < 12) {
+          const m = monthlyData[acadIdx];
+          m.savings += diff;
+          m.savingsCount++;
+          m.initialTotal += initAmt;
+          m.actualTotal += actAmt;
+          m.negotiatedRequests.push(reqObj);
+        }
+
+        const u = r.unit || 'Belirtilmemiş';
+        unitSavingsMap[u] = (unitSavingsMap[u] || 0) + diff;
+      }
+    });
+
+    const overallRatePct = grandInitial > 0 ? ((grandSavings / grandInitial) * 100).toFixed(1) : '0.0';
+    const avgSavingsPerJob = totalNegotiatedCount > 0 ? Math.round(grandSavings / totalNegotiatedCount) : 0;
+
+    let topMonthName = '-';
+    let maxMonthSavings = 0;
+    monthlyData.forEach((m, idx) => {
+      if (m.savings > maxMonthSavings) {
+        maxMonthSavings = m.savings;
+        topMonthName = `${months[idx]} (${m.savings.toLocaleString('tr-TR')} ₺)`;
+      }
+    });
+
+    const elSavings = document.getElementById('ps-kpi-total-savings');
+    const elRate = document.getElementById('ps-kpi-savings-rate');
+    const elCount = document.getElementById('ps-kpi-negotiated-count');
+    const elAvg = document.getElementById('ps-kpi-avg-savings');
+    const elSubTop = document.getElementById('ps-kpi-top-month-sub');
+
+    if (elSavings) elSavings.innerText = `${grandSavings.toLocaleString('tr-TR')} ₺`;
+    if (elRate) elRate.innerText = `%${overallRatePct}`;
+    if (elCount) elCount.innerText = `${totalNegotiatedCount} Adet`;
+    if (elAvg) elAvg.innerText = `${avgSavingsPerJob.toLocaleString('tr-TR')} ₺`;
+    if (elSubTop) elSubTop.innerText = `En Verimli Ay: ${topMonthName}`;
+
+    // 1. Chart: Monthly Trend Combo Line/Bar Chart
+    this.createOrUpdateChart('chart-ps-monthly-trend', 'bar', {
+      labels: months,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Pazarlık Tasarrufu (TRY)',
+          data: monthlyData.map(d => d.savings),
+          backgroundColor: 'rgba(34, 197, 94, 0.75)',
+          borderRadius: 6,
+          yAxisID: 'y'
+        },
+        {
+          type: 'line',
+          label: 'Gerçekleşen Harcama (TRY)',
+          data: monthlyData.map(d => d.actualTotal),
+          borderColor: '#3b82f6',
+          borderWidth: 3,
+          tension: 0.3,
+          yAxisID: 'y'
+        }
+      ]
+    }, { responsive: true, maintainAspectRatio: false });
+
+    // 2. Chart: Unit Savings Doughnut Chart
+    const sortedUnits = Object.entries(unitSavingsMap).sort((a,b) => b[1] - a[1]).slice(0, 6);
+    const unitLabels = sortedUnits.map(u => u[0].length > 16 ? u[0].substring(0, 16) + '...' : u[0]);
+    const unitData = sortedUnits.map(u => u[1]);
+    const unitColors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'];
+
+    this.createOrUpdateChart('chart-ps-unit-pie', 'doughnut', {
+      labels: unitLabels.length > 0 ? unitLabels : ['Tasarruf Yok'],
+      datasets: [{
+        data: unitData.length > 0 ? unitData : [1],
+        backgroundColor: unitColors.slice(0, Math.max(1, unitLabels.length))
+      }]
+    }, { responsive: true, maintainAspectRatio: false });
+
+    // 3. Render 12-Month KPI Summary Table
+    const tbodyKpi = document.querySelector('#table-ps-monthly-kpi tbody');
+    if (tbodyKpi) {
+      const selectedMonthVal = document.getElementById('ps-filter-month')?.value || 'ALL';
+
+      tbodyKpi.innerHTML = months.map((mName, mIdx) => {
+        const m = monthlyData[mIdx];
+        const mRatePct = m.initialTotal > 0 ? ((m.savings / m.initialTotal) * 100).toFixed(1) : '0.0';
+        const isFiltered = selectedMonthVal === mIdx.toString();
+
+        return `
+          <tr style="cursor: pointer; ${isFiltered ? 'background: rgba(59, 130, 246, 0.18); border-left: 4px solid var(--accent-primary);' : (m.savings > 0 ? 'background: rgba(34, 197, 94, 0.04);' : '')}"
+              onclick="App.setPersonnelSavingsMonthFilter(${mIdx})" title="Bu ayın işlerini listelemek için tıklayın">
+            <td><strong style="color:var(--text-main);">${mName}</strong></td>
+            <td><span class="badge" style="background:var(--bg-card);">${m.completedCount} Biten</span></td>
+            <td><span class="badge status-open">${m.savingsCount} Pazarlıklı İş</span></td>
+            <td style="font-family:var(--font-mono); font-size:0.85rem;">${m.initialTotal > 0 ? m.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+            <td style="font-family:var(--font-mono); font-size:0.85rem;">${m.actualTotal > 0 ? m.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+            <td style="font-family:var(--font-mono); font-weight:700; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-size:0.92rem;">
+              ${m.savings > 0 ? '+' + m.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
+            </td>
+            <td>
+              <span class="badge" style="background:${m.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
+                %${mRatePct}
+              </span>
+            </td>
+            <td>
+              <button class="btn-secondary" style="padding:0.2rem 0.55rem; font-size:0.75rem;" onclick="event.stopPropagation(); App.setPersonnelSavingsMonthFilter(${mIdx})">
+                🔍 ${m.savingsCount} İş Süz
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
-    const titleEl = document.getElementById(`savings-jobs-title-${userIndex}`);
-    const tbody = document.getElementById(`savings-jobs-tbody-${userIndex}`);
+    // 4. Render Filtered Detailed Negotiated Requests Table
+    const selectedMonth = document.getElementById('ps-filter-month')?.value || 'ALL';
+    const selectedUnit = document.getElementById('ps-filter-unit')?.value || 'ALL';
+    const searchText = document.getElementById('ps-filter-search')?.value.toLowerCase().trim() || '';
 
-    let targetRequests = [];
-    if (acadIdx !== 'ALL' && acadIdx >= 0 && acadIdx < 12) {
-      targetRequests = person.monthlyData[acadIdx].negotiatedRequests;
-      if (titleEl) titleEl.innerHTML = `📋 <strong>${person.user.name}</strong> — <u>${months[acadIdx]}</u> Ayı Pazarlıklı İşler (${targetRequests.length} Adet)`;
-    } else {
-      targetRequests = person.monthlyData.reduce((acc, m) => acc.concat(m.negotiatedRequests), []);
-      if (titleEl) titleEl.innerHTML = `📋 <strong>${person.user.name}</strong> — Yıllık Tüm Pazarlıklı İşler (${targetRequests.length} Adet)`;
+    let allNegotiatedJobs = [];
+    monthlyData.forEach(m => {
+      allNegotiatedJobs = allNegotiatedJobs.concat(m.negotiatedRequests);
+    });
+
+    let filteredJobs = allNegotiatedJobs.filter(r => {
+      if (selectedMonth !== 'ALL' && r.acadIdx.toString() !== selectedMonth) return false;
+      if (selectedUnit !== 'ALL' && r.unit !== selectedUnit) return false;
+      if (searchText) {
+        const bc = (r.requestBarcode || r.orderBarcode || r.id || '').toString().toLowerCase();
+        const subj = (r.subject || '').toLowerCase();
+        const unit = (r.unit || '').toLowerCase();
+        if (!bc.includes(searchText) && !subj.includes(searchText) && !unit.includes(searchText)) return false;
+      }
+      return true;
+    });
+
+    const countBadge = document.getElementById('ps-jobs-count-badge');
+    const jobsTitle = document.getElementById('ps-jobs-table-title');
+    if (countBadge) countBadge.innerText = `${filteredJobs.length} Kayıt`;
+    if (jobsTitle) {
+      const monthLabel = selectedMonth !== 'ALL' ? months[parseInt(selectedMonth)] + ' Ayı' : 'Tüm Yıl';
+      jobsTitle.innerHTML = `📋 Pazarlıklı İşler Listesi (${monthLabel} - ${filteredJobs.length} Adet İş)`;
     }
 
-    if (tbody) {
-      tbody.innerHTML = this._buildJobsTableRowsHtml(targetRequests);
+    const tbodyJobs = document.querySelector('#table-ps-jobs-list tbody');
+    if (tbodyJobs) {
+      if (filteredJobs.length === 0) {
+        tbodyJobs.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun pazarlıklı iş kaydı bulunamadı.</td></tr>`;
+      } else {
+        tbodyJobs.innerHTML = filteredJobs.map(r => `
+          <tr>
+            <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-primary);">#${r.requestBarcode || r.id}</td>
+            <td style="font-weight:600;">${r.subject}</td>
+            <td style="font-size:0.82rem; color:var(--text-muted);">${r.unit || '-'}</td>
+            <td style="font-size:0.82rem; color:var(--text-muted);">${r.orderDate || r.arrivalDate || r.requestDate || '-'}</td>
+            <td style="font-family:var(--font-mono);">${r.initAmt.toLocaleString('tr-TR')} ₺</td>
+            <td style="font-family:var(--font-mono); font-weight:600;">${r.actAmt.toLocaleString('tr-TR')} ₺</td>
+            <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed);">+${r.diff.toLocaleString('tr-TR')} ₺</td>
+            <td><span class="badge status-completed">%${r.rate}</span></td>
+          </tr>
+        `).join('');
+      }
     }
   },
 
-  _buildJobsTableRowsHtml(requestsList) {
-    if (!requestsList || requestsList.length === 0) {
-      return `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Seçilen dönem için pazarlıklı tasarruf sağlanan iş kaydı bulunmamaktadır.</td></tr>`;
+  setPersonnelSavingsMonthFilter(mIdx) {
+    const monthSelect = document.getElementById('ps-filter-month');
+    if (monthSelect) {
+      monthSelect.value = mIdx.toString();
+      this.renderPersonnelSavingsDetail();
     }
-    return requestsList.map(r => `
-      <tr>
-        <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-primary);">#${r.barcode || r.id}</td>
-        <td style="font-weight:600;">${r.subject}</td>
-        <td style="font-size:0.82rem; color:var(--text-muted);">${r.unit || '-'}</td>
-        <td style="font-size:0.82rem; color:var(--text-muted);">${r.orderDate || r.arrivalDate || r.requestDate || '-'}</td>
-        <td style="font-family:var(--font-mono);">${r.initAmt.toLocaleString('tr-TR')} ₺</td>
-        <td style="font-family:var(--font-mono); font-weight:600;">${r.actAmt.toLocaleString('tr-TR')} ₺</td>
-        <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed);">+${r.diff.toLocaleString('tr-TR')} ₺</td>
-        <td><span class="badge status-completed">%${r.rate}</span></td>
-      </tr>
-    `).join('');
   },
 
   // 8. SETTINGS RENDERER

@@ -1297,6 +1297,195 @@
         </div>
       </section>
 
+      <!-- 9.5 DEDICATED PERSONNEL SAVINGS & KPI DETAIL VIEW -->
+      <section id="view-personnel-savings-detail" class="view-section" style="display: none;">
+        <!-- Header & Action Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <button class="btn-secondary" id="btn-back-to-yearly-report" style="padding: 0.55rem 1.1rem; font-weight: 700; background: var(--bg-card); border-color: var(--accent-primary); color: var(--accent-primary);">
+              <span>⬅️</span> Yıllık Rapora Dön
+            </button>
+            <div>
+              <h2 id="personnel-savings-header-name" style="margin: 0; font-size: 1.35rem; font-weight: 800; color: var(--text-main);">
+                👤 Personel Tasarruf ve KPI Raporu
+              </h2>
+              <p id="personnel-savings-header-title" style="margin: 0; font-size: 0.82rem; color: var(--text-muted);">
+                Satınalma Uzmanı Performans Analizi ve Pazarlıklı İhale Dökümü
+              </p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-secondary" id="btn-export-personnel-savings-excel">
+              <span>📥</span> Uzman Raporunu Excel'e Aktar
+            </button>
+            <button class="btn-export-pdf" id="btn-export-personnel-savings-pdf">
+              <span>🖨️</span> PDF / Yazdır
+            </button>
+          </div>
+        </div>
+
+        <!-- Person Summary Banner Cards -->
+        <div class="grid-4" style="margin-bottom: 1.5rem;">
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon green">💰</div>
+            <div class="kpi-data">
+              <h3 id="ps-kpi-total-savings">0 ₺</h3>
+              <p>Yıllık Net Pazarlık Tasarrufu</p>
+              <div class="kpi-sub" id="ps-kpi-total-savings-sub">Sağlanan Net Kazanç</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon blue">🎯</div>
+            <div class="kpi-data">
+              <h3 id="ps-kpi-savings-rate">%0</h3>
+              <p>Ortalama Tasarruf Oranı</p>
+              <div class="kpi-sub" id="ps-kpi-savings-rate-sub">Bütçe Kazanım Başarısı</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon purple">📋</div>
+            <div class="kpi-data">
+              <h3 id="ps-kpi-negotiated-count">0 Adet</h3>
+              <p>Pazarlıklı İş Adedi</p>
+              <div class="kpi-sub" id="ps-kpi-total-count-sub">Toplam Atanan İş İçinden</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon yellow">⚡</div>
+            <div class="kpi-data">
+              <h3 id="ps-kpi-avg-savings">0 ₺</h3>
+              <p>Ortalama İş Başı Tasarruf</p>
+              <div class="kpi-sub" id="ps-kpi-top-month-sub">En Verimli Ay: -</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Filter Bar for Personnel Detail View -->
+        <div class="glass-card" style="margin-bottom: 1.5rem; padding: 1rem;">
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.6rem;">
+            ⚙️ Uzman Raporu Filtreleri (Ay, Birim ve Konu Bazlı Detaylandırma)
+          </div>
+          <div class="filter-bar" style="background: transparent; border: none; padding: 0; gap: 0.75rem; flex-wrap: wrap;">
+            <div class="form-group" style="margin: 0; min-width: 180px;">
+              <label style="font-size: 0.75rem; margin-bottom: 0.2rem;">📅 Dönem / Ay Seçin</label>
+              <select class="filter-select" id="ps-filter-month">
+                <option value="ALL">🌟 Tüm Aylar (Tüm Yıl)</option>
+                <option value="0">Eylül</option>
+                <option value="1">Ekim</option>
+                <option value="2">Kasım</option>
+                <option value="3">Aralık</option>
+                <option value="4">Ocak</option>
+                <option value="5">Şubat</option>
+                <option value="6">Mart</option>
+                <option value="7">Nisan</option>
+                <option value="8">Mayıs</option>
+                <option value="9">Haziran</option>
+                <option value="10">Temmuz</option>
+                <option value="11">Ağustos</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin: 0; min-width: 190px;">
+              <label style="font-size: 0.75rem; margin-bottom: 0.2rem;">🏢 Birim Süz</label>
+              <select class="filter-select" id="ps-filter-unit">
+                <option value="ALL">Tüm Birimler</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin: 0; flex: 1; min-width: 230px;">
+              <label style="font-size: 0.75rem; margin-bottom: 0.2rem;">🔍 Barkod No veya Konu Ara</label>
+              <div class="search-input-box" style="width: 100%;">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="ps-filter-search" placeholder="ör: 249015 veya Yazılım...">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 Visual Charts Grid -->
+        <div class="grid-2" style="margin-bottom: 1.5rem;">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>📈 Ay Bazlı Tasarruf ve Harcama Trendi</h3>
+              <button class="btn-secondary" id="btn-export-ps-chart-trend" style="padding:0.25rem 0.6rem; font-size:0.75rem;">
+                <span>📷</span> PNG İndir
+              </button>
+            </div>
+            <div style="height: 280px; position: relative;">
+              <canvas id="chart-ps-monthly-trend"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>🏢 Birim Bazlı Tasarruf Dağılımı Payı</h3>
+              <button class="btn-secondary" id="btn-export-ps-chart-unit" style="padding:0.25rem 0.6rem; font-size:0.75rem;">
+                <span>📷</span> PNG İndir
+              </button>
+            </div>
+            <div style="height: 280px; position: relative;">
+              <canvas id="chart-ps-unit-pie"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 12-Month KPI Targets Summary Table -->
+        <div class="glass-card" style="margin-bottom: 1.5rem;">
+          <div class="card-header">
+            <h3>📅 12 Aylık Tasarruf Hedef ve İlerleme Karnesi (KPI)</h3>
+          </div>
+          <div class="table-container">
+            <table class="custom-table" id="table-ps-monthly-kpi">
+              <thead>
+                <tr>
+                  <th>Ay / Dönem</th>
+                  <th>Biten İş</th>
+                  <th>Pazarlıklı İş</th>
+                  <th>Tahmini Bütçe (₺)</th>
+                  <th>Gerçekleşen Harcama (₺)</th>
+                  <th>Sağlanan Net Tasarruf (₺)</th>
+                  <th>Tasarruf Oranı (%)</th>
+                  <th>Filtrele</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Detailed Filtered Negotiated Requests Table -->
+        <div class="glass-card">
+          <div class="card-header">
+            <div>
+              <h3 id="ps-jobs-table-title">📋 Pazarlıklı İşler Listesi ve İhale Kazanımları</h3>
+              <p style="font-size: 0.8rem; color: var(--text-muted);">Yukarıdaki filtrelere göre listelenen pazarlık sonlandırılmış tüm talepler</p>
+            </div>
+            <span class="badge status-completed" id="ps-jobs-count-badge">0 Kayıt</span>
+          </div>
+          <div class="table-container">
+            <table class="custom-table" id="table-ps-jobs-list">
+              <thead>
+                <tr>
+                  <th>Barkod</th>
+                  <th>Talep Konusu</th>
+                  <th>Birim</th>
+                  <th>Sipariş Tarihi</th>
+                  <th>Tahmini Bütçe (₺)</th>
+                  <th>Gerçekleşen (₺)</th>
+                  <th>Pazarlık Tasarrufu (₺)</th>
+                  <th>Tasarruf Oranı (%)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- 10. SETTINGS VIEW (COMPREHENSIVE USER MANAGEMENT) -->
       <section id="view-settings" class="view-section" style="display: none;">
         <div class="grid-2">
