@@ -3,29 +3,60 @@
 
 ---
 
-### 🚀 HIZLI BAŞLANGIÇ (Windows Sunucu için 2 Adım)
+### 🚀 HIZLI BAŞLANGIÇ
 
-1. **Uygulamayı Çalıştırın:**  
-   `server.ps1` dosyasına sağ tıklayıp **"PowerShell ile Çalıştır"** deyin.  
-   *(Erişim adresi: `http://localhost:3000`)*
+#### 🐧 Linux Sunucu (Önerilen — 3 Adım)
+```bash
+# 1. Projeyi GitHub'dan çekin
+git clone https://github.com/cemcsharp/satinalma.git
+cd satinalma
 
-2. **Otomatik Gece Yedeğini Kurun:**  
-   `Yedek_Kur.bat` dosyasına sağ tıklayıp **"Yönetici Olarak Çalıştır"** deyin.  
-   *(Her gece 02:00'de son 30 günün yedeği `backups/` klasörüne otomatik alınır).*
+# 2. Sunucuyu başlatın (Node.js 14+ gerekli, harici paket gerekmez)
+node server.js
+
+# 3. Gece 02:00 otomatik yedek kurun
+chmod +x backup.sh
+crontab -e
+# Açılan editöre şu satırı ekleyip kaydedin:
+# 0 2 * * * /bin/bash /opt/satinalma/backup.sh > /dev/null 2>&1
+```
+Erişim: `http://sunucu-ip:3000`
+
+#### 🪟 Windows Sunucu (Alternatif)
+1. `server.ps1` → Sağ tıkla → **"PowerShell ile Çalıştır"**
+2. `Yedek_Kur.bat` → Sağ tıkla → **"Yönetici Olarak Çalıştır"** *(gece 02:00 otomatik yedek)*
 
 ---
 
-### ⚙️ DETAYLI IT & SUNUCU YAPILANDIRMASI
+### ⚙️ DETAYLI YAPILANDIRMA
 
-#### 1. Güvenlik Duvarı İzni (Windows Firewall - Port 3000)
-Ağdaki kullanıcıların erişebilmesi için Yönetici PowerShell'de çalıştırın:
-```powershell
-netsh advfirewall firewall add rule name="SatinalmaTakip" dir=in action=allow protocol=TCP localport=3000
+#### 1. Ağ Erişimi ve Firewall
+- **Linux:** `sudo ufw allow 3000/tcp`
+- **Windows:** `netsh advfirewall firewall add rule name="SatinalmaTakip" dir=in action=allow protocol=TCP localport=3000`
+
+#### 2. Sunucu Yeniden Başladığında Otomatik Çalışma (systemd)
+`/etc/systemd/system/satinalma.service` dosyası oluşturun:
+```ini
+[Unit]
+Description=Satinalma Takip
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/satinalma
+ExecStart=/usr/bin/node /opt/satinalma/server.js
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable satinalma
+sudo systemctl start satinalma
 ```
 
-#### 2. Domain & Web Server Yönlendirmesi (Nginx / IIS)
-- Uygulama kodunda **domain kısıtlaması yoktur**. IT Dairesi DNS'te hangi ismi tanımlarsa (`satinalma.pirireis.edu.tr`, `satinalmatakip.pirireis.edu.tr` vb.) o adres üzerinden sorunsuz çalışır.
-- **Nginx Yönlendirme Örneği (Port 80/443 -> 3000):**
+#### 3. Domain ve Nginx Yönlendirmesi (Port 80 → 3000)
+- Uygulama kodunda **domain kısıtlaması yoktur**. IT DNS'te hangi ismi tanımlarsa o adres ile çalışır.
 ```nginx
 server {
     listen 80;
@@ -40,17 +71,14 @@ server {
     }
 }
 ```
-
-#### 3. Linux Sunucu Kurulumu (Alternative)
-- **Çalıştırma:** `pwsh server.ps1` veya `node server.js`
-- **Linux Gece Yedeği (Cron 02:00):**  
-  `crontab -e` komutuna ekleyin:
-  ```bash
-  0 2 * * * /bin/bash /opt/satinalma/backup.sh > /dev/null 2>&1
-  ```
+```bash
+sudo ln -s /etc/nginx/sites-available/satinalma /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ---
 
 ### 🔒 GÜVENLİK VE VERİ YAPISI
-- **Veritabanı:** `data/db.json` (Harici SQL kuruluma gerek yoktur).
-- **Portal Arama Güvenliği:** Şifresiz giriş ekranındaki talep sorgulamasında **Birebir Tam Barkod Eşleşmesi** zorunludur. Başkasının verisine veya genel liste sorgulamasına izin verilmez.
+- **Veritabanı:** `data/db.json` — Harici SQL veritabanı gerekmez.
+- **Yedekleme:** Son 30 günün yedeği `backups/` klasöründe tarih damgasıyla saklanır.
+- **Portal Güvenliği:** Şifresiz sorgulama ekranında **Birebir Tam Barkod Eşleşmesi** zorunludur. Kısmi arama ile başkalarının taleplerine erişim engellenmiştir.
