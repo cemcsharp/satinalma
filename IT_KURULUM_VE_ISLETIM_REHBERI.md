@@ -57,5 +57,18 @@ Uygulama kodunda herhangi bir domain kısıtlaması **yoktur**. IT Dairesi DNS �
 
 ---
 
-### 💾 Veri Yedeği
-Tüm veriler **`data/db.json`** dosyasındadır. Bu dosyanın kopyasını alarak anında yedek alabilirsiniz.
+### 💾 OTOMATİK VERİ YEDEKLENMESİ (Her Gece 02:00)
+
+Tüm uygulama verileri tek bir **`data/db.json`** dosyasında saklanmaktadır. Otomatik yedekleme scriptleri hazırlarmış olup son **30 günün yedeği** tarih damgasıyla (`backups/db-YYYY-MM-DD_HH-mm.json`) tutulur ve 30 günü geçenler otomatik temizlenir.
+
+#### 🪟 Windows Sunucuda Kurulum:
+`Yedek_Kur.bat` dosyasına sağ tıklayıp **"Yönetici Olarak Çalıştır"** seçeneğini tıklayın. Her gece 02:00'de otomatik çalışan Görev Zamanlayıcı (Task Scheduler) görevi tanımlanacaktır.
+
+#### 🐧 Linux Sunucuda Kurulum (Cron):
+`crontab -e` komutunu çalıştırıp aşağıdaki satırı ekleyin:
+```bash
+0 2 * * * /bin/bash /opt/satinalma/backup.sh > /dev/null 2>&1
+```
+
+*(Not: `/opt/satinalma` yerine uygulamanın kurulu olduğu dizin yazılmalıdır).*
+
