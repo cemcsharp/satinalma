@@ -1,38 +1,69 @@
-# 🏛️ Piri Reis Üniversitesi — Satınalma Takip
-## ⚡ IT Kurulum Rehberi (Windows, Linux & Nginx)
+# 🏛️ Piri Reis Üniversitesi — Satınalma Takip Uygulaması
+## ⚡ IT Kurulum, Güvenlik ve İşletim Rehberi
 
 ---
 
-### 🪟 WINDOWS SUNUCU KURULUMU (3 Adım)
+### 📋 SİSTEM MİMARİSİ VE ÖZELLİKLERİ
+- **Mimari:** Single Page Application (SPA) + Minimalist REST API.
+- **Veritabanı:** Dahili `data/db.json` (Harici SQL sunucusu gerektirmez, sıfır konfigürasyon).
+- **Port:** Varsayılan `3000` (Nginx veya IIS arkasında 80/443 olarak çalıştırılabilir).
+- **Mobil/Tablet Uyum:** %100 Duyarlı (Responsive) CSS altyapısı, mobil hamburger menü ve dokunmatik tablo kaydırma.
+- **Güvenlik Mimarisi:** 
+  - Portal Talep Sorgulama ekranında **BİREBİR TAM BARKOD EŞLEŞMESİ** zorunludur.
+  - Kısmi arama ile başkasının taleplerine erişilmesi veya veri ifşası engellenmiştir.
 
-1. **Sunucuyu Başlatın:**  
-   `server.ps1` dosyasına sağ tıklayıp **"PowerShell ile Çalıştır"** deyin.
+---
 
-2. **Güvenlik Duvarı Ağ İzni (Port 3000):**  
-   Yönetici PowerShell'e yapıştırın:
+### 🪟 1. WINDOWS SUNUCU KURULUMU
+
+#### A. Hızlı Başlatma (Komut Satırı / PowerShell)
+1. `server.ps1` dosyasına sağ tıklayıp **"PowerShell ile Çalıştır"** deyin.
+2. Güvenlik duvarı izni eklemek için Yönetici PowerShell'de çalıştırın:
    ```powershell
    netsh advfirewall firewall add rule name="SatinalmaTakip" dir=in action=allow protocol=TCP localport=3000
    ```
+3. **Yerel Erişim:** `http://localhost:3000/` veya `http://[SUNUCU_IP]:3000/`
 
-3. **Erişim Adresi:** `http://[SUNUCU_IP]:3000/`
+#### B. Sunucu Yeniden Başladığında Otomatik Çalışma (Windows Servisi / Görev)
+Windows sunucu her açıldığında uygulamanın otomatik başlaması için:
+1. `Servis_Yukle.bat` dosyasına sağ tıklayıp **"Yönetici Olarak Çalıştır"** deyin.
+2. Uygulama Windows Başlangıç Görevi olarak sisteme kaydolur.
 
 ---
 
-### 🐧 LINUX SUNUCU KURULUMU (Ubuntu / Debian / CentOS)
+### 🐧 2. LINUX SUNUCU KURULUMU (Ubuntu / Debian / RHEL)
 
-#### 1️⃣ Sunucuyu Başlatma:
-```bash
-node server.js   # veya: pwsh server.ps1
+#### A. Servis Olarak Çalıştırma (systemd)
+`/etc/systemd/system/satinalma.service` dosyası oluşturun:
+```ini
+[Unit]
+Description=Piri Reis Satınalma Takip Uygulaması
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/satinalma
+ExecStart=/usr/bin/pwsh /opt/satinalma/server.ps1
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-#### 2️⃣ Nginx Reverse Proxy Konfigürasyonu (Port 80 / 443 HTTPS):
-`/etc/nginx/sites-available/satinalma` dosyası oluşturup yapıştırın:
+Servisi aktifleştirin:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable satinalma
+sudo systemctl start satinalma
+```
 
+#### B. Nginx Reverse Proxy (Domain & SSL / HTTPS Konfigürasyonu)
+`/etc/nginx/sites-available/satinalma` dosyası:
 ```nginx
 server {
     listen 80;
-    # IT Ekibinin Belirleyeceği Herhangi Bir Domain (ör: satinalma, satinalmatakip, sat-portal):
-    server_name satinalma.pirireis.edu.tr;
+    server_name satinalma.pirireis.edu.tr; # IT Dairesinin belirleyeceği domain ismi
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -40,11 +71,11 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
-
-Nginx servisini aktifleştirin ve yeniden başlatın:
+Aktifleştirme:
 ```bash
 sudo ln -s /etc/nginx/sites-available/satinalma /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
@@ -52,23 +83,21 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ---
 
-### 🌐 Kurumsal Bağlantı Adresi (Domain Esnekliği)
-Uygulama kodunda herhangi bir domain kısıtlaması **yoktur**. IT Dairesi DNS üzerinde hangi ismi yönlendirirse (`satinalmatakip.pirireis.edu.tr`, `sat.pirireis.edu.tr` vb.), uygulama o adres üzerinden %100 sorunsuz çalışır.
+### 🌐 3. DOMAIN VE DNS ESNEKLİĞİ
+Uygulama kodunda herhangi bir domain, IP veya CORS kısıtlaması **bulunmamaktadır**.
+IT Dairesi DNS sunucusunda hangi ismi tanımlarsa (`satinalma.pirireis.edu.tr`, `satinalmatakip.pirireis.edu.tr`, `sat.pirireis.edu.tr` vb.), sistem o domain üzerinden sorunsuz çalışır.
 
 ---
 
-### 💾 OTOMATİK VERİ YEDEKLENMESİ (Her Gece 02:00)
+### 💾 4. OTOMATİK VERİ YEDEKLENMESİ (Her Gece 02:00)
 
-Tüm uygulama verileri tek bir **`data/db.json`** dosyasında saklanmaktadır. Otomatik yedekleme scriptleri hazırlarmış olup son **30 günün yedeği** tarih damgasıyla (`backups/db-YYYY-MM-DD_HH-mm.json`) tutulur ve 30 günü geçenler otomatik temizlenir.
+Tüm veriler `data/db.json` dosyasında saklanır. Otomatik yedekleme scriptleri hazır olup **son 30 günün yedeği** tarih damgasıyla (`backups/db-YYYY-MM-DD_HH-mm.json`) tutulur ve 30 günü geçenler otomatik temizlenir.
 
-#### 🪟 Windows Sunucuda Kurulum:
-`Yedek_Kur.bat` dosyasına sağ tıklayıp **"Yönetici Olarak Çalıştır"** seçeneğini tıklayın. Her gece 02:00'de otomatik çalışan Görev Zamanlayıcı (Task Scheduler) görevi tanımlanacaktır.
+- **Windows Otomatik Kurulum:**  
+  `Yedek_Kur.bat` dosyasına **"Yönetici Olarak Çalıştır"** diyerek tıklayın. Görev Zamanlayıcısına 02:00 görevi eklenir.
 
-#### 🐧 Linux Sunucuda Kurulum (Cron):
-`crontab -e` komutunu çalıştırıp aşağıdaki satırı ekleyin:
-```bash
-0 2 * * * /bin/bash /opt/satinalma/backup.sh > /dev/null 2>&1
-```
-
-*(Not: `/opt/satinalma` yerine uygulamanın kurulu olduğu dizin yazılmalıdır).*
-
+- **Linux Otomatik Kurulum:**  
+  `crontab -e` komutuyla ekleyin:
+  ```bash
+  0 2 * * * /bin/bash /opt/satinalma/backup.sh > /dev/null 2>&1
+  ```
