@@ -290,6 +290,7 @@ const App = {
             <div>👤 Sorumlu Uzman: <strong style="color: var(--accent-primary);">${r.assignedTo || '-'}</strong></div>
             <div>📅 Geliş Tarihi: <strong style="color: var(--text-main);">${r.arrivalDate || r.requestDate || '-'}</strong></div>
             <div>🚚 Süreç Durumu: <strong style="color: var(--status-completed);">${orderStatusText}</strong></div>
+            ${r.description ? `<div style="grid-column: span 2; border-top: 1px dashed var(--border-color); padding-top: 0.35rem; margin-top: 0.2rem; color: var(--text-main); font-size: 0.8rem; line-height: 1.45;">📝 <strong>Açıklama / Not:</strong> ${r.description}</div>` : ''}
             <div style="grid-column: span 2; border-top: 1px solid var(--border-color); padding-top: 0.4rem; margin-top: 0.25rem; color: var(--accent-purple); font-weight: 600; display: flex; gap: 1rem; flex-wrap: wrap;">
               <span>📞 Dahili Tel: <strong>${expertPhone}</strong></span>
               <span>✉️ E-Posta: <strong>${expertEmail}</strong></span>
