@@ -86,6 +86,7 @@ const App = {
 
             const savedView = localStorage.getItem('activeView') || 'dashboard';
             this.switchView(savedView);
+            this.handleHashRoute();
           }
         }
       }
@@ -200,7 +201,44 @@ const App = {
     document.getElementById('user-role-label').innerText = `${user.title} (${user.role})`;
   },
 
+  handleHashRoute() {
+    const hash = window.location.hash;
+    if (!hash) return;
+
+    if (hash.startsWith('#request/')) {
+      const reqId = parseInt(hash.replace('#request/', ''));
+      if (!isNaN(reqId)) {
+        this.switchView('requests');
+        setTimeout(() => this.viewRequestDetails(reqId), 150);
+      }
+    } else if (hash.startsWith('#contract/')) {
+      const contractId = parseInt(hash.replace('#contract/', ''));
+      if (!isNaN(contractId)) {
+        this.switchView('contracts');
+        setTimeout(() => this.viewContractDetails(contractId), 150);
+      }
+    } else if (hash.startsWith('#invoice/')) {
+      const invoiceId = parseInt(hash.replace('#invoice/', ''));
+      if (!isNaN(invoiceId)) {
+        this.switchView('invoices');
+        setTimeout(() => this.viewInvoiceDetails(invoiceId), 150);
+      }
+    }
+  },
+
+  _handleLinkClick(event, type, id) {
+    if (event.ctrlKey || event.metaKey || event.button === 1) {
+      return true;
+    }
+    event.preventDefault();
+    if (type === 'request') this.viewRequestDetails(id);
+    else if (type === 'contract') this.viewContractDetails(id);
+    else if (type === 'invoice') this.viewInvoiceDetails(id);
+  },
+
   bindEvents() {
+    window.addEventListener('hashchange', () => this.handleHashRoute());
+
     // Login Form Submit
     document.getElementById('form-login-screen')?.addEventListener('submit', (e) => this.handleLogin(e));
 
@@ -1254,7 +1292,7 @@ const App = {
         <td style="font-weight:700; font-family:var(--font-mono);">${r.actualAmount > 0 ? r.actualAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
         <td class="sticky-col-right">
           <div class="action-btns">
-            <button class="btn-icon" onclick="App.viewRequestDetails(${r.id})" title="Detayları Görüntüle">👁️</button>
+            <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', ${r.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-icon" onclick="App.openEditModal(${r.id})" title="Düzenle / Sipariş Gir">✏️</button>
             <button class="btn-icon" onclick="App.deleteRequest(${r.id})" title="Talebi Sil">🗑️</button>
           </div>
@@ -1473,7 +1511,7 @@ const App = {
         <td style="font-weight:700;">${r.actualAmount > 0 ? r.actualAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
         <td>
           <div class="action-btns">
-            <button class="btn-icon" onclick="App.viewRequestDetails(${r.id})" title="Detayları Görüntüle">👁️</button>
+            <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', ${r.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" onclick="App.openEditModal(${r.id})">Sipariş Gir / Güncelle</button>
             <button class="btn-icon" onclick="App.deleteRequest(${r.id})" title="Talebi Sil">🗑️</button>
           </div>
@@ -1604,7 +1642,7 @@ const App = {
           <td><span class="badge status-${c.status === 'Aktif' ? 'completed' : 'rejected'}">${c.status}</span></td>
           <td>
             <div class="action-btns">
-              <button class="btn-icon" onclick="App.viewContractDetails(${c.id})" title="Detayları Görüntüle">👁️</button>
+              <a href="#contract/${c.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'contract', ${c.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openContractModal(${c.id})" title="Düzenle">✏️</button>
               <button class="btn-icon" onclick="App.deleteContract(${c.id})" title="Sözleşmeyi Sil">🗑️</button>
             </div>
@@ -2214,7 +2252,7 @@ const App = {
           <td><span style="font-family:var(--font-mono); font-size:0.8rem; color:var(--accent-purple);">${inv.relatedBarcode || '-'}</span></td>
           <td>
             <div class="action-btns">
-              <button class="btn-icon" onclick="App.viewInvoiceDetails(${inv.id})" title="Detayları Görüntüle">👁️</button>
+              <a href="#invoice/${inv.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'invoice', ${inv.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>
               ${inv.paymentStatus !== 'Ödendi' ? `<button class="btn-icon" onclick="App.markInvoiceAsPaid(${inv.id})" title="Ödendi İşaretle">✅</button>` : ''}
               <button class="btn-icon" onclick="App.deleteInvoice(${inv.id})" title="Faturayı Sil">🗑️</button>
