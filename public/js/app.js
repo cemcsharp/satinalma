@@ -278,50 +278,23 @@ const App = {
     if (!cleanQ || cleanQ.length < 2) {
       resultsBox.innerHTML = `
         <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
-          🔍 Sorgulamak istediğiniz talep barkodunu veya kelimeyi yukarıya yazın.
+          🔒 Sorgulamak istediğiniz talep barkod numarasını eksiksiz girin.
         </div>
       `;
       return;
     }
 
-    const allRequests = this.state.requests || [];
-    const matchedItems = [];
-
-    allRequests.forEach(r => {
+    // Bilgi Güvenliği ve Gizlilik: Yalnızca BİREBİR TAM EŞLEŞEN barkod veya sipariş numarası gösterilir
+    const matches = (this.state.requests || []).filter(r => {
       const reqBc = r.requestBarcode?.toString().toLowerCase().trim() || '';
       const ordBc = r.orderBarcode?.toString().toLowerCase().trim() || '';
-      const subj = r.subject?.toLowerCase() || '';
-      const unit = r.unit?.toLowerCase() || '';
-      const desc = r.description?.toLowerCase() || '';
-
-      let score = 0;
-
-      // 1. Tam Barkod Eşleşmesi (En yüksek öncelik)
-      if (reqBc === cleanQ || ordBc === cleanQ) {
-        score = 100;
-      }
-      // 2. Barkod Kısmi Eşleşme (Örn: 24211 yazılınca 242116'yı da bulur)
-      else if (reqBc.includes(cleanQ) || ordBc.includes(cleanQ)) {
-        score = 50;
-      }
-      // 3. Konu, Birim veya Açıklama İçinde Eşleşme
-      else if (subj.includes(cleanQ) || unit.includes(cleanQ) || desc.includes(cleanQ)) {
-        score = 10;
-      }
-
-      if (score > 0) {
-        matchedItems.push({ request: r, score });
-      }
+      return reqBc === cleanQ || ordBc === cleanQ;
     });
-
-    // Puan sırasına göre diz (En alakalı sonuç en üstte)
-    matchedItems.sort((a, b) => b.score - a.score);
-    const matches = matchedItems.map(item => item.request).slice(0, 6);
 
     if (matches.length === 0) {
       resultsBox.innerHTML = `
         <div style="padding: 1.5rem; text-align: center; color: var(--status-rejected); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
-          ⚠️ "${query}" ile eşleşen hiçbir talep kaydı bulunamadı.
+          ⚠️ "${query}" numaralı bir talep kaydı bulunamadı. Lütfen barkod numaranızı eksiksiz girdiğinizden emin olun.
         </div>
       `;
       return;
