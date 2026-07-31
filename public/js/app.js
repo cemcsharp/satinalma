@@ -3289,6 +3289,174 @@ const App = {
         }).join('');
       }
     }
+
+    // TAB 4: PERSONEL PAZARLIK TASARRUFU & AYLIK KIRILIM RAPORU
+    else if (activeTab === 'savings') {
+      const activeUsers = this.state.users.filter(u => u.isActive !== false);
+      const personMap = {};
+      activeUsers.forEach(u => {
+        personMap[u.name] = {
+          user: u,
+          total: 0,
+          savingsCount: 0,
+          initialTotal: 0,
+          actualTotal: 0,
+          savings: 0
+        };
+      });
+
+      requests.forEach(r => {
+        const pName = r.assignedTo;
+        if (personMap[pName]) {
+          const p = personMap[pName];
+          p.total++;
+
+          const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+          const actAmt = parseFloat(r.actualAmount) || 0;
+
+          if (initAmt > 0 && actAmt > 0 && initAmt > actAmt) {
+            p.savings += (initAmt - actAmt);
+            p.savingsCount++;
+            p.initialTotal += initAmt;
+            p.actualTotal += actAmt;
+          }
+        }
+      });
+
+      const grandSavings = Object.values(personMap).reduce((sum, p) => sum + p.savings, 0);
+      const grandBadge = document.getElementById('yearly-tab-savings-grand-badge');
+      if (grandBadge) {
+        grandBadge.innerHTML = `💰 Yıllık Toplam Tasarruf: <strong>${grandSavings.toLocaleString('tr-TR')} ₺</strong>`;
+      }
+
+      const tbody = document.querySelector('#table-yearly-personnel-savings tbody');
+      if (tbody) {
+        const sortedPersons = Object.values(personMap).sort((a, b) => b.savings - a.savings);
+
+        tbody.innerHTML = sortedPersons.map(p => {
+          const ratePct = p.initialTotal > 0 ? ((p.savings / p.initialTotal) * 100).toFixed(1) : '0.0';
+          const safeName = p.user.name.replace(/'/g, "\\'");
+          return `
+            <tr>
+              <td><strong style="color:var(--text-main);">${p.user.name}</strong></td>
+              <td style="font-size:0.82rem; color:var(--text-muted);">${p.user.title}</td>
+              <td><span class="badge" style="background:var(--bg-card);">${p.total} İş</span></td>
+              <td><span class="badge status-open">${p.savingsCount} Pazarlıklı İş</span></td>
+              <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.initialTotal > 0 ? p.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+              <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.actualTotal > 0 ? p.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+              <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.95rem;">
+                ${p.savings > 0 ? '+' + p.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
+              </td>
+              <td>
+                <span class="badge" style="background:${p.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${p.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
+                  %${ratePct} Tasarruf
+                </span>
+              </td>
+              <td>
+                <button class="btn-primary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" onclick="App.openPersonnelMonthlySavingsModal('${safeName}')">
+                  👁️ Aylık Detay
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+  },
+
+  openPersonnelMonthlySavingsModal(userName) {
+    const requests = this.getFilteredRequests().filter(r => r.assignedTo === userName);
+
+    const userObj = (this.state.users || []).find(u => u.name === userName);
+    const titleEl = document.getElementById('savings-modal-title');
+    if (titleEl) {
+      titleEl.innerText = `📊 ${userName} (${userObj?.title || 'Uzman'}) — Aylık Pazarlık Tasarrufu Kırılımı`;
+    }
+
+    const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
+    const monthlyData = Array.from({ length: 12 }, () => ({
+      completedCount: 0,
+      initialTotal: 0,
+      actualTotal: 0,
+      savings: 0,
+      savingsCount: 0
+    }));
+
+    let grandTotalSavings = 0;
+    let totalNegotiatedCount = 0;
+
+    requests.forEach(r => {
+      const dtStr = r.arrivalDate || r.requestDate || r.orderDate;
+      if (!dtStr) return;
+
+      const d = new Date(dtStr);
+      if (isNaN(d.getTime())) return;
+
+      const monthIdx = d.getMonth();
+      const acadIdx = monthIdx >= 8 ? (monthIdx - 8) : (monthIdx + 4);
+
+      if (acadIdx >= 0 && acadIdx < 12) {
+        const m = monthlyData[acadIdx];
+        if (r.status === 'Tamamlandı') m.completedCount++;
+
+        const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+        const actAmt = parseFloat(r.actualAmount) || 0;
+
+        if (initAmt > 0 && actAmt > 0 && initAmt > actAmt) {
+          const diff = initAmt - actAmt;
+          m.savings += diff;
+          m.savingsCount++;
+          m.initialTotal += initAmt;
+          m.actualTotal += actAmt;
+
+          grandTotalSavings += diff;
+          totalNegotiatedCount++;
+        }
+      }
+    });
+
+    let topMonthName = '-';
+    let maxMonthSavings = 0;
+    monthlyData.forEach((m, idx) => {
+      if (m.savings > maxMonthSavings) {
+        maxMonthSavings = m.savings;
+        topMonthName = `${months[idx]} (${m.savings.toLocaleString('tr-TR')} ₺)`;
+      }
+    });
+
+    const elTotal = document.getElementById('savings-modal-total');
+    const elTop = document.getElementById('savings-modal-top-month');
+    const elCount = document.getElementById('savings-modal-count');
+
+    if (elTotal) elTotal.innerText = `${grandTotalSavings.toLocaleString('tr-TR')} ₺`;
+    if (elTop) elTop.innerText = topMonthName;
+    if (elCount) elCount.innerText = `${totalNegotiatedCount} Adet İş`;
+
+    const tbody = document.querySelector('#table-personnel-monthly-savings-breakdown tbody');
+    if (tbody) {
+      tbody.innerHTML = months.map((mName, idx) => {
+        const m = monthlyData[idx];
+        const ratePct = m.initialTotal > 0 ? ((m.savings / m.initialTotal) * 100).toFixed(1) : '0.0';
+        return `
+          <tr style="${m.savings > 0 ? 'background: rgba(34, 197, 94, 0.05);' : ''}">
+            <td><strong style="color:var(--text-main);">${mName}</strong></td>
+            <td><span class="badge" style="background:var(--bg-card);">${m.completedCount} Biten</span></td>
+            <td style="font-family:var(--font-mono); font-size:0.88rem;">${m.initialTotal > 0 ? m.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+            <td style="font-family:var(--font-mono); font-size:0.88rem;">${m.actualTotal > 0 ? m.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+            <td style="font-family:var(--font-mono); font-weight:700; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-size:0.95rem;">
+              ${m.savings > 0 ? '+' + m.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
+            </td>
+            <td>
+              <span class="badge" style="background:${m.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
+                %${ratePct}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    this.openModal('modal-personnel-monthly-savings');
   },
 
   // 8. SETTINGS RENDERER
