@@ -273,8 +273,9 @@ const App = {
     const resultsBox = document.getElementById('portal-search-results');
     if (!resultsBox) return;
 
-    const q = query?.toLowerCase().trim();
-    if (!q || q.length < 2) {
+    // Temizleme: Baştaki # simgesi ve fazla boşluklar temizlenir
+    const cleanQ = query?.toString().replace(/^#/, '').toLowerCase().trim();
+    if (!cleanQ || cleanQ.length < 2) {
       resultsBox.innerHTML = `
         <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
           🔍 Sorgulamak istediğiniz talep barkodunu veya kelimeyi yukarıya yazın.
@@ -283,19 +284,39 @@ const App = {
       return;
     }
 
-    const isNumeric = /^\d+$/.test(q);
+    const allRequests = this.state.requests || [];
+    const matchedItems = [];
 
-    const matches = (this.state.requests || []).filter(r => {
-      if (isNumeric) {
-        // Barkod numarası girilmişse → TAM EŞLEŞME zorunlu
-        return r.requestBarcode?.toString() === q ||
-               r.orderBarcode?.toString() === q;
-      } else {
-        // Kelime / birim girilmişse → kısmi arama
-        return r.subject?.toLowerCase().includes(q) ||
-               r.unit?.toLowerCase().includes(q);
+    allRequests.forEach(r => {
+      const reqBc = r.requestBarcode?.toString().toLowerCase().trim() || '';
+      const ordBc = r.orderBarcode?.toString().toLowerCase().trim() || '';
+      const subj = r.subject?.toLowerCase() || '';
+      const unit = r.unit?.toLowerCase() || '';
+      const desc = r.description?.toLowerCase() || '';
+
+      let score = 0;
+
+      // 1. Tam Barkod Eşleşmesi (En yüksek öncelik)
+      if (reqBc === cleanQ || ordBc === cleanQ) {
+        score = 100;
       }
-    }).slice(0, 6);
+      // 2. Barkod Kısmi Eşleşme (Örn: 24211 yazılınca 242116'yı da bulur)
+      else if (reqBc.includes(cleanQ) || ordBc.includes(cleanQ)) {
+        score = 50;
+      }
+      // 3. Konu, Birim veya Açıklama İçinde Eşleşme
+      else if (subj.includes(cleanQ) || unit.includes(cleanQ) || desc.includes(cleanQ)) {
+        score = 10;
+      }
+
+      if (score > 0) {
+        matchedItems.push({ request: r, score });
+      }
+    });
+
+    // Puan sırasına göre diz (En alakalı sonuç en üstte)
+    matchedItems.sort((a, b) => b.score - a.score);
+    const matches = matchedItems.map(item => item.request).slice(0, 6);
 
     if (matches.length === 0) {
       resultsBox.innerHTML = `
