@@ -156,15 +156,53 @@ body {
   padding: 1.5rem;
 }
 
-.login-card {
+.login-card, .login-dual-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   width: 100%;
-  max-width: 440px;
-  padding: 2.5rem 2rem;
+  max-width: 940px;
+  padding: 2.25rem 2rem;
   box-shadow: var(--shadow-lg);
   backdrop-filter: var(--glass-backdrop);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
+}
+
+@media (max-width: 820px) {
+  .login-dual-card {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+    gap: 2rem;
+  }
+}
+
+.login-panel-left {
+  border-right: 1px solid var(--border-color);
+  padding-right: 2rem;
+}
+
+@media (max-width: 820px) {
+  .login-panel-left {
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding-right: 0;
+    padding-bottom: 2rem;
+  }
+}
+
+.portal-result-card {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.9rem;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.portal-result-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
 }
 
 .login-header {

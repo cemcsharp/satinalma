@@ -236,8 +236,67 @@ const App = {
     else if (type === 'invoice') this.viewInvoiceDetails(id);
   },
 
+  handlePortalSearch(query) {
+    const resultsBox = document.getElementById('portal-search-results');
+    if (!resultsBox) return;
+
+    const q = query?.toLowerCase().trim();
+    if (!q || q.length < 2) {
+      resultsBox.innerHTML = `
+        <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+          🔍 Sorgulamak istediğiniz talep barkodunu veya kelimeyi yukarıya yazın.
+        </div>
+      `;
+      return;
+    }
+
+    const matches = (this.state.requests || []).filter(r => 
+      r.requestBarcode?.toString().toLowerCase().includes(q) ||
+      r.subject?.toLowerCase().includes(q) ||
+      r.unit?.toLowerCase().includes(q) ||
+      r.orderBarcode?.toString().toLowerCase().includes(q)
+    ).slice(0, 6);
+
+    if (matches.length === 0) {
+      resultsBox.innerHTML = `
+        <div style="padding: 1.5rem; text-align: center; color: var(--status-rejected); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+          ⚠️ "${query}" ile eşleşen hiçbir talep kaydı bulunamadı.
+        </div>
+      `;
+      return;
+    }
+
+    resultsBox.innerHTML = matches.map(r => {
+      let orderStatusText = '🚚 İşlemde / Sipariş Sürecinde';
+      if (r.status === 'Tamamlandı') orderStatusText = '✅ Tamamlandı / Kapatıldı';
+      else if (r.status === 'Reddedildi') orderStatusText = '❌ İptal Edildi';
+      else if (r.orderBarcode) orderStatusText = `🚚 Sipariş Verildi (#${r.orderBarcode})`;
+
+      return `
+        <div class="portal-result-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.4rem;">
+            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary); font-size: 0.95rem;">
+              Barkod #${r.requestBarcode || r.id}
+            </span>
+            <span class="badge status-${r.status?.toLowerCase()}">${r.status}</span>
+          </div>
+          <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.35rem;">${r.subject}</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.25rem; margin-bottom: 0.5rem;">
+            <div>🏢 Birim: <strong>${r.unit}</strong></div>
+            <div>👤 Uzman: <strong>${r.assignedTo || '-'}</strong></div>
+            <div>📅 Geliş: ${r.arrivalDate || r.requestDate || '-'}</div>
+            <div>🚚 Durum: ${orderStatusText}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
   bindEvents() {
     window.addEventListener('hashchange', () => this.handleHashRoute());
+
+    // Portal Search Input Listener
+    document.getElementById('portal-search-input')?.addEventListener('input', (e) => this.handlePortalSearch(e.target.value));
 
     // Login Form Submit
     document.getElementById('form-login-screen')?.addEventListener('submit', (e) => this.handleLogin(e));

@@ -12,34 +12,66 @@
   <!-- Toast Notification Area -->
   <div id="toast-container"></div>
 
-  <!-- Fullscreen Login Screen -->
+  <!-- Fullscreen Login Screen (Dual Panel Portal) -->
   <div id="login-screen" class="login-screen-overlay">
-    <div class="login-card">
-      <div class="login-header">
-        <div class="login-logo">🛒</div>
-        <h2>Satınalma Takip Girişi</h2>
-        <p>Piri Reis Üniversitesi Kurum İçi Sistem</p>
+    <div class="login-dual-card">
+      
+      <!-- Left Panel: Birim Talep Sorgulama (Şifresiz Public Portal) -->
+      <div class="login-panel-left">
+        <div class="login-header" style="text-align: left; margin-bottom: 1.25rem;">
+          <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.4rem;">
+            <div class="login-logo" style="width:38px; height:38px; font-size:1.3rem; margin:0;">🔍</div>
+            <h3 style="font-size: 1.2rem; margin:0;">Birim Talep Sorgulama</h3>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin:0;">Şifresiz Barkod veya Konu Arama Portalı</p>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label style="font-size: 0.8rem; font-weight:700;">Barkod No veya Talep Konusu / Birim Girin</label>
+          <div style="position:relative;">
+            <input type="text" id="portal-search-input" placeholder="ör: 249015 veya Evrak İmha..." style="padding-left: 2.3rem;">
+            <span style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); font-size:1rem;">🔍</span>
+          </div>
+        </div>
+
+        <div id="portal-search-results" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+            🔍 Sorgulamak istediğiniz talep barkodunu veya kelimeyi yukarıya yazın.
+          </div>
+        </div>
       </div>
 
-      <form id="form-login-screen">
-        <div class="form-group" style="margin-bottom: 1.2rem;">
-          <label>Kullanıcı Seçin</label>
-          <select id="login-screen-user-select" required></select>
+      <!-- Right Panel: Satınalma Ekibi Güvenli Girişi -->
+      <div class="login-panel-right">
+        <div class="login-header" style="text-align: left; margin-bottom: 1.25rem;">
+          <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.4rem;">
+            <div class="login-logo" style="width:38px; height:38px; font-size:1.3rem; margin:0;">🔐</div>
+            <h3 style="font-size: 1.2rem; margin:0;">Satınalma Ekibi Girişi</h3>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin:0;">Piri Reis Üniversitesi Kurumsal Yönetim</p>
         </div>
 
-        <div class="form-group" style="margin-bottom: 1.5rem;">
-          <label>Şifre</label>
-          <input type="password" id="login-screen-password" placeholder="Şifrenizi girin" required>
-        </div>
+        <form id="form-login-screen">
+          <div class="form-group" style="margin-bottom: 1.1rem;">
+            <label style="font-size:0.8rem; font-weight:700;">Personel Seçin</label>
+            <select id="login-screen-user-select" required></select>
+          </div>
 
-        <div id="login-error-msg" style="color: var(--status-rejected); font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; display: none;">
-          ⚠️ Şifre hatalı! Lütfen tekrar deneyin.
-        </div>
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label style="font-size:0.8rem; font-weight:700;">Şifre</label>
+            <input type="password" id="login-screen-password" placeholder="Şifrenizi girin" required>
+          </div>
 
-        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.85rem;">
-          🚀 Sistem Girişi Yap
-        </button>
-      </form>
+          <div id="login-error-msg" style="color: var(--status-rejected); font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; display: none;">
+            ⚠️ Şifre hatalı! Lütfen tekrar deneyin.
+          </div>
+
+          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.85rem;">
+            🚀 Güvenli Giriş Yap
+          </button>
+        </form>
+      </div>
+
     </div>
   </div>
 
