@@ -3337,7 +3337,7 @@ const App = {
           const ratePct = p.initialTotal > 0 ? ((p.savings / p.initialTotal) * 100).toFixed(1) : '0.0';
           const safeName = p.user.name.replace(/'/g, "\\'");
           return `
-            <tr>
+            <tr style="cursor: pointer;" onclick="App.openPersonnelMonthlySavingsModal('${safeName}')" title="Kullanıcıya tıklayarak ay ay pazarlık detaylarını görün">
               <td><strong style="color:var(--text-main);">${p.user.name}</strong></td>
               <td style="font-size:0.82rem; color:var(--text-muted);">${p.user.title}</td>
               <td><span class="badge" style="background:var(--bg-card);">${p.total} İş</span></td>
@@ -3353,7 +3353,7 @@ const App = {
                 </span>
               </td>
               <td>
-                <button class="btn-primary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" onclick="App.openPersonnelMonthlySavingsModal('${safeName}')">
+                <button class="btn-primary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" onclick="event.stopPropagation(); App.openPersonnelMonthlySavingsModal('${safeName}')">
                   👁️ Aylık Detay
                 </button>
               </td>
@@ -3364,13 +3364,13 @@ const App = {
     }
   },
 
-  openPersonnelMonthlySavingsModal(userName) {
+  openPersonnelMonthlySavingsModal(userName, selectedAcadIdx = null) {
     const requests = this.getFilteredRequests().filter(r => r.assignedTo === userName);
-
     const userObj = (this.state.users || []).find(u => u.name === userName);
+
     const titleEl = document.getElementById('savings-modal-title');
     if (titleEl) {
-      titleEl.innerText = `📊 ${userName} (${userObj?.title || 'Uzman'}) — Aylık Pazarlık Tasarrufu Kırılımı`;
+      titleEl.innerText = `📊 ${userName} (${userObj?.title || 'Uzman'}) — Aylık Pazarlık Tasarrufu & KPI Detayı`;
     }
 
     const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
@@ -3379,14 +3379,15 @@ const App = {
       initialTotal: 0,
       actualTotal: 0,
       savings: 0,
-      savingsCount: 0
+      savingsCount: 0,
+      negotiatedRequests: []
     }));
 
     let grandTotalSavings = 0;
     let totalNegotiatedCount = 0;
 
     requests.forEach(r => {
-      const dtStr = r.arrivalDate || r.requestDate || r.orderDate;
+      const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
       if (!dtStr) return;
 
       const d = new Date(dtStr);
@@ -3408,6 +3409,8 @@ const App = {
           m.savingsCount++;
           m.initialTotal += initAmt;
           m.actualTotal += actAmt;
+          const rate = ((diff / initAmt) * 100).toFixed(1);
+          m.negotiatedRequests.push({ ...r, initAmt, actAmt, diff, rate });
 
           grandTotalSavings += diff;
           totalNegotiatedCount++;
@@ -3437,10 +3440,15 @@ const App = {
       tbody.innerHTML = months.map((mName, idx) => {
         const m = monthlyData[idx];
         const ratePct = m.initialTotal > 0 ? ((m.savings / m.initialTotal) * 100).toFixed(1) : '0.0';
+        const isSelected = selectedAcadIdx === idx;
+        const safeName = userName.replace(/'/g, "\\'");
+
         return `
-          <tr style="${m.savings > 0 ? 'background: rgba(34, 197, 94, 0.05);' : ''}">
+          <tr style="cursor: pointer; ${isSelected ? 'background: rgba(59, 130, 246, 0.18); border-left: 4px solid var(--accent-primary);' : (m.savings > 0 ? 'background: rgba(34, 197, 94, 0.04);' : '')}"
+              onclick="App.filterMonthlySavingsDetailModal('${safeName}', ${idx})" title="Tıklayarak bu ayın pazarlıklı işlerini aşağıdaki listede süzün">
             <td><strong style="color:var(--text-main);">${mName}</strong></td>
             <td><span class="badge" style="background:var(--bg-card);">${m.completedCount} Biten</span></td>
+            <td><span class="badge status-open">${m.savingsCount} Pazarlıklı İş</span></td>
             <td style="font-family:var(--font-mono); font-size:0.88rem;">${m.initialTotal > 0 ? m.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
             <td style="font-family:var(--font-mono); font-size:0.88rem;">${m.actualTotal > 0 ? m.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
             <td style="font-family:var(--font-mono); font-weight:700; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-size:0.95rem;">
@@ -3451,12 +3459,57 @@ const App = {
                 %${ratePct}
               </span>
             </td>
+            <td>
+              <button class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="event.stopPropagation(); App.filterMonthlySavingsDetailModal('${safeName}', ${idx})">
+                🔍 ${m.savingsCount} İş Göster
+              </button>
+            </td>
           </tr>
         `;
       }).join('');
     }
 
+    this.renderPersonnelMonthlyRequestList(userName, selectedAcadIdx, monthlyData, months);
     this.openModal('modal-personnel-monthly-savings');
+  },
+
+  filterMonthlySavingsDetailModal(userName, acadIdx) {
+    this.openPersonnelMonthlySavingsModal(userName, acadIdx);
+  },
+
+  renderPersonnelMonthlyRequestList(userName, selectedAcadIdx, monthlyData, months) {
+    const titleEl = document.getElementById('savings-modal-requests-list-title');
+    const tbody = document.querySelector('#table-personnel-monthly-request-list tbody');
+
+    if (!tbody) return;
+
+    let targetRequests = [];
+    if (selectedAcadIdx !== null && selectedAcadIdx >= 0 && selectedAcadIdx < 12) {
+      targetRequests = monthlyData[selectedAcadIdx].negotiatedRequests;
+      if (titleEl) titleEl.innerHTML = `📋 <strong>${userName}</strong> — <u>${months[selectedAcadIdx]}</u> Ayı Pazarlıklı İş Listesi (${targetRequests.length} Adet)`;
+    } else {
+      monthlyData.forEach(m => {
+        targetRequests = targetRequests.concat(m.negotiatedRequests);
+      });
+      if (titleEl) titleEl.innerHTML = `📋 <strong>${userName}</strong> — Yıllık Tüm Pazarlıklı İşler Listesi (${targetRequests.length} Adet)`;
+    }
+
+    if (targetRequests.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Bu dönem için pazarlıklı tasarruf sağlanan iş kaydı bulunmamaktadır.</td></tr>`;
+    } else {
+      tbody.innerHTML = targetRequests.map(r => `
+        <tr>
+          <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-primary);">#${r.barcode || r.id}</td>
+          <td style="font-weight:600;">${r.subject}</td>
+          <td style="font-size:0.82rem; color:var(--text-muted);">${r.unit || '-'}</td>
+          <td style="font-size:0.82rem; color:var(--text-muted);">${r.orderDate || r.arrivalDate || r.requestDate || '-'}</td>
+          <td style="font-family:var(--font-mono);">${r.initAmt.toLocaleString('tr-TR')} ₺</td>
+          <td style="font-family:var(--font-mono); font-weight:600;">${r.actAmt.toLocaleString('tr-TR')} ₺</td>
+          <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed);">+${r.diff.toLocaleString('tr-TR')} ₺</td>
+          <td><span class="badge status-completed">%${r.rate}</span></td>
+        </tr>
+      `).join('');
+    }
   },
 
   // 8. SETTINGS RENDERER
