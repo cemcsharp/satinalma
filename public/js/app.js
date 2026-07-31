@@ -283,12 +283,19 @@ const App = {
       return;
     }
 
-    const matches = (this.state.requests || []).filter(r => 
-      r.requestBarcode?.toString().toLowerCase().includes(q) ||
-      r.subject?.toLowerCase().includes(q) ||
-      r.unit?.toLowerCase().includes(q) ||
-      r.orderBarcode?.toString().toLowerCase().includes(q)
-    ).slice(0, 6);
+    const isNumeric = /^\d+$/.test(q);
+
+    const matches = (this.state.requests || []).filter(r => {
+      if (isNumeric) {
+        // Barkod numarası girilmişse → TAM EŞLEŞME zorunlu
+        return r.requestBarcode?.toString() === q ||
+               r.orderBarcode?.toString() === q;
+      } else {
+        // Kelime / birim girilmişse → kısmi arama
+        return r.subject?.toLowerCase().includes(q) ||
+               r.unit?.toLowerCase().includes(q);
+      }
+    }).slice(0, 6);
 
     if (matches.length === 0) {
       resultsBox.innerHTML = `
