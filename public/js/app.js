@@ -272,20 +272,28 @@ const App = {
       else if (r.status === 'Reddedildi') orderStatusText = '❌ İptal Edildi';
       else if (r.orderBarcode) orderStatusText = `🚚 Sipariş Verildi (#${r.orderBarcode})`;
 
+      const expertUser = (this.state.users || []).find(u => u.name === r.assignedTo);
+      const expertPhone = expertUser?.phone || (r.assignedTo === 'Merih AVCI' ? '1101' : r.assignedTo === 'Cem TUR' ? '1102' : r.assignedTo === 'Gülsüm YILDIRIM' ? '1103' : r.assignedTo === 'Sultan MERİÇ' ? '1104' : r.assignedTo === 'Şimal ERDEM' ? '1105' : '1106');
+      const expertEmail = expertUser?.email || (r.assignedTo ? (r.assignedTo.split(' ')[0].toLowerCase() + '@pirireis.edu.tr') : '');
+
       return `
         <div class="portal-result-card">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.4rem;">
-            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary); font-size: 0.95rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.45rem;">
+            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary); font-size: 1rem;">
               Barkod #${r.requestBarcode || r.id}
             </span>
             <span class="badge status-${r.status?.toLowerCase()}">${r.status}</span>
           </div>
-          <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.35rem;">${r.subject}</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted); display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.25rem; margin-bottom: 0.5rem;">
-            <div>🏢 Birim: <strong>${r.unit}</strong></div>
-            <div>👤 Uzman: <strong>${r.assignedTo || '-'}</strong></div>
-            <div>📅 Geliş: ${r.arrivalDate || r.requestDate || '-'}</div>
-            <div>🚚 Durum: ${orderStatusText}</div>
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); margin-bottom: 0.5rem; line-height: 1.4;">${r.subject}</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-bottom: 0.2rem; background: var(--bg-card); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+            <div>🏢 Birim: <strong style="color: var(--text-main);">${r.unit}</strong></div>
+            <div>👤 Sorumlu Uzman: <strong style="color: var(--accent-primary);">${r.assignedTo || '-'}</strong></div>
+            <div>📅 Geliş Tarihi: <strong style="color: var(--text-main);">${r.arrivalDate || r.requestDate || '-'}</strong></div>
+            <div>🚚 Süreç Durumu: <strong style="color: var(--status-completed);">${orderStatusText}</strong></div>
+            <div style="grid-column: span 2; border-top: 1px solid var(--border-color); padding-top: 0.4rem; margin-top: 0.25rem; color: var(--accent-purple); font-weight: 600; display: flex; gap: 1rem; flex-wrap: wrap;">
+              <span>📞 Dahili Tel: <strong>${expertPhone}</strong></span>
+              <span>✉️ E-Posta: <strong>${expertEmail}</strong></span>
+            </div>
           </div>
         </div>
       `;
@@ -3203,6 +3211,8 @@ const App = {
       document.getElementById('um-title').value = u.title;
       document.getElementById('um-role').value = u.role || 'STAFF';
       document.getElementById('um-password').value = u.password || '123';
+      if (document.getElementById('um-phone')) document.getElementById('um-phone').value = u.phone || '';
+      if (document.getElementById('um-email')) document.getElementById('um-email').value = u.email || '';
       document.getElementById('um-is-active').value = (u.isActive !== false).toString();
       document.getElementById('user-modal-title').innerText = `✏️ Personel Düzenle (${u.name})`;
     } else {
@@ -3250,6 +3260,8 @@ const App = {
     const title = document.getElementById('um-title').value.trim();
     const role = document.getElementById('um-role').value;
     const password = document.getElementById('um-password').value.trim() || '123';
+    const phone = document.getElementById('um-phone')?.value.trim() || '';
+    const email = document.getElementById('um-email')?.value.trim() || '';
     const isActive = document.getElementById('um-is-active').value === 'true';
 
     if (id) {
@@ -3259,6 +3271,8 @@ const App = {
         u.title = title;
         u.role = role;
         u.password = password;
+        u.phone = phone;
+        u.email = email;
         u.isActive = isActive;
       }
     } else {
@@ -3270,6 +3284,8 @@ const App = {
         title: title,
         role: role,
         password: password,
+        phone: phone,
+        email: email,
         isActive: isActive
       };
       this.state.users.push(newUser);
