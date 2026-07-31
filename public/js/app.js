@@ -3290,10 +3290,12 @@ const App = {
       }
     }
 
-    // TAB 4: PERSONEL PAZARLIK TASARRUFU & AYLIK KIRILIM RAPORU
+    // TAB 4: PERSONEL PAZARLIK TASARRUFU & AYLIK KIRILIM RAPORU (IN-PAGE EXPANDABLE ACCORDION)
     else if (activeTab === 'savings') {
       const activeUsers = this.state.users.filter(u => u.isActive !== false);
       const personMap = {};
+      const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
+
       activeUsers.forEach(u => {
         personMap[u.name] = {
           user: u,
@@ -3301,7 +3303,15 @@ const App = {
           savingsCount: 0,
           initialTotal: 0,
           actualTotal: 0,
-          savings: 0
+          savings: 0,
+          monthlyData: Array.from({ length: 12 }, () => ({
+            completedCount: 0,
+            initialTotal: 0,
+            actualTotal: 0,
+            savings: 0,
+            savingsCount: 0,
+            negotiatedRequests: []
+          }))
         };
       });
 
@@ -3315,10 +3325,43 @@ const App = {
           const actAmt = parseFloat(r.actualAmount) || 0;
 
           if (initAmt > 0 && actAmt > 0 && initAmt > actAmt) {
-            p.savings += (initAmt - actAmt);
+            const diff = initAmt - actAmt;
+            p.savings += diff;
             p.savingsCount++;
             p.initialTotal += initAmt;
             p.actualTotal += actAmt;
+
+            const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
+            if (dtStr) {
+              const d = new Date(dtStr);
+              if (!isNaN(d.getTime())) {
+                const monthIdx = d.getMonth();
+                const acadIdx = monthIdx >= 8 ? (monthIdx - 8) : (monthIdx + 4);
+                if (acadIdx >= 0 && acadIdx < 12) {
+                  const m = p.monthlyData[acadIdx];
+                  m.savings += diff;
+                  m.savingsCount++;
+                  m.initialTotal += initAmt;
+                  m.actualTotal += actAmt;
+                  const rate = ((diff / initAmt) * 100).toFixed(1);
+                  m.negotiatedRequests.push({ ...r, initAmt, actAmt, diff, rate });
+                }
+              }
+            }
+          }
+
+          if (r.status === 'Tamamlandı') {
+            const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
+            if (dtStr) {
+              const d = new Date(dtStr);
+              if (!isNaN(d.getTime())) {
+                const monthIdx = d.getMonth();
+                const acadIdx = monthIdx >= 8 ? (monthIdx - 8) : (monthIdx + 4);
+                if (acadIdx >= 0 && acadIdx < 12) {
+                  p.monthlyData[acadIdx].completedCount++;
+                }
+              }
+            }
           }
         }
       });
@@ -3329,187 +3372,242 @@ const App = {
         grandBadge.innerHTML = `💰 Yıllık Toplam Tasarruf: <strong>${grandSavings.toLocaleString('tr-TR')} ₺</strong>`;
       }
 
+      this.state.savingsPersonList = Object.values(personMap).sort((a, b) => b.savings - a.savings);
+
       const tbody = document.querySelector('#table-yearly-personnel-savings tbody');
       if (tbody) {
-        const sortedPersons = Object.values(personMap).sort((a, b) => b.savings - a.savings);
+        if (this.state.savingsPersonList.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:2rem;">Personel verisi bulunamadı.</td></tr>`;
+        } else {
+          tbody.innerHTML = this.state.savingsPersonList.map((p, idx) => {
+            const ratePct = p.initialTotal > 0 ? ((p.savings / p.initialTotal) * 100).toFixed(1) : '0.0';
 
-        tbody.innerHTML = sortedPersons.map(p => {
-          const ratePct = p.initialTotal > 0 ? ((p.savings / p.initialTotal) * 100).toFixed(1) : '0.0';
-          const safeName = p.user.name.replace(/'/g, "\\'");
-          return `
-            <tr style="cursor: pointer;" onclick="App.openPersonnelMonthlySavingsModal('${safeName}')" title="Kullanıcıya tıklayarak ay ay pazarlık detaylarını görün">
-              <td><strong style="color:var(--text-main);">${p.user.name}</strong></td>
-              <td style="font-size:0.82rem; color:var(--text-muted);">${p.user.title}</td>
-              <td><span class="badge" style="background:var(--bg-card);">${p.total} İş</span></td>
-              <td><span class="badge status-open">${p.savingsCount} Pazarlıklı İş</span></td>
-              <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.initialTotal > 0 ? p.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-              <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.actualTotal > 0 ? p.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-              <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.95rem;">
-                ${p.savings > 0 ? '+' + p.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
-              </td>
-              <td>
-                <span class="badge" style="background:${p.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${p.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
-                  %${ratePct} Tasarruf
-                </span>
-              </td>
-              <td>
-                <button class="btn-primary" style="padding:0.3rem 0.65rem; font-size:0.78rem;" onclick="event.stopPropagation(); App.openPersonnelMonthlySavingsModal('${safeName}')">
-                  👁️ Aylık Detay
-                </button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
-  },
+            const monthlyRowsHtml = months.map((mName, mIdx) => {
+              const m = p.monthlyData[mIdx];
+              const mRatePct = m.initialTotal > 0 ? ((m.savings / m.initialTotal) * 100).toFixed(1) : '0.0';
+              return `
+                <tr style="${m.savings > 0 ? 'background: rgba(34, 197, 94, 0.05);' : ''}">
+                  <td><strong style="color:var(--text-main);">${mName}</strong></td>
+                  <td><span class="badge" style="background:var(--bg-card);">${m.completedCount} Biten</span></td>
+                  <td><span class="badge status-open">${m.savingsCount} Pazarlıklı İş</span></td>
+                  <td style="font-family:var(--font-mono); font-size:0.82rem;">${m.initialTotal > 0 ? m.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+                  <td style="font-family:var(--font-mono); font-size:0.82rem;">${m.actualTotal > 0 ? m.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+                  <td style="font-family:var(--font-mono); font-weight:700; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-size:0.88rem;">
+                    ${m.savings > 0 ? '+' + m.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
+                  </td>
+                  <td>
+                    <span class="badge" style="background:${m.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
+                      %${mRatePct}
+                    </span>
+                  </td>
+                  <td>
+                    <button class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="App.filterUserSavingsJobsByMonth(${idx}, ${mIdx})">
+                      🔍 ${m.savingsCount} İş Süz
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('');
 
-  openPersonnelMonthlySavingsModal(userName, selectedAcadIdx = null) {
-    const requests = this.getFilteredRequests().filter(r => r.assignedTo === userName);
-    const userObj = (this.state.users || []).find(u => u.name === userName);
+            const pillsHtml = `<button class="btn-secondary active-date-tab pill-month-${idx}" data-month="ALL" onclick="App.filterUserSavingsJobsByMonth(${idx}, 'ALL')" style="padding:0.25rem 0.6rem; font-size:0.75rem;">🌟 Tüm Aylar (${p.savingsCount})</button>` +
+              months.map((mName, mIdx) => {
+                const count = p.monthlyData[mIdx].savingsCount;
+                return `<button class="btn-secondary pill-month-${idx}" data-month="${mIdx}" onclick="App.filterUserSavingsJobsByMonth(${idx}, ${mIdx})" style="padding:0.25rem 0.6rem; font-size:0.75rem; ${count > 0 ? 'border-color: var(--status-completed);' : ''}">
+                  ${mName} (${count})
+                </button>`;
+              }).join('');
 
-    const titleEl = document.getElementById('savings-modal-title');
-    if (titleEl) {
-      titleEl.innerText = `📊 ${userName} (${userObj?.title || 'Uzman'}) — Aylık Pazarlık Tasarrufu & KPI Detayı`;
-    }
+            const allNegotiated = p.monthlyData.reduce((acc, m) => acc.concat(m.negotiatedRequests), []);
+            const defaultJobsHtml = this._buildJobsTableRowsHtml(allNegotiated);
 
-    const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
-    const monthlyData = Array.from({ length: 12 }, () => ({
-      completedCount: 0,
-      initialTotal: 0,
-      actualTotal: 0,
-      savings: 0,
-      savingsCount: 0,
-      negotiatedRequests: []
-    }));
+            return `
+              <!-- Main Personnel Summary Row -->
+              <tr class="user-savings-summary-row" id="savings-summary-row-${idx}" onclick="App.toggleUserSavingsDetail(${idx})" style="cursor: pointer; transition: background 0.2s;">
+                <td>
+                  <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <span id="savings-toggle-icon-${idx}" style="font-size:0.8rem; color:var(--accent-primary); transition: transform 0.2s;">▶</span>
+                    <strong style="color:var(--text-main); font-size:0.92rem;">${p.user.name}</strong>
+                  </div>
+                </td>
+                <td style="font-size:0.82rem; color:var(--text-muted);">${p.user.title}</td>
+                <td><span class="badge" style="background:var(--bg-card);">${p.total} İş</span></td>
+                <td><span class="badge status-open">${p.savingsCount} Pazarlıklı İş</span></td>
+                <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.initialTotal > 0 ? p.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+                <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.actualTotal > 0 ? p.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+                <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.95rem;">
+                  ${p.savings > 0 ? '+' + p.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
+                </td>
+                <td>
+                  <span class="badge" style="background:${p.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${p.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
+                    %${ratePct} Tasarruf
+                  </span>
+                </td>
+                <td>
+                  <button class="btn-primary" id="savings-toggle-btn-${idx}" style="padding:0.3rem 0.65rem; font-size:0.78rem;" onclick="event.stopPropagation(); App.toggleUserSavingsDetail(${idx})">
+                    🔽 Aylık Kırılım Aç
+                  </button>
+                </td>
+              </tr>
 
-    let grandTotalSavings = 0;
-    let totalNegotiatedCount = 0;
+              <!-- In-Page Expandable Accordion Drawer -->
+              <tr id="savings-detail-drawer-${idx}" style="display: none; background: rgba(15, 23, 42, 0.45);">
+                <td colspan="9" style="padding: 1.25rem; border-left: 4px solid var(--accent-primary);">
+                  <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                      <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+                        📊 <span>${p.user.name}</span> — Ay Bazlı Tasarruf Karnesi (KPI) ve Pazarlıklı İşler
+                      </h4>
+                      <div style="display:flex; gap:0.75rem; font-size:0.82rem;">
+                        <span style="background: rgba(34, 197, 94, 0.12); color: var(--status-completed); font-weight: 700; padding: 0.35rem 0.75rem; border-radius: 4px; font-family: var(--font-mono);">
+                          💰 Yıllık Net Tasarruf: ${p.savings.toLocaleString('tr-TR')} ₺
+                        </span>
+                        <span style="background: rgba(59, 130, 246, 0.12); color: var(--accent-primary); font-weight: 700; padding: 0.35rem 0.75rem; border-radius: 4px;">
+                          🎯 Pazarlıklı İş: ${p.savingsCount} Adet
+                        </span>
+                      </div>
+                    </div>
 
-    requests.forEach(r => {
-      const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
-      if (!dtStr) return;
+                    <!-- 1. Monthly Summary Table -->
+                    <h5 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-muted); font-weight: 700;">
+                      📅 12 Aylık Tasarruf Karnesi Özet Cetveli (Aya Tıklayarak İşleri Süzün)
+                    </h5>
+                    <div class="table-container" style="max-height: 240px; overflow-y: auto; margin-bottom: 1.25rem;">
+                      <table class="custom-table" style="font-size: 0.82rem;">
+                        <thead>
+                          <tr>
+                            <th>Ay / Dönem</th>
+                            <th>Biten İş</th>
+                            <th>Pazarlıklı İş</th>
+                            <th>Bütçe Tutarı</th>
+                            <th>Gerçekleşen</th>
+                            <th>Aylık Net Tasarruf (₺)</th>
+                            <th>Tasarruf Oranı (%)</th>
+                            <th>İşlemler</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${monthlyRowsHtml}
+                        </tbody>
+                      </table>
+                    </div>
 
-      const d = new Date(dtStr);
-      if (isNaN(d.getTime())) return;
+                    <!-- 2. Interactive Month Filter Pills -->
+                    <div style="margin-bottom: 0.85rem;">
+                      <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.4rem;">
+                        🔍 Ay Filtresi (İş Listesini Süzmek İçin Butonlara Tıklayın):
+                      </div>
+                      <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;" id="savings-month-pills-${idx}">
+                        ${pillsHtml}
+                      </div>
+                    </div>
 
-      const monthIdx = d.getMonth();
-      const acadIdx = monthIdx >= 8 ? (monthIdx - 8) : (monthIdx + 4);
+                    <!-- 3. Negotiated Jobs Detailed Table -->
+                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem;">
+                      <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.75rem;" id="savings-jobs-title-${idx}">
+                        📋 ${p.user.name} — Yıllık Tüm Pazarlıklı İşler Listesi (${allNegotiated.length} Adet)
+                      </div>
+                      <div class="table-container" style="max-height: 260px; overflow-y: auto;">
+                        <table class="custom-table" style="font-size: 0.82rem;">
+                          <thead>
+                            <tr>
+                              <th>Barkod</th>
+                              <th>Talep Konusu</th>
+                              <th>Birim</th>
+                              <th>Tarih</th>
+                              <th>Bütçe (₺)</th>
+                              <th>Gerçekleşen (₺)</th>
+                              <th>Net Tasarruf (₺)</th>
+                              <th>Kazanım (%)</th>
+                            </tr>
+                          </thead>
+                          <tbody id="savings-jobs-tbody-${idx}">
+                            ${defaultJobsHtml}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
 
-      if (acadIdx >= 0 && acadIdx < 12) {
-        const m = monthlyData[acadIdx];
-        if (r.status === 'Tamamlandı') m.completedCount++;
-
-        const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
-        const actAmt = parseFloat(r.actualAmount) || 0;
-
-        if (initAmt > 0 && actAmt > 0 && initAmt > actAmt) {
-          const diff = initAmt - actAmt;
-          m.savings += diff;
-          m.savingsCount++;
-          m.initialTotal += initAmt;
-          m.actualTotal += actAmt;
-          const rate = ((diff / initAmt) * 100).toFixed(1);
-          m.negotiatedRequests.push({ ...r, initAmt, actAmt, diff, rate });
-
-          grandTotalSavings += diff;
-          totalNegotiatedCount++;
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('');
         }
       }
-    });
+    }
+  },
 
-    let topMonthName = '-';
-    let maxMonthSavings = 0;
-    monthlyData.forEach((m, idx) => {
-      if (m.savings > maxMonthSavings) {
-        maxMonthSavings = m.savings;
-        topMonthName = `${months[idx]} (${m.savings.toLocaleString('tr-TR')} ₺)`;
-      }
-    });
+  toggleUserSavingsDetail(userIndex) {
+    const drawer = document.getElementById(`savings-detail-drawer-${userIndex}`);
+    const icon = document.getElementById(`savings-toggle-icon-${userIndex}`);
+    const btn = document.getElementById(`savings-toggle-btn-${userIndex}`);
+    const row = document.getElementById(`savings-summary-row-${userIndex}`);
 
-    const elTotal = document.getElementById('savings-modal-total');
-    const elTop = document.getElementById('savings-modal-top-month');
-    const elCount = document.getElementById('savings-modal-count');
+    if (!drawer) return;
 
-    if (elTotal) elTotal.innerText = `${grandTotalSavings.toLocaleString('tr-TR')} ₺`;
-    if (elTop) elTop.innerText = topMonthName;
-    if (elCount) elCount.innerText = `${totalNegotiatedCount} Adet İş`;
+    const isVisible = drawer.style.display !== 'none';
+    if (isVisible) {
+      drawer.style.display = 'none';
+      if (icon) icon.style.transform = 'rotate(0deg)';
+      if (btn) btn.innerHTML = '🔽 Aylık Kırılım Aç';
+      if (row) row.style.background = '';
+    } else {
+      drawer.style.display = 'table-row';
+      if (icon) icon.style.transform = 'rotate(90deg)';
+      if (btn) btn.innerHTML = '🔼 Detayı Kapat';
+      if (row) row.style.background = 'rgba(59, 130, 246, 0.12)';
+    }
+  },
 
-    const tbody = document.querySelector('#table-personnel-monthly-savings-breakdown tbody');
-    if (tbody) {
-      tbody.innerHTML = months.map((mName, idx) => {
-        const m = monthlyData[idx];
-        const ratePct = m.initialTotal > 0 ? ((m.savings / m.initialTotal) * 100).toFixed(1) : '0.0';
-        const isSelected = selectedAcadIdx === idx;
-        const safeName = userName.replace(/'/g, "\\'");
+  filterUserSavingsJobsByMonth(userIndex, acadIdx) {
+    const person = (this.state.savingsPersonList || [])[userIndex];
+    if (!person) return;
 
-        return `
-          <tr style="cursor: pointer; ${isSelected ? 'background: rgba(59, 130, 246, 0.18); border-left: 4px solid var(--accent-primary);' : (m.savings > 0 ? 'background: rgba(34, 197, 94, 0.04);' : '')}"
-              onclick="App.filterMonthlySavingsDetailModal('${safeName}', ${idx})" title="Tıklayarak bu ayın pazarlıklı işlerini aşağıdaki listede süzün">
-            <td><strong style="color:var(--text-main);">${mName}</strong></td>
-            <td><span class="badge" style="background:var(--bg-card);">${m.completedCount} Biten</span></td>
-            <td><span class="badge status-open">${m.savingsCount} Pazarlıklı İş</span></td>
-            <td style="font-family:var(--font-mono); font-size:0.88rem;">${m.initialTotal > 0 ? m.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-            <td style="font-family:var(--font-mono); font-size:0.88rem;">${m.actualTotal > 0 ? m.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-            <td style="font-family:var(--font-mono); font-weight:700; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-size:0.95rem;">
-              ${m.savings > 0 ? '+' + m.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
-            </td>
-            <td>
-              <span class="badge" style="background:${m.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${m.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
-                %${ratePct}
-              </span>
-            </td>
-            <td>
-              <button class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="event.stopPropagation(); App.filterMonthlySavingsDetailModal('${safeName}', ${idx})">
-                🔍 ${m.savingsCount} İş Göster
-              </button>
-            </td>
-          </tr>
-        `;
-      }).join('');
+    const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
+
+    const pillsContainer = document.getElementById(`savings-month-pills-${userIndex}`);
+    if (pillsContainer) {
+      pillsContainer.querySelectorAll('button').forEach(btn => {
+        const mVal = btn.getAttribute('data-month');
+        if (mVal === acadIdx.toString()) btn.classList.add('active-date-tab');
+        else btn.classList.remove('active-date-tab');
+      });
     }
 
-    this.renderPersonnelMonthlyRequestList(userName, selectedAcadIdx, monthlyData, months);
-    this.openModal('modal-personnel-monthly-savings');
-  },
-
-  filterMonthlySavingsDetailModal(userName, acadIdx) {
-    this.openPersonnelMonthlySavingsModal(userName, acadIdx);
-  },
-
-  renderPersonnelMonthlyRequestList(userName, selectedAcadIdx, monthlyData, months) {
-    const titleEl = document.getElementById('savings-modal-requests-list-title');
-    const tbody = document.querySelector('#table-personnel-monthly-request-list tbody');
-
-    if (!tbody) return;
+    const titleEl = document.getElementById(`savings-jobs-title-${userIndex}`);
+    const tbody = document.getElementById(`savings-jobs-tbody-${userIndex}`);
 
     let targetRequests = [];
-    if (selectedAcadIdx !== null && selectedAcadIdx >= 0 && selectedAcadIdx < 12) {
-      targetRequests = monthlyData[selectedAcadIdx].negotiatedRequests;
-      if (titleEl) titleEl.innerHTML = `📋 <strong>${userName}</strong> — <u>${months[selectedAcadIdx]}</u> Ayı Pazarlıklı İş Listesi (${targetRequests.length} Adet)`;
+    if (acadIdx !== 'ALL' && acadIdx >= 0 && acadIdx < 12) {
+      targetRequests = person.monthlyData[acadIdx].negotiatedRequests;
+      if (titleEl) titleEl.innerHTML = `📋 <strong>${person.user.name}</strong> — <u>${months[acadIdx]}</u> Ayı Pazarlıklı İşler (${targetRequests.length} Adet)`;
     } else {
-      monthlyData.forEach(m => {
-        targetRequests = targetRequests.concat(m.negotiatedRequests);
-      });
-      if (titleEl) titleEl.innerHTML = `📋 <strong>${userName}</strong> — Yıllık Tüm Pazarlıklı İşler Listesi (${targetRequests.length} Adet)`;
+      targetRequests = person.monthlyData.reduce((acc, m) => acc.concat(m.negotiatedRequests), []);
+      if (titleEl) titleEl.innerHTML = `📋 <strong>${person.user.name}</strong> — Yıllık Tüm Pazarlıklı İşler (${targetRequests.length} Adet)`;
     }
 
-    if (targetRequests.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Bu dönem için pazarlıklı tasarruf sağlanan iş kaydı bulunmamaktadır.</td></tr>`;
-    } else {
-      tbody.innerHTML = targetRequests.map(r => `
-        <tr>
-          <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-primary);">#${r.barcode || r.id}</td>
-          <td style="font-weight:600;">${r.subject}</td>
-          <td style="font-size:0.82rem; color:var(--text-muted);">${r.unit || '-'}</td>
-          <td style="font-size:0.82rem; color:var(--text-muted);">${r.orderDate || r.arrivalDate || r.requestDate || '-'}</td>
-          <td style="font-family:var(--font-mono);">${r.initAmt.toLocaleString('tr-TR')} ₺</td>
-          <td style="font-family:var(--font-mono); font-weight:600;">${r.actAmt.toLocaleString('tr-TR')} ₺</td>
-          <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed);">+${r.diff.toLocaleString('tr-TR')} ₺</td>
-          <td><span class="badge status-completed">%${r.rate}</span></td>
-        </tr>
-      `).join('');
+    if (tbody) {
+      tbody.innerHTML = this._buildJobsTableRowsHtml(targetRequests);
     }
+  },
+
+  _buildJobsTableRowsHtml(requestsList) {
+    if (!requestsList || requestsList.length === 0) {
+      return `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Seçilen dönem için pazarlıklı tasarruf sağlanan iş kaydı bulunmamaktadır.</td></tr>`;
+    }
+    return requestsList.map(r => `
+      <tr>
+        <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-primary);">#${r.barcode || r.id}</td>
+        <td style="font-weight:600;">${r.subject}</td>
+        <td style="font-size:0.82rem; color:var(--text-muted);">${r.unit || '-'}</td>
+        <td style="font-size:0.82rem; color:var(--text-muted);">${r.orderDate || r.arrivalDate || r.requestDate || '-'}</td>
+        <td style="font-family:var(--font-mono);">${r.initAmt.toLocaleString('tr-TR')} ₺</td>
+        <td style="font-family:var(--font-mono); font-weight:600;">${r.actAmt.toLocaleString('tr-TR')} ₺</td>
+        <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed);">+${r.diff.toLocaleString('tr-TR')} ₺</td>
+        <td><span class="badge status-completed">%${r.rate}</span></td>
+      </tr>
+    `).join('');
   },
 
   // 8. SETTINGS RENDERER
