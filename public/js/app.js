@@ -18,6 +18,7 @@ const App = {
     invoiceDatePeriod: 'ALL',
     currentPage: 1,
     pageSize: 15,
+    yearlyActiveTab: 'financial',
     charts: {}
   },
 
@@ -108,7 +109,7 @@ const App = {
 
   populateDropdowns() {
     // Populate unit dropdowns
-    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'cm-unit', 'filter-contract-unit', 'filter-my-unit'];
+    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'cm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit'];
     unitSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -131,7 +132,7 @@ const App = {
 
     // Active personnel only for assignments
     const activeUsers = this.state.users.filter(u => u.isActive !== false);
-    const assignSelects = ['nr-assigned-to', 'er-assigned-to', 'delegate-to-person', 'cm-assigned-to'];
+    const assignSelects = ['nr-assigned-to', 'er-assigned-to', 'delegate-to-person', 'cm-assigned-to', 'bulk-delegate-person'];
     assignSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -228,13 +229,71 @@ const App = {
     });
 
     // Filters for Requests
-    ['filter-search', 'filter-status', 'filter-unit', 'filter-person', 'filter-priority'].forEach(id => {
+    ['filter-search', 'filter-start-date', 'filter-end-date', 'filter-status', 'filter-unit', 'filter-person', 'filter-priority'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener('input', () => {
           this.state.currentPage = 1;
           this.renderRequestsTable();
         });
+        el.addEventListener('change', () => {
+          this.state.currentPage = 1;
+          this.renderRequestsTable();
+        });
+      }
+    });
+
+    // Select All Checkbox Handler for Requests Table
+    document.getElementById('chk-select-all-requests')?.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      document.querySelectorAll('.chk-select-request').forEach(chk => chk.checked = isChecked);
+      this._onRowCheckboxChange();
+    });
+
+    // Bulk Complete Button
+    document.getElementById('btn-bulk-complete')?.addEventListener('click', () => this.handleBulkComplete());
+
+    // Bulk Delegate Button
+    document.getElementById('btn-bulk-delegate')?.addEventListener('click', () => this.handleBulkDelegate());
+
+    // Clickable KPI Cards for Requests Management (Talep Yönetimi)
+    document.getElementById('card-req-kpi-total')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-status');
+      if (statusSelect) {
+        statusSelect.value = 'ALL';
+        this.state.currentPage = 1;
+        this.renderRequestsTable();
+        this.showToast("Tüm kurum talepleri listelendi.", "info", "📋");
+      }
+    });
+
+    document.getElementById('card-req-kpi-open')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-status');
+      if (statusSelect) {
+        statusSelect.value = 'Açık';
+        this.state.currentPage = 1;
+        this.renderRequestsTable();
+        this.showToast("Devam eden açık talepler filtrelendi.", "info", "⏳");
+      }
+    });
+
+    document.getElementById('card-req-kpi-overdue')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-status');
+      if (statusSelect) {
+        statusSelect.value = 'OVERDUE_14';
+        this.state.currentPage = 1;
+        this.renderRequestsTable();
+        this.showToast("🚨 14 günden fazla süredir bekleyen kurum talepleri filtrelendi.", "info", "🚨");
+      }
+    });
+
+    document.getElementById('card-req-kpi-completed')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-status');
+      if (statusSelect) {
+        statusSelect.value = 'Tamamlandı';
+        this.state.currentPage = 1;
+        this.renderRequestsTable();
+        this.showToast("Tamamlanan talepler filtrelendi.", "success", "✅");
       }
     });
 
@@ -244,6 +303,43 @@ const App = {
       if (el) {
         el.addEventListener('input', () => this.renderMyRequestsTable());
         el.addEventListener('change', () => this.renderMyRequestsTable());
+      }
+    });
+
+    // Clickable KPI Cards for My Requests
+    document.getElementById('card-my-kpi-total')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-my-status');
+      if (statusSelect) {
+        statusSelect.value = 'ALL';
+        this.renderMyRequestsTable();
+        this.showToast("Tüm atanan işleriniz listelendi.", "info", "👤");
+      }
+    });
+
+    document.getElementById('card-my-kpi-open')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-my-status');
+      if (statusSelect) {
+        statusSelect.value = 'Açık';
+        this.renderMyRequestsTable();
+        this.showToast("Devam eden açık talepleriniz filtrelendi.", "info", "⏳");
+      }
+    });
+
+    document.getElementById('card-my-kpi-overdue')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-my-status');
+      if (statusSelect) {
+        statusSelect.value = 'OVERDUE_14';
+        this.renderMyRequestsTable();
+        this.showToast("🚨 14 günden fazla süredir bekleyen acil talepler filtrelendi.", "info", "🚨");
+      }
+    });
+
+    document.getElementById('card-my-kpi-completed')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-my-status');
+      if (statusSelect) {
+        statusSelect.value = 'Tamamlandı';
+        this.renderMyRequestsTable();
+        this.showToast("Tamamlanan siparişleriniz filtrelendi.", "success", "✅");
       }
     });
 
@@ -323,11 +419,25 @@ const App = {
     document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportToCSV());
     document.getElementById('btn-export-requests-pdf')?.addEventListener('click', () => this.printSection('view-requests'));
 
+    document.getElementById('btn-export-my-pdf')?.addEventListener('click', () => this.printSection('view-my-requests'));
+
     document.getElementById('btn-export-contracts-excel')?.addEventListener('click', () => this.exportTableToExcel('table-contracts', 'Sozlesme_Listesi.xls'));
     document.getElementById('btn-export-contracts-pdf')?.addEventListener('click', () => this.printSection('view-contracts'));
 
     document.getElementById('btn-export-invoices-excel')?.addEventListener('click', () => this.exportTableToExcel('table-invoices', 'Fatura_Listesi.xls'));
     document.getElementById('btn-export-invoices-pdf')?.addEventListener('click', () => this.printSection('view-invoices'));
+
+    document.getElementById('btn-export-unit-excel')?.addEventListener('click', () => this.exportTableToExcel('table-unit-detailed', 'Birim_Analizi.xls'));
+    document.getElementById('btn-export-unit-pdf')?.addEventListener('click', () => this.printSection('view-unit-analysis'));
+
+    document.getElementById('btn-export-supplier-excel')?.addEventListener('click', () => this.exportTableToExcel('table-supplier-detailed', 'Tedarikci_Analizi.xls'));
+    document.getElementById('btn-export-supplier-pdf')?.addEventListener('click', () => this.printSection('view-supplier-analysis'));
+
+    document.getElementById('btn-export-logs-excel')?.addEventListener('click', () => this.exportTableToExcel('table-activity-logs', 'Aktivite_Loglari.xls'));
+    document.getElementById('btn-export-logs-pdf')?.addEventListener('click', () => this.printSection('view-activity-logs'));
+
+    document.getElementById('btn-export-delegation-excel')?.addEventListener('click', () => this.exportTableToExcel('table-delegation-requests', 'Delegasyon_Listesi.xls'));
+    document.getElementById('btn-export-delegation-pdf')?.addEventListener('click', () => this.printSection('view-workload'));
 
     // Manual Backup Button
     document.getElementById('btn-trigger-backup-now')?.addEventListener('click', () => this.triggerManualBackup());
@@ -336,16 +446,25 @@ const App = {
     document.getElementById('btn-export-weekly-payments')?.addEventListener('click', () => this.exportWeeklyPaymentsToCSV());
 
     // Re-import Excel
-    document.getElementById('btn-reimport-excel')?.addEventListener('click', async () => {
-      if (confirm("Excel verilerini yeniden senkronize etmek istediğinize emin misiniz?")) {
+    document.getElementById('btn-reimport-excel')?.addEventListener('click', () => {
+      this.showConfirm("Veri Senkronizasyonu", "Excel verilerini yeniden senkronize etmek istediğinize emin misiniz?", async () => {
         await this.fetchInitialData();
-        alert("Veriler yeniden yüklendi!");
+        this.showToast("Veriler başarıyla yeniden yüklendi!", "success");
         this.render();
-      }
+      }, '🔄');
     });
 
     // Filter for Activity Logs
     document.getElementById('filter-log-search')?.addEventListener('input', () => this.renderActivityLogs());
+
+    // Filters for Supplier Analysis
+    ['filter-supplier-search', 'filter-supplier-unit', 'filter-supplier-sort'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', () => this.renderSupplierAnalysis());
+        el.addEventListener('change', () => this.renderSupplierAnalysis());
+      }
+    });
 
     // Save Currency Rates
     document.getElementById('btn-save-rates')?.addEventListener('click', async () => {
@@ -354,12 +473,83 @@ const App = {
       this.state.rates = { USD: usd, EUR: eur, lastUpdated: new Date().toLocaleString('tr-TR') };
       await this.saveDatabase();
       this.logAction('Döviz Kuru Güncellendi', `USD: ${usd} ₺, EUR: ${eur} ₺`);
-      alert("Döviz kurları başarıyla güncellendi!");
+      this.showToast("Döviz kurları başarıyla güncellendi!", "success");
       this.render();
     });
 
     // Auto Fetch TCMB Rates
     document.getElementById('btn-fetch-tcmb-rates')?.addEventListener('click', () => this.fetchTCMBRates());
+
+    // Notification Bell Toggle
+    const notifBtn = document.getElementById('btn-notification-bell');
+    const notifDropdown = document.getElementById('notification-dropdown');
+    if (notifBtn && notifDropdown) {
+      notifBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        notifDropdown.classList.toggle('show');
+      });
+    }
+
+    // Global Search Input
+    const globalInput = document.getElementById('global-search-input');
+    if (globalInput) {
+      globalInput.addEventListener('input', (e) => this.handleGlobalSearch(e.target.value));
+      globalInput.addEventListener('focus', (e) => this.handleGlobalSearch(e.target.value));
+    }
+
+    // Close Dropdowns on Click Outside
+    document.addEventListener('click', (e) => {
+      if (notifDropdown && !notifDropdown.contains(e.target) && e.target !== notifBtn) {
+        notifDropdown.classList.remove('show');
+      }
+      const searchResults = document.getElementById('global-search-results');
+      if (searchResults && !searchResults.contains(e.target) && e.target !== globalInput) {
+        searchResults.classList.remove('show');
+      }
+    });
+
+    // Global Keyboard Shortcut (Ctrl + K)
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const input = document.getElementById('global-search-input');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }
+    });
+
+    // Yearly Report Tab Switching
+    document.querySelectorAll('#yearly-report-tabs button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tab = e.currentTarget.getAttribute('data-tab');
+        if (!tab) return;
+        this.state.yearlyActiveTab = tab;
+        document.querySelectorAll('#yearly-report-tabs button').forEach(b => b.classList.remove('active-date-tab'));
+        e.currentTarget.classList.add('active-date-tab');
+
+        document.querySelectorAll('.yearly-tab-content').forEach(el => el.style.display = 'none');
+        const activeTabEl = document.getElementById(`yearly-tab-${tab}`);
+        if (activeTabEl) activeTabEl.style.display = 'block';
+
+        this.renderYearlyReport();
+      });
+    });
+
+    // Chart PNG Exports
+    document.getElementById('btn-export-chart-unit')?.addEventListener('click', () => this.exportChartToPNG('chart-unit-spend-pie', 'Birim_Harcama_Grafigi.png'));
+    document.getElementById('btn-export-chart-unit-volume')?.addEventListener('click', () => this.exportChartToPNG('chart-unit-volume-bar', 'Birimler_Arasi_Kiyaslama_Grafigi.png'));
+    document.getElementById('btn-export-chart-combo')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-combo', 'Aylik_Harcama_Talep_Grafigi.png'));
+    document.getElementById('btn-export-chart-savings')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-savings', 'Pazarlik_Tasarrufu_Grafigi.png'));
+    document.getElementById('btn-export-chart-sla')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-sla', 'SLA_Surec_Hizi_Grafigi.png'));
+    document.getElementById('btn-export-chart-sla-dist')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-sla-distribution', 'Bekleme_Suresi_Dagilimi_Grafigi.png'));
+    document.getElementById('btn-export-chart-regulations')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-regulations', 'Yonetmelik_Maddeleri_Grafigi.png'));
+    document.getElementById('btn-export-chart-currency')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-currency', 'Para_Birimi_Payi_Grafigi.png'));
+    document.getElementById('btn-export-chart-top-suppliers')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-top-suppliers', 'Top_Tedarikciler_Grafigi.png'));
+
+    // Filter for Unit Analysis
+    document.getElementById('filter-unit-search')?.addEventListener('input', () => this.renderUnitAnalysis());
   },
 
   async fetchTCMBRates() {
@@ -387,15 +577,15 @@ const App = {
 
           await this.saveDatabase();
           this.logAction('TCMB Kurları Çekildi', `Merkez Bankası Satış Kurları -> USD: ${data.USD} ₺, EUR: ${data.EUR} ₺ (${data.lastUpdated})`);
-          alert(`✅ Türkiye Cumhuriyet Merkez Bankası (TCMB) Kurları Başarıyla Çekildi!\n\n💵 USD: ${data.USD} ₺\n💶 EUR: ${data.EUR} ₺\n📅 Tarih: ${data.lastUpdated}`);
+          this.showToast(`TCMB Kurları Başarıyla Çekildi! (USD: ${data.USD} ₺, EUR: ${data.EUR} ₺)`, "success", "🏛️");
           this.render();
         } else {
-          alert("TCMB kurları alınırken bir hata oluştu: " + data.error);
+          this.showToast("TCMB kurları alınırken bir hata oluştu: " + data.error, "error");
         }
       }
     } catch (err) {
       console.error("Error fetching TCMB rates:", err);
-      alert("Merkez Bankası sunucusuna bağlanılamadı.");
+      this.showToast("Merkez Bankası sunucusuna bağlanılamadı.", "error");
     } finally {
       const btn = document.getElementById('btn-fetch-tcmb-rates');
       if (btn) btn.innerHTML = '<span>⚡</span> TCMB\'den Kurları Otomatik Çek';
@@ -413,6 +603,7 @@ const App = {
     };
     this.state.logs.unshift(newLog);
     if (this.state.logs.length > 500) this.state.logs.pop();
+    this.saveDatabase();
   },
 
   switchView(viewName) {
@@ -457,6 +648,25 @@ const App = {
       this.fetchBackups();
     }
 
+    if (viewName === 'my-requests') {
+      const currentPersonName = this.state.currentUser ? this.state.currentUser.name : '';
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const overdueCount = this.getFilteredRequests().filter(r => {
+        if (r.assignedTo !== currentPersonName || r.status !== 'Açık') return false;
+        const arrDt = new Date(r.arrivalDate || r.requestDate);
+        arrDt.setHours(0,0,0,0);
+        const diff = Math.max(0, Math.ceil((today - arrDt) / (1000 * 60 * 60 * 24)));
+        return diff >= 14;
+      }).length;
+
+      if (overdueCount > 0) {
+        setTimeout(() => {
+          this.showToast(`🚨 Dikkat! Tarafınıza atanan ve 14 günden fazla süredir işlem bekleyen ${overdueCount} adet acil talep bulunmaktadır!`, "error", "🚨");
+        }, 300);
+      }
+    }
+
     this.render();
   },
 
@@ -471,6 +681,7 @@ const App = {
 
   render() {
     if (!this.state.isLoggedIn) return;
+    this.renderNotifications();
     const view = this.state.currentView;
     if (view === 'dashboard') this.renderDashboard();
     else if (view === 'requests') this.renderRequestsTable();
@@ -485,6 +696,260 @@ const App = {
     else if (view === 'settings') this.renderSettings();
   },
 
+  // 🔔 NOTIFICATION CENTER & ALERTS
+  renderNotifications() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const notifs = [];
+
+    // 1. 14+ Day SLA Overdue Requests
+    const overdueRequests = (this.state.requests || []).filter(r => {
+      if (r.status !== 'Açık') return false;
+      const d = new Date(r.arrivalDate || r.requestDate);
+      d.setHours(0, 0, 0, 0);
+      const diff = Math.max(0, Math.ceil((today - d) / (1000 * 60 * 60 * 24)));
+      return diff >= 14;
+    });
+
+    if (overdueRequests.length > 0) {
+      notifs.push({
+        type: 'sla',
+        icon: '🚨',
+        title: `${overdueRequests.length} Adet Talep SLA Sınırını (14 Gün) Aştı!`,
+        sub: 'Gecikmiş açık talepleri incelemek için tıklayın',
+        action: () => {
+          this.switchView('requests');
+          const sel = document.getElementById('filter-status');
+          if (sel) {
+            sel.value = 'OVERDUE_14';
+            this.renderRequestsTable();
+          }
+        }
+      });
+    }
+
+    // 2. Contracts Expiring in <= 30 Days or Guarantee Expiry in <= 30 Days
+    const expiringContracts = (this.state.contracts || []).filter(c => {
+      if (c.status !== 'Aktif') return false;
+      let isExpiring = false;
+      if (c.endDate) {
+        const endDt = new Date(c.endDate);
+        const diff = Math.ceil((endDt - today) / (1000 * 60 * 60 * 24));
+        if (diff >= 0 && diff <= 30) isExpiring = true;
+      }
+      if (c.guaranteeExpiry) {
+        const gDt = new Date(c.guaranteeExpiry);
+        const diffG = Math.ceil((gDt - today) / (1000 * 60 * 60 * 24));
+        if (diffG >= 0 && diffG <= 30) isExpiring = true;
+      }
+      return isExpiring;
+    });
+
+    if (expiringContracts.length > 0) {
+      notifs.push({
+        type: 'contract',
+        icon: '📑',
+        title: `${expiringContracts.length} Adet Sözleşme / Teminat Süresi Bitiyor!`,
+        sub: 'Son 30 gün kalan aktif anlaşmaları kontrol edin',
+        action: () => {
+          this.switchView('contracts');
+        }
+      });
+    }
+
+    // 3. Unpaid Invoices Due in <= 7 Days or Overdue
+    const dueInvoices = (this.state.invoices || []).filter(i => {
+      if (i.paymentStatus === 'Ödendi') return false;
+      if (i.dueDate) {
+        const dDt = new Date(i.dueDate);
+        const diff = Math.ceil((dDt - today) / (1000 * 60 * 60 * 24));
+        return diff <= 7;
+      }
+      return false;
+    });
+
+    if (dueInvoices.length > 0) {
+      notifs.push({
+        type: 'invoice',
+        icon: '⏳',
+        title: `${dueInvoices.length} Adet Faturanın Vadesi Yaklaştı / Geçti!`,
+        sub: 'Vadesi 7 gün içinde gelen faturaları görüntüleyin',
+        action: () => {
+          this.switchView('invoices');
+        }
+      });
+    }
+
+    const badge = document.getElementById('notif-badge');
+    const headerCount = document.getElementById('notif-header-count');
+    const list = document.getElementById('notif-list');
+
+    const totalNotifs = notifs.length;
+
+    if (badge) {
+      if (totalNotifs > 0) {
+        badge.style.display = 'inline-block';
+        badge.innerText = totalNotifs;
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    if (headerCount) {
+      headerCount.innerText = `${totalNotifs} Akıllı Uyarı`;
+    }
+
+    if (list) {
+      if (notifs.length === 0) {
+        list.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">Şu an için kritik uyarı veya bildiriminiz yok.</div>`;
+      } else {
+        list.innerHTML = notifs.map((n, idx) => `
+          <div class="notif-item" onclick="App._triggerNotif(${idx})">
+            <div class="notif-item-icon">${n.icon}</div>
+            <div>
+              <div class="notif-item-title">${n.title}</div>
+              <div class="notif-item-sub">${n.sub}</div>
+            </div>
+          </div>
+        `).join('');
+        this._notifActions = notifs.map(n => n.action);
+      }
+    }
+  },
+
+  _triggerNotif(idx) {
+    const dropdown = document.getElementById('notification-dropdown');
+    if (dropdown) dropdown.classList.remove('show');
+    if (this._notifActions && this._notifActions[idx]) {
+      this._notifActions[idx]();
+    }
+  },
+
+  // 🔍 GLOBAL SEARCH SYSTEM (Ctrl + K)
+  handleGlobalSearch(query) {
+    const resultsBox = document.getElementById('global-search-results');
+    if (!resultsBox) return;
+
+    const q = query.toLowerCase().trim();
+    if (!q || q.length < 2) {
+      resultsBox.classList.remove('show');
+      resultsBox.innerHTML = '';
+      return;
+    }
+
+    const matchingRequests = (this.state.requests || []).filter(r => 
+      r.requestBarcode?.toString().toLowerCase().includes(q) ||
+      r.subject?.toLowerCase().includes(q) ||
+      r.supplier?.toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    const matchingContracts = (this.state.contracts || []).filter(c =>
+      c.contractNo?.toLowerCase().includes(q) ||
+      c.title?.toLowerCase().includes(q) ||
+      c.supplier?.toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    const matchingInvoices = (this.state.invoices || []).filter(i =>
+      i.invoiceNo?.toLowerCase().includes(q) ||
+      i.supplier?.toLowerCase().includes(q) ||
+      i.relatedBarcode?.toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    const totalMatches = matchingRequests.length + matchingContracts.length + matchingInvoices.length;
+
+    if (totalMatches === 0) {
+      resultsBox.innerHTML = `<div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">"${query}" ile eşleşen talep, sözleşme veya fatura bulunamadı.</div>`;
+      resultsBox.classList.add('show');
+      return;
+    }
+
+    let html = '';
+
+    if (matchingRequests.length > 0) {
+      html += `<div class="search-category-title">📋 Talepler (${matchingRequests.length})</div>`;
+      html += matchingRequests.map(r => `
+        <div class="search-result-item" onclick="App._onSearchSelect('request', ${r.id})">
+          <div>
+            <div class="search-result-title">${r.subject}</div>
+            <div class="search-result-sub">Barkod: ${r.requestBarcode || '-'} | Birim: ${r.unit}</div>
+          </div>
+          <span class="badge status-${r.status?.toLowerCase()}">${r.status}</span>
+        </div>
+      `).join('');
+    }
+
+    if (matchingContracts.length > 0) {
+      html += `<div class="search-category-title">📑 Sözleşmeler (${matchingContracts.length})</div>`;
+      html += matchingContracts.map(c => `
+        <div class="search-result-item" onclick="App._onSearchSelect('contract', ${c.id})">
+          <div>
+            <div class="search-result-title">${c.title}</div>
+            <div class="search-result-sub">Sözleşme No: ${c.contractNo} | Firma: ${c.supplier}</div>
+          </div>
+          <span class="badge status-${c.status === 'Aktif' ? 'completed' : 'rejected'}">${c.status}</span>
+        </div>
+      `).join('');
+    }
+
+    if (matchingInvoices.length > 0) {
+      html += `<div class="search-category-title">🧾 Faturalar (${matchingInvoices.length})</div>`;
+      html += matchingInvoices.map(i => `
+        <div class="search-result-item" onclick="App._onSearchSelect('invoice', ${i.id})">
+          <div>
+            <div class="search-result-title">Fatura #${i.invoiceNo}</div>
+            <div class="search-result-sub">Tedarikçi: ${i.supplier} | Tutar: ${i.amount ? i.amount.toLocaleString('tr-TR') + ' ₺' : '-'}</div>
+          </div>
+          <span class="badge status-${i.paymentStatus === 'Ödendi' ? 'completed' : 'open'}">${i.paymentStatus}</span>
+        </div>
+      `).join('');
+    }
+
+    resultsBox.innerHTML = html;
+    resultsBox.classList.add('show');
+  },
+
+  _onSearchSelect(type, id) {
+    const resultsBox = document.getElementById('global-search-results');
+    if (resultsBox) resultsBox.classList.remove('show');
+    const input = document.getElementById('global-search-input');
+    if (input) input.value = '';
+
+    if (type === 'request') {
+      this.switchView('requests');
+      this.viewRequestDetails(id);
+    } else if (type === 'contract') {
+      this.switchView('contracts');
+      this.viewContractDetails(id);
+    } else if (type === 'invoice') {
+      this.switchView('invoices');
+      this.viewInvoiceDetails(id);
+    }
+  },
+
+  // 📷 EXPORT CHART TO PNG
+  exportChartToPNG(canvasId, filename) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+      this.showToast("Grafik öğesi bulunamadı.", "error", "⚠️");
+      return;
+    }
+
+    try {
+      const imageURI = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = filename || 'Grafik_Analizi.png';
+      link.href = imageURI;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      this.showToast("Grafik resmi (PNG) başarıyla indirildi!", "success", "📷");
+    } catch (e) {
+      console.error("Chart export error:", e);
+      this.showToast("Grafik resmi aktarılırken hata oluştu.", "error", "⚠️");
+    }
+  },
+
   // 1. DASHBOARD RENDERER
   renderDashboard() {
     const requests = this.getFilteredRequests();
@@ -495,11 +960,29 @@ const App = {
     const totalSpend = requests.reduce((sum, r) => sum + (r.actualAmount || 0), 0);
     const completedRate = totalCount > 0 ? ((completedCount / totalCount) * 100).toFixed(1) : 0;
 
+    let totalEstimated = 0;
+    let totalSavings = 0;
+
+    requests.forEach(r => {
+      if (r.estimatedAmount > 0 && r.actualAmount > 0 && r.estimatedAmount > r.actualAmount) {
+        totalEstimated += r.estimatedAmount;
+        totalSavings += (r.estimatedAmount - r.actualAmount);
+      }
+    });
+
+    const savingsRate = totalEstimated > 0 ? ((totalSavings / totalEstimated) * 100).toFixed(1) : 0;
+
     document.getElementById('kpi-total-demands').innerText = totalCount;
     document.getElementById('kpi-completed-demands').innerText = completedCount;
     document.getElementById('kpi-completed-rate').innerText = `%${completedRate} Tamamlanma`;
     document.getElementById('kpi-open-demands').innerText = openCount;
     document.getElementById('kpi-total-spend').innerText = `${totalSpend.toLocaleString('tr-TR')} ₺`;
+
+    const elSavingsTotal = document.getElementById('kpi-savings-total');
+    const elSavingsRate = document.getElementById('kpi-savings-rate');
+
+    if (elSavingsTotal) elSavingsTotal.innerText = `${totalSavings.toLocaleString('tr-TR')} ₺`;
+    if (elSavingsRate) elSavingsRate.innerText = `%${savingsRate} Bütçe Kazancı`;
 
     this.renderDashboardCharts(requests);
     this.renderDashboardTables(requests);
@@ -634,18 +1117,90 @@ const App = {
     }
   },
 
+  getStatusBadge(r) {
+    if (r.status === 'Tamamlandı') {
+      return `<span class="badge status-completed">✅ Tamamlandı</span>`;
+    } else if (r.status === 'Reddedildi') {
+      return `<span class="badge status-rejected">❌ Reddedildi</span>`;
+    } else {
+      if (r.orderBarcode || r.orderDate) {
+        return `<span class="badge priority-yüksek" style="background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5);" title="Sipariş geçildi, teslimat bekleniyor">🚚 Sipariş Verildi</span>`;
+      } else if (r._diffDays >= 14) {
+        return `<span class="badge badge-sla-overdue" title="14 günden fazla süredir işlem bekliyor!">🚨 ${r._diffDays} Gün (SLA Gecikmede)</span>`;
+      } else if (r._diffDays >= 8) {
+        return `<span class="badge priority-yüksek">🟠 ${r._diffDays} Gün Bekliyor</span>`;
+      } else {
+        return `<span class="badge status-open">🔵 Açık / Teklif Aşamasında</span>`;
+      }
+    }
+  },
+
   // 2. REQUESTS TABLE RENDERER
   renderRequestsTable() {
-    let requests = this.getFilteredRequests();
+    const allFilteredRequests = this.getFilteredRequests();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    allFilteredRequests.forEach(r => {
+      if (r.arrivalDate || r.requestDate) {
+        const arrDt = new Date(r.arrivalDate || r.requestDate);
+        arrDt.setHours(0, 0, 0, 0);
+        r._diffDays = Math.max(0, Math.ceil((today - arrDt) / (1000 * 60 * 60 * 24)));
+      } else {
+        r._diffDays = 0;
+      }
+    });
+
+    // Update Request Management KPI Totals
+    const reqTotal = allFilteredRequests.length;
+    const reqOpen = allFilteredRequests.filter(r => r.status === 'Açık').length;
+    const reqCompleted = allFilteredRequests.filter(r => r.status === 'Tamamlandı').length;
+    const reqOverdue = allFilteredRequests.filter(r => r.status === 'Açık' && r._diffDays >= 14).length;
+
+    const elReqTotal = document.getElementById('req-kpi-total');
+    const elReqOpen = document.getElementById('req-kpi-open');
+    const elReqOverdue = document.getElementById('req-kpi-overdue');
+    const elReqCompleted = document.getElementById('req-kpi-completed');
+
+    if (elReqTotal) elReqTotal.innerText = reqTotal;
+    if (elReqOpen) elReqOpen.innerText = reqOpen;
+    if (elReqOverdue) elReqOverdue.innerText = reqOverdue;
+    if (elReqCompleted) elReqCompleted.innerText = reqCompleted;
+
+    let requests = [...allFilteredRequests];
 
     const searchText = document.getElementById('filter-search')?.value.toLowerCase() || '';
+    const startDateVal = document.getElementById('filter-start-date')?.value || '';
+    const endDateVal = document.getElementById('filter-end-date')?.value || '';
     const statusVal = document.getElementById('filter-status')?.value || 'ALL';
     const unitVal = document.getElementById('filter-unit')?.value || 'ALL';
     const personVal = document.getElementById('filter-person')?.value || 'ALL';
     const priorityVal = document.getElementById('filter-priority')?.value || 'ALL';
 
     requests = requests.filter(r => {
-      if (statusVal !== 'ALL' && r.status !== statusVal) return false;
+      if (startDateVal) {
+        const sDt = new Date(startDateVal);
+        sDt.setHours(0,0,0,0);
+        const reqDt = new Date(r.arrivalDate || r.requestDate);
+        reqDt.setHours(0,0,0,0);
+        if (reqDt < sDt) return false;
+      }
+
+      if (endDateVal) {
+        const eDt = new Date(endDateVal);
+        eDt.setHours(23,59,59,999);
+        const reqDt = new Date(r.arrivalDate || r.requestDate);
+        reqDt.setHours(0,0,0,0);
+        if (reqDt > eDt) return false;
+      }
+
+      if (statusVal === 'OVERDUE_14') {
+        if (r.status !== 'Açık' || r._diffDays < 14) return false;
+      } else if (statusVal !== 'ALL' && r.status !== statusVal) {
+        return false;
+      }
+
       if (unitVal !== 'ALL' && r.unit !== unitVal) return false;
       if (personVal !== 'ALL' && r.assignedTo !== personVal) return false;
       if (priorityVal !== 'ALL' && r.priority !== priorityVal) return false;
@@ -678,14 +1233,15 @@ const App = {
     if (!tbody) return;
 
     if (pageRequests.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:2rem;">Arama kriterlerine uygun talep bulunamadı.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted); padding:2rem;">Arama kriterlerine uygun talep bulunamadı.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = pageRequests.map((r, i) => `
       <tr>
+        <td><input type="checkbox" class="chk-select-request" data-id="${r.id}" onchange="App._onRowCheckboxChange()"></td>
         <td>${r.sequenceNo || startIdx + i + 1}</td>
-        <td><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
+        <td class="sticky-col-left"><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
         <td style="font-weight:600; max-width: 250px;">
           <div>${r.subject}</div>
           <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">${r.description ? r.description.substring(0, 45) + '...' : ''}</div>
@@ -694,9 +1250,9 @@ const App = {
         <td><span style="font-weight:600;">${r.assignedTo}</span></td>
         <td style="font-size:0.8rem; color:var(--text-muted);">${r.arrivalDate || r.requestDate}</td>
         <td><span class="badge priority-${r.priority?.toLowerCase() || 'orta'}">${r.priority || 'Orta'}</span></td>
-        <td><span class="badge status-${r.status?.toLowerCase()}">${r.status}</span></td>
+        <td>${this.getStatusBadge(r)}</td>
         <td style="font-weight:700; font-family:var(--font-mono);">${r.actualAmount > 0 ? r.actualAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-        <td>
+        <td class="sticky-col-right">
           <div class="action-btns">
             <button class="btn-icon" onclick="App.viewRequestDetails(${r.id})" title="Detayları Görüntüle">👁️</button>
             <button class="btn-icon" onclick="App.openEditModal(${r.id})" title="Düzenle / Sipariş Gir">✏️</button>
@@ -714,7 +1270,7 @@ const App = {
     const activeUsers = this.state.users.filter(u => u.isActive !== false);
     const personMap = {};
     activeUsers.forEach(u => {
-      personMap[u.name] = { user: u, total: 0, open: 0, completed: 0, rejected: 0, critical: 0, high: 0, score: 0 };
+      personMap[u.name] = { user: u, total: 0, open: 0, completed: 0, rejected: 0, critical: 0, high: 0, score: 0, savings: 0 };
     });
 
     requests.forEach(r => {
@@ -727,6 +1283,10 @@ const App = {
         if (r.status === 'Reddedildi') p.rejected++;
         if (r.priority === 'Kritik') p.critical++;
         if (r.priority === 'Yüksek') p.high++;
+
+        if (r.estimatedAmount > 0 && r.actualAmount > 0 && r.estimatedAmount > r.actualAmount) {
+          p.savings += (r.estimatedAmount - r.actualAmount);
+        }
       }
     });
 
@@ -763,8 +1323,8 @@ const App = {
               <p>Biten</p>
             </div>
             <div class="stat-box">
-              <h5 style="color:var(--priority-critical);">${p.critical + p.high}</h5>
-              <p>Acil</p>
+              <h5 style="color:var(--status-completed); font-size:0.85rem;" title="Uzmanın Kuruma Kazandırdığı Pazarlık Tasarrufu">🎯 ${p.savings > 0 ? (p.savings / 1000).toFixed(1) + 'k ₺' : '0 ₺'}</h5>
+              <p>Tasarruf</p>
             </div>
           </div>
         </div>
@@ -808,12 +1368,12 @@ const App = {
     const targetPerson = document.getElementById('delegate-to-person').value;
 
     if (!targetPerson) {
-      alert("Lütfen hedef aktif personeli seçin!");
+      this.showToast("Lütfen hedef aktif personeli seçin!", "warning");
       return;
     }
 
     if (checked.length === 0) {
-      alert("Lütfen devretmek için en az bir talep seçin!");
+      this.showToast("Lütfen devretmek için en az bir talep seçin!", "warning");
       return;
     }
 
@@ -824,14 +1384,46 @@ const App = {
     });
 
     await this.saveDatabase();
-    alert(`${checked.length} adet talep başarıyla ${targetPerson} adlı personele devredildi!`);
+    this.showToast(`${checked.length} adet talep başarıyla ${targetPerson} adlı personele devredildi!`, "success", "⚖️");
     this.render();
   },
 
   // 4. MY REQUESTS (PERSONNEL VIEW)
   renderMyRequestsTable() {
     const currentPersonName = this.state.currentUser ? this.state.currentUser.name : '';
-    let requests = this.getFilteredRequests().filter(r => r.assignedTo === currentPersonName);
+    const allMyRequests = this.getFilteredRequests().filter(r => r.assignedTo === currentPersonName);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Compute SLA waiting days for each assigned request
+    allMyRequests.forEach(r => {
+      if (r.arrivalDate || r.requestDate) {
+        const arrDt = new Date(r.arrivalDate || r.requestDate);
+        arrDt.setHours(0, 0, 0, 0);
+        r._diffDays = Math.max(0, Math.ceil((today - arrDt) / (1000 * 60 * 60 * 24)));
+      } else {
+        r._diffDays = 0;
+      }
+    });
+
+    // Update KPI Card Totals
+    const myTotal = allMyRequests.length;
+    const myOpen = allMyRequests.filter(r => r.status === 'Açık').length;
+    const myCompleted = allMyRequests.filter(r => r.status === 'Tamamlandı').length;
+    const myOverdue = allMyRequests.filter(r => r.status === 'Açık' && r._diffDays >= 14).length;
+
+    const elTotal = document.getElementById('my-kpi-total');
+    const elOpen = document.getElementById('my-kpi-open');
+    const elOverdue = document.getElementById('my-kpi-overdue');
+    const elCompleted = document.getElementById('my-kpi-completed');
+
+    if (elTotal) elTotal.innerText = myTotal;
+    if (elOpen) elOpen.innerText = myOpen;
+    if (elOverdue) elOverdue.innerText = myOverdue;
+    if (elCompleted) elCompleted.innerText = myCompleted;
+
+    let requests = [...allMyRequests];
 
     const searchText = document.getElementById('filter-my-search')?.value.toLowerCase().trim() || '';
     const statusVal = document.getElementById('filter-my-status')?.value || 'ALL';
@@ -839,7 +1431,12 @@ const App = {
     const priorityVal = document.getElementById('filter-my-priority')?.value || 'ALL';
 
     requests = requests.filter(r => {
-      if (statusVal !== 'ALL' && r.status !== statusVal) return false;
+      if (statusVal === 'OVERDUE_14') {
+        if (r.status !== 'Açık' || r._diffDays < 14) return false;
+      } else if (statusVal !== 'ALL' && r.status !== statusVal) {
+        return false;
+      }
+
       if (unitVal !== 'ALL' && r.unit !== unitVal) return false;
       if (priorityVal !== 'ALL' && r.priority !== priorityVal) return false;
 
@@ -869,7 +1466,7 @@ const App = {
         <td style="font-weight:600; max-width: 240px;">${r.subject}</td>
         <td>${r.unit}</td>
         <td>${r.arrivalDate || r.requestDate}</td>
-        <td><span class="badge status-${r.status?.toLowerCase()}">${r.status}</span></td>
+        <td>${this.getStatusBadge(r)}</td>
         <td style="font-family:var(--font-mono);">${r.orderBarcode || '-'}</td>
         <td>${r.orderDate || '-'}</td>
         <td>${r.supplier || '-'}</td>
@@ -1105,7 +1702,7 @@ const App = {
 
     this.logAction(id ? 'Sözleşme Güncellendi' : 'Yeni Sözleşme Eklendi', `No: ${contractNo}, Tutar: ${totalAmount} ${currency} (Sabit Kur: ${rateVal} ₺)`);
     await this.saveDatabase();
-    alert("Sözleşme bilgileri başarıyla kaydedildi!");
+    this.showToast("Sözleşme bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.renderContracts();
   },
@@ -1123,39 +1720,39 @@ const App = {
     if (!req) return;
 
     const barcodeText = req.requestBarcode ? `Barkod #${req.requestBarcode}` : 'Talep';
-    if (confirm(`${barcodeText} - "${req.subject}" başlıklı talebi silmek istediğinizden emin misiniz?`)) {
+    this.showConfirm("Talebi Sil", `${barcodeText} - "${req.subject}" başlıklı talebi silmek istediğinizden emin misiniz?`, async () => {
       this.state.requests = this.state.requests.filter(r => r.id !== requestId);
       this.logAction('Talep Silindi', `Barkod: ${req.requestBarcode || '-'}, Konu: ${req.subject}`);
       await this.saveDatabase();
-      alert("Talep başarıyla silindi!");
+      this.showToast("Talep başarıyla silindi!", "warning");
       this.render();
-    }
+    }, '🗑️');
   },
 
   async deleteContract(contractId) {
     const c = this.state.contracts.find(item => item.id === contractId);
     if (!c) return;
 
-    if (confirm(`Sözleşme #${c.contractNo} ("${c.title}") silinecek. Emin misiniz?`)) {
+    this.showConfirm("Sözleşmeyi Sil", `Sözleşme #${c.contractNo} ("${c.title}") silinecek. Emin misiniz?`, async () => {
       this.state.contracts = this.state.contracts.filter(item => item.id !== contractId);
       this.logAction('Sözleşme Silindi', `No: ${c.contractNo}, Konu: ${c.title}`);
       await this.saveDatabase();
-      alert("Sözleşme başarıyla silindi!");
+      this.showToast("Sözleşme başarıyla silindi!", "warning");
       this.renderContracts();
-    }
+    }, '🗑️');
   },
 
   async deleteInvoice(invoiceId) {
     const inv = this.state.invoices.find(item => item.id === invoiceId);
     if (!inv) return;
 
-    if (confirm(`Fatura #${inv.invoiceNo} (${inv.supplier}) silinecek. Emin misiniz?`)) {
+    this.showConfirm("Faturayı Sil", `Fatura #${inv.invoiceNo} (${inv.supplier}) silinecek. Emin misiniz?`, async () => {
       this.state.invoices = this.state.invoices.filter(item => item.id !== invoiceId);
       this.logAction('Fatura Silindi', `No: ${inv.invoiceNo}, Tedarikçi: ${inv.supplier}`);
       await this.saveDatabase();
-      alert("Fatura başarıyla silindi!");
+      this.showToast("Fatura başarıyla silindi!", "warning");
       this.renderInvoices();
-    }
+    }, '🗑️');
   },
 
   // 11. ACTIVITY LOGS RENDERER
@@ -1194,6 +1791,7 @@ const App = {
     const req = this.state.requests.find(r => r.id === requestId);
     if (!req) return;
 
+    this.state.currentActiveDetail = { type: 'request', data: req };
     document.getElementById('view-details-title').innerText = `📋 Talep Detayı #${req.requestBarcode || req.id}`;
 
     const body = document.getElementById('view-details-body');
@@ -1273,6 +1871,7 @@ const App = {
     const c = this.state.contracts.find(item => item.id === contractId);
     if (!c) return;
 
+    this.state.currentActiveDetail = { type: 'contract', data: c };
     document.getElementById('view-details-title').innerText = `📑 Sözleşme Detayı #${c.contractNo}`;
 
     const body = document.getElementById('view-details-body');
@@ -1324,6 +1923,7 @@ const App = {
     const inv = this.state.invoices.find(item => item.id === invoiceId);
     if (!inv) return;
 
+    this.state.currentActiveDetail = { type: 'invoice', data: inv };
     document.getElementById('view-details-title').innerText = `🧾 Fatura Detayı #${inv.invoiceNo}`;
 
     const body = document.getElementById('view-details-body');
@@ -1367,6 +1967,129 @@ const App = {
       };
     }
     this.openModal('modal-view-details');
+  },
+
+  printCurrentDetail() {
+    if (!this.state.currentActiveDetail || !this.state.currentActiveDetail.data) {
+      this.showToast("Yazdırılacak detay verisi bulunamadı.", "error", "⚠️");
+      return;
+    }
+
+    const { type, data } = this.state.currentActiveDetail;
+    const printBody = document.getElementById('print-doc-body');
+    const printDate = document.getElementById('print-doc-date');
+    const printTitle = document.querySelector('#printable-official-document .print-header div:nth-child(2)');
+
+    const todayStr = new Date().toLocaleDateString('tr-TR');
+    if (printDate) printDate.innerText = `Belge Düzenleme Tarihi: ${todayStr}`;
+
+    if (!printBody) return;
+
+    if (type === 'request') {
+      if (printTitle) printTitle.innerText = 'SATİNALMA TALEP VE SİPARİŞ FORMU';
+      printBody.innerHTML = `
+        <div style="border: 2px solid #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">TALEP BARKODU</div>
+              <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.requestBarcode || '-'}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">DURUM & ÖNCELİK</div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a;">${data.status} (${data.priority || 'Orta'})</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; font-size: 0.95rem; margin-bottom: 1.5rem;">
+            <div><strong>İlgili Birim:</strong> ${data.unit}</div>
+            <div><strong>Takip Eden Personel:</strong> ${data.assignedTo}</div>
+            <div><strong>Geliş Tarihi:</strong> ${data.arrivalDate || data.requestDate || '-'}</div>
+            <div><strong>Sipariş Tarihi:</strong> ${data.orderDate || '-'}</div>
+            <div><strong>Sipariş Barkodu:</strong> ${data.orderBarcode || '-'}</div>
+            <div><strong>Tedarikçi Firma:</strong> ${data.supplier || '-'}</div>
+            <div><strong>Yönetmelik Maddesi:</strong> ${data.regulation ? 'Madde ' + data.regulation : '-'}</div>
+            <div><strong>Gerçekleşen Tutar:</strong> <span style="font-size: 1.15rem; font-weight: 800; color: #16a34a;">${data.actualAmount > 0 ? data.actualAmount.toLocaleString('tr-TR') + ' ' + (data.currency || 'TRY') : '-'}</span></div>
+          </div>
+
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">TALEP KONUSU:</div>
+            <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a;">${data.subject}</div>
+            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">AÇIKLAMA VE NOTLAR:</div>
+            <div style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; color: #1e293b;">${data.description || 'Not bulunmamaktadır.'}</div>
+          </div>
+        </div>
+      `;
+    } else if (type === 'contract') {
+      if (printTitle) printTitle.innerText = 'RESMİ SÖZLEŞME VE TEMİNAT TAKİP FORMU';
+      printBody.innerHTML = `
+        <div style="border: 2px solid #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">SÖZLEŞME NO</div>
+              <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.contractNo}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">SÖZLEŞME DURUMU</div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: #16a34a;">${data.status}</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; font-size: 0.95rem; margin-bottom: 1.5rem;">
+            <div><strong>Sözleşme Konusu:</strong> ${data.title}</div>
+            <div><strong>Yüklenici Tedarikçi:</strong> ${data.supplier}</div>
+            <div><strong>Sorumlu Birim:</strong> ${data.unit}</div>
+            <div><strong>Takip Eden Personel:</strong> ${data.assignedTo || '-'}</div>
+            <div><strong>Başlangıç Tarihi:</strong> ${data.startDate}</div>
+            <div><strong>Bitiş Tarihi:</strong> ${data.endDate}</div>
+            <div><strong>Teminat Mektubu Tutarı:</strong> ${data.guaranteeAmount ? data.guaranteeAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</div>
+            <div><strong>Teminat Bitiş Tarihi:</strong> ${data.guaranteeExpiry || '-'}</div>
+            <div style="grid-column: span 2;"><strong>Toplam Sözleşme Bedeli:</strong> <span style="font-size: 1.2rem; font-weight: 800; color: #16a34a;">${(data.totalAmount || 0).toLocaleString('tr-TR')} ${data.currency || 'TRY'}</span></div>
+          </div>
+
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">SÖZLEŞME NOTLARI VE ŞARTLAR:</div>
+            <div style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Not bulunmamaktadır.'}</div>
+          </div>
+        </div>
+      `;
+    } else if (type === 'invoice') {
+      if (printTitle) printTitle.innerText = 'FATURA VE MUHASEBE TESLİM FORMU';
+      printBody.innerHTML = `
+        <div style="border: 2px solid #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">FATURA NO</div>
+              <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.invoiceNo}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">ÖDEME DURUMU</div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: #16a34a;">${data.paymentStatus}</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; font-size: 0.95rem; margin-bottom: 1.5rem;">
+            <div><strong>Tedarikçi Firma:</strong> ${data.supplier}</div>
+            <div><strong>Bağlı Barkod / Sözleşme:</strong> ${data.relatedBarcode || '-'}</div>
+            <div><strong>Fatura Tarihi:</strong> ${data.invoiceDate}</div>
+            <div><strong>Vade Tarihi:</strong> ${data.dueDate}</div>
+            <div><strong>Muhasebeye Teslim:</strong> ${data.accountingDeliveryDate || '-'}</div>
+            <div><strong>Ödeme Yapılma Tarihi:</strong> ${data.paymentDate || '-'}</div>
+            <div style="grid-column: span 2;"><strong>Fatura Tutarı:</strong> <span style="font-size: 1.2rem; font-weight: 800; color: #16a34a;">${(data.amount || 0).toLocaleString('tr-TR')} ${data.currency || 'TRY'}</span></div>
+          </div>
+
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">AÇIKLAMA VE NOTLAR:</div>
+            <div style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Açıklama girilmemiş.'}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    document.body.classList.add('printing-detail');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('printing-detail');
+    }, 1000);
   },
 
   // 6. INVOICES & WEEKLY PAYMENT SCHEDULE RENDERER (FATURA & HAFTALIK ÖDEME LİSTESİ)
@@ -1577,7 +2300,7 @@ const App = {
     }
 
     await this.saveDatabase();
-    alert("Fatura bilgileri başarıyla kaydedildi!");
+    this.showToast("Fatura bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.renderInvoices();
   },
@@ -1586,13 +2309,13 @@ const App = {
     const inv = this.state.invoices.find(item => item.id === invoiceId);
     if (!inv) return;
 
-    if (confirm(`Fatura #${inv.invoiceNo} (${inv.amount.toLocaleString('tr-TR')} ₺) ödenmiş olarak işaretlensin mi?`)) {
+    this.showConfirm("Fatura Ödeme Onayı", `Fatura #${inv.invoiceNo} (${inv.amount.toLocaleString('tr-TR')} ₺) ödenmiş olarak işaretlensin mi?`, async () => {
       inv.paymentStatus = 'Ödendi';
       inv.paymentDate = new Date().toISOString().split('T')[0];
       await this.saveDatabase();
-      alert("Fatura ödenmiş olarak güncellendi!");
+      this.showToast("Fatura ödenmiş olarak güncellendi!", "success", "✅");
       this.renderInvoices();
-    }
+    }, '💳');
   },
 
   exportWeeklyPaymentsToCSV() {
@@ -1627,46 +2350,161 @@ const App = {
     link.click();
   },
 
-  // 7. UNIT ANALYSIS RENDERER
+  _onRowCheckboxChange() {
+    const selectedChks = document.querySelectorAll('.chk-select-request:checked');
+    const bulkBar = document.getElementById('requests-bulk-bar');
+    const countEl = document.getElementById('bulk-selected-count');
+
+    if (bulkBar) {
+      if (selectedChks.length > 0) {
+        bulkBar.style.display = 'flex';
+        if (countEl) countEl.innerText = selectedChks.length;
+      } else {
+        bulkBar.style.display = 'none';
+      }
+    }
+  },
+
+  async handleBulkComplete() {
+    const selectedChks = Array.from(document.querySelectorAll('.chk-select-request:checked'));
+    if (selectedChks.length === 0) return;
+
+    const ids = selectedChks.map(c => parseInt(c.getAttribute('data-id')));
+
+    this.showConfirm("Toplu Durum Güncelleme", `Seçilen ${ids.length} adet talebi 'Tamamlandı' olarak güncellemek istediğinize emin misiniz?`, async () => {
+      ids.forEach(id => {
+        const r = this.state.requests.find(req => req.id === id);
+        if (r) r.status = 'Tamamlandı';
+      });
+
+      this.logAction('Toplu Talep Tamamlandı', `${ids.length} adet talep toplu olarak tamamlandı yapıldı.`);
+      await this.saveDatabase();
+      this.showToast(`${ids.length} adet talep başarıyla tamamlandı!`, "success", "✅");
+      const chkAll = document.getElementById('chk-select-all-requests');
+      if (chkAll) chkAll.checked = false;
+      this._onRowCheckboxChange();
+      this.render();
+    }, '✅');
+  },
+
+  async handleBulkDelegate() {
+    const selectedChks = Array.from(document.querySelectorAll('.chk-select-request:checked'));
+    if (selectedChks.length === 0) return;
+
+    const targetPerson = document.getElementById('bulk-delegate-person')?.value;
+    if (!targetPerson) {
+      this.showToast("Lütfen devredilecek personeli seçin.", "warning", "⚠️");
+      return;
+    }
+
+    const ids = selectedChks.map(c => parseInt(c.getAttribute('data-id')));
+
+    this.showConfirm("Toplu Talep Devretme", `Seçilen ${ids.length} adet talebi '${targetPerson}' isimli personele devretmek istediğinize emin misiniz?`, async () => {
+      ids.forEach(id => {
+        const r = this.state.requests.find(req => req.id === id);
+        if (r) r.assignedTo = targetPerson;
+      });
+
+      this.logAction('Toplu Talep Devredildi', `${ids.length} adet talep ${targetPerson} isimli personele devredildi.`);
+      await this.saveDatabase();
+      this.showToast(`${ids.length} adet talep ${targetPerson} personeline başarıyla devredildi!`, "success", "👉");
+      const chkAll = document.getElementById('chk-select-all-requests');
+      if (chkAll) chkAll.checked = false;
+      this._onRowCheckboxChange();
+      this.render();
+    }, '👉');
+  },
+
+  // 7. UNIT ANALYSIS RENDERER (REDESIGNED DASHBOARD)
   renderUnitAnalysis() {
     const requests = this.getFilteredRequests();
     const selectedUnit = document.getElementById('select-unit-analysis')?.value || 'ALL';
+    const searchText = document.getElementById('filter-unit-search')?.value.toLowerCase().trim() || '';
 
     const unitMap = {};
+    const unitSLA = {};
+    let grandTotalSpend = 0;
+
     requests.forEach(r => {
-      if (selectedUnit !== 'ALL' && r.unit !== selectedUnit) return;
-      if (!unitMap[r.unit]) unitMap[r.unit] = { total: 0, completed: 0, open: 0, spend: 0 };
-      unitMap[r.unit].total++;
-      if (r.status === 'Tamamlandı') unitMap[r.unit].completed++;
-      if (r.status === 'Açık') unitMap[r.unit].open++;
-      unitMap[r.unit].spend += (r.actualAmount || 0);
+      const uName = r.unit;
+      if (!unitMap[uName]) unitMap[uName] = { total: 0, completed: 0, open: 0, spend: 0 };
+      if (!unitSLA[uName]) unitSLA[uName] = { totalDays: 0, count: 0 };
+
+      unitMap[uName].total++;
+      if (r.status === 'Tamamlandı') unitMap[uName].completed++;
+      if (r.status === 'Açık') unitMap[uName].open++;
+      
+      const sp = (r.actualAmount || 0);
+      unitMap[uName].spend += sp;
+      grandTotalSpend += sp;
+
+      if (r.arrivalDate && r.orderDate) {
+        const d1 = new Date(r.arrivalDate);
+        const d2 = new Date(r.orderDate);
+        const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+        if (!isNaN(diffDays) && diffDays >= 0 && diffDays < 180) {
+          unitSLA[uName].totalDays += diffDays;
+          unitSLA[uName].count++;
+        }
+      }
     });
 
-    const sortedUnits = Object.entries(unitMap).sort((a, b) => b[1].spend - a[1].spend);
+    const entries = Object.entries(unitMap);
 
-    const tbody = document.querySelector('#table-unit-detailed tbody');
-    if (tbody) {
-      if (sortedUnits.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:2rem;">Seçili birim için talep kaydı bulunamadı.</td></tr>`;
+    // 1. Top Spender KPI
+    const topSpender = entries.length > 0 ? [...entries].sort((a,b) => b[1].spend - a[1].spend)[0] : null;
+    const elSpender = document.getElementById('unit-kpi-top-spender');
+    const elSpenderSub = document.getElementById('unit-kpi-top-spender-sub');
+    if (elSpender && topSpender) {
+      elSpender.innerText = topSpender[0];
+      if (elSpenderSub) elSpenderSub.innerText = `${topSpender[1].spend.toLocaleString('tr-TR')} ₺ Toplam Harcama`;
+    }
+
+    // 2. Top Demander KPI
+    const topDemander = entries.length > 0 ? [...entries].sort((a,b) => b[1].total - a[1].total)[0] : null;
+    const elDemander = document.getElementById('unit-kpi-top-demander');
+    const elDemanderSub = document.getElementById('unit-kpi-top-demander-sub');
+    if (elDemander && topDemander) {
+      elDemander.innerText = topDemander[0];
+      if (elDemanderSub) elDemanderSub.innerText = `${topDemander[1].total} Talep Açıldı`;
+    }
+
+    // 3. Fastest Unit KPI
+    const slaEntries = Object.entries(unitSLA).filter(([u, s]) => s.count > 0);
+    slaEntries.sort((a,b) => (a[1].totalDays / a[1].count) - (b[1].totalDays / b[1].count));
+    const fastest = slaEntries.length > 0 ? slaEntries[0] : null;
+
+    const elFastest = document.getElementById('unit-kpi-fastest');
+    const elFastestSub = document.getElementById('unit-kpi-fastest-sub');
+    if (elFastest) {
+      if (fastest) {
+        const avg = (fastest[1].totalDays / fastest[1].count).toFixed(1);
+        elFastest.innerText = fastest[0];
+        if (elFastestSub) elFastestSub.innerText = `${avg} Gün Ort. Temin Süresi`;
       } else {
-        tbody.innerHTML = sortedUnits.map(([uName, s]) => `
-          <tr>
-            <td style="font-weight:700;">${uName}</td>
-            <td>${s.total}</td>
-            <td><span class="badge status-completed">${s.completed}</span></td>
-            <td><span class="badge status-open">${s.open}</span></td>
-            <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${s.spend.toLocaleString('tr-TR')} ₺</td>
-          </tr>
-        `).join('');
+        elFastest.innerText = '-';
+        if (elFastestSub) elFastestSub.innerText = 'Süresi tamamlanmış veri yok';
       }
     }
 
-    // Doughnut Chart for Top Units
-    const topPieUnits = sortedUnits.slice(0, 8);
+    // 4. Total Unit Spend KPI
+    const elTotalSpend = document.getElementById('unit-kpi-total-spend');
+    if (elTotalSpend) elTotalSpend.innerText = `${grandTotalSpend.toLocaleString('tr-TR')} ₺`;
+
+    // Filter units based on dropdown and search text
+    let filteredEntries = entries.filter(([uName, s]) => {
+      if (selectedUnit !== 'ALL' && uName !== selectedUnit) return false;
+      if (searchText && !uName.toLowerCase().includes(searchText)) return false;
+      return true;
+    });
+
+    filteredEntries.sort((a, b) => b[1].spend - a[1].spend);
+
+    // 1. Doughnut Chart (Birim Harcama Payı)
+    const topPieUnits = filteredEntries.slice(0, 7);
     const pieLabels = topPieUnits.map(u => u[0].length > 18 ? u[0].substring(0, 18) + '...' : u[0]);
     const pieData = topPieUnits.map(u => u[1].spend);
-
-    const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#6366f1'];
+    const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16'];
 
     this.createOrUpdateChart('chart-unit-spend-pie', 'doughnut', {
       labels: pieLabels.length > 0 ? pieLabels : ['Harcama Yok'],
@@ -1675,17 +2513,142 @@ const App = {
         backgroundColor: colors.slice(0, Math.max(1, pieLabels.length))
       }]
     }, { responsive: true, maintainAspectRatio: false });
+
+    // 2. Bar Chart (Birimler Arası Harcama Kıyaslaması)
+    const topBarUnits = filteredEntries.slice(0, 8);
+    const barLabels = topBarUnits.map(u => u[0].length > 15 ? u[0].substring(0, 15) + '...' : u[0]);
+    const barSpend = topBarUnits.map(u => u[1].spend);
+    const barCount = topBarUnits.map(u => u[1].total);
+
+    this.createOrUpdateChart('chart-unit-volume-bar', 'bar', {
+      labels: barLabels,
+      datasets: [
+        {
+          label: 'Harcama (TRY)',
+          data: barSpend,
+          backgroundColor: '#3b82f6',
+          borderRadius: 6,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Talep Adedi',
+          data: barCount,
+          backgroundColor: '#8b5cf6',
+          borderRadius: 6,
+          yAxisID: 'y1'
+        }
+      ]
+    }, {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { type: 'linear', display: true, position: 'left' },
+        y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false } }
+      }
+    });
+
+    // 3. Render Interactive Unit Dashboard Cards Grid
+    const cardsContainer = document.getElementById('unit-cards-container');
+    if (cardsContainer) {
+      if (filteredEntries.length === 0) {
+        cardsContainer.innerHTML = `<div style="grid-column: span 3; text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun birim bulunamadı.</div>`;
+      } else {
+        cardsContainer.innerHTML = filteredEntries.map(([uName, s]) => {
+          const share = grandTotalSpend > 0 ? ((s.spend / grandTotalSpend) * 100).toFixed(1) : 0;
+          const sla = unitSLA[uName] && unitSLA[uName].count > 0 ? (unitSLA[uName].totalDays / unitSLA[uName].count).toFixed(1) : '-';
+
+          // Dynamic Progress Color
+          let fillClass = 'progress-fill-green';
+          if (share > 20) fillClass = 'progress-fill-yellow';
+          if (share > 35) fillClass = 'progress-fill-red';
+
+          return `
+            <div class="unit-dashboard-card">
+              <div>
+                <div class="unit-card-title">
+                  <h4>🏢 ${uName}</h4>
+                  <span class="badge priority-orta">%${share} Bütçe Payı</span>
+                </div>
+
+                <div style="font-size: 1.35rem; font-weight: 800; color: var(--status-completed); font-family: var(--font-mono); margin-bottom: 0.5rem;">
+                  ${s.spend.toLocaleString('tr-TR')} ₺
+                </div>
+
+                <div class="budget-progress-container">
+                  <div class="budget-progress-header">
+                    <span>Kurum Bütçe Payı Oranı</span>
+                    <span>%${share}</span>
+                  </div>
+                  <div class="budget-progress-track">
+                    <div class="budget-progress-fill ${fillClass}" style="width: ${Math.min(100, Math.max(6, share * 2.2))}%;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem; margin-top: 0.5rem; font-size: 0.8rem;">
+                <div>
+                  <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">${s.total}</div>
+                  <div style="color: var(--text-muted); font-size: 0.72rem;">Toplam</div>
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: var(--status-completed); font-size: 0.95rem;">${s.completed}</div>
+                  <div style="color: var(--text-muted); font-size: 0.72rem;">Biten</div>
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: var(--status-open); font-size: 0.95rem;">${sla} gün</div>
+                  <div style="color: var(--text-muted); font-size: 0.72rem;">Ort. SLA</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // 4. Render Detailed Unit Table
+    const tbody = document.querySelector('#table-unit-detailed tbody');
+    if (tbody) {
+      if (filteredEntries.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun birim kaydı bulunamadı.</td></tr>`;
+      } else {
+        tbody.innerHTML = filteredEntries.map(([uName, s]) => {
+          const share = grandTotalSpend > 0 ? ((s.spend / grandTotalSpend) * 100).toFixed(1) : 0;
+          const sla = unitSLA[uName] && unitSLA[uName].count > 0 ? (unitSLA[uName].totalDays / unitSLA[uName].count).toFixed(1) + ' gün' : '-';
+
+          return `
+            <tr>
+              <td style="font-weight:700;">🏢 ${uName}</td>
+              <td style="font-weight:600;">${s.total}</td>
+              <td><span class="badge status-completed">${s.completed}</span></td>
+              <td><span class="badge status-open">${s.open}</span></td>
+              <td style="font-weight:600;">%${share}</td>
+              <td style="color:var(--text-muted); font-size:0.85rem;">${sla}</td>
+              <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${s.spend.toLocaleString('tr-TR')} ₺</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
   },
 
   // 8. SUPPLIER ANALYSIS RENDERER
   renderSupplierAnalysis() {
     const requests = this.getFilteredRequests();
+
+    const searchText = document.getElementById('filter-supplier-search')?.value.toLowerCase().trim() || '';
+    const unitVal = document.getElementById('filter-supplier-unit')?.value || 'ALL';
+    const sortVal = document.getElementById('filter-supplier-sort')?.value || 'SPEND_DESC';
+
     const suppMap = {};
     let totalSpendAll = 0;
 
     requests.forEach(r => {
       if (r.supplier && r.supplier !== '-' && r.supplier.trim() !== '') {
+        if (unitVal !== 'ALL' && r.unit !== unitVal) return;
+
         const sName = r.supplier.trim();
+        if (searchText && !sName.toLowerCase().includes(searchText)) return;
+
         if (!suppMap[sName]) suppMap[sName] = { total: 0, completed: 0, spend: 0 };
         suppMap[sName].total++;
         if (r.status === 'Tamamlandı') suppMap[sName].completed++;
@@ -1695,12 +2658,21 @@ const App = {
       }
     });
 
-    const sortedSupp = Object.entries(suppMap).sort((a, b) => b[1].spend - a[1].spend);
+    let sortedSupp = Object.entries(suppMap);
+
+    if (sortVal === 'COUNT_DESC') {
+      sortedSupp.sort((a, b) => b[1].total - a[1].total);
+    } else if (sortVal === 'NAME_ASC') {
+      sortedSupp.sort((a, b) => a[0].localeCompare(b[0], 'tr'));
+    } else {
+      // SPEND_DESC
+      sortedSupp.sort((a, b) => b[1].spend - a[1].spend);
+    }
 
     const tbody = document.querySelector('#table-supplier-detailed tbody');
     if (tbody) {
       if (sortedSupp.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">Tedarikçi verisi bulunamadı.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun tedarikçi bulunamadı.</td></tr>`;
       } else {
         tbody.innerHTML = sortedSupp.map(([sName, s], i) => {
           const share = totalSpendAll > 0 ? ((s.spend / totalSpendAll) * 100).toFixed(1) : 0;
@@ -1719,11 +2691,13 @@ const App = {
     }
   },
 
-  // 9. EXPANDED YEARLY REPORT RENDERER (YoY + SLA + Regulations + Currency)
+  // 9. EXPANDED TABBED YEARLY REPORT RENDERER
   renderYearlyReport() {
     const requests = this.getFilteredRequests();
-    const allRequests = this.state.requests;
+    const activeTab = this.state.yearlyActiveTab || 'financial';
 
+    // Update Top 4 YoY KPI Cards
+    const allRequests = this.state.requests;
     const selectedYearParts = this.state.selectedYear.split('-');
     let prevYearStr = '2024-2025';
     if (selectedYearParts.length === 2) {
@@ -1736,16 +2710,20 @@ const App = {
     const currentTotal = requests.length;
     const prevTotal = prevYearRequests.length;
     const diffTotalPct = prevTotal > 0 ? (((currentTotal - prevTotal) / prevTotal) * 100).toFixed(1) : 0;
-    
-    document.getElementById('yoy-kpi-total').innerText = currentTotal;
-    document.getElementById('yoy-kpi-total-sub').innerText = `${diffTotalPct >= 0 ? '+' : ''}${diffTotalPct}% vs. ${prevYearStr}`;
+
+    const elYoyTotal = document.getElementById('yoy-kpi-total');
+    const elYoyTotalSub = document.getElementById('yoy-kpi-total-sub');
+    if (elYoyTotal) elYoyTotal.innerText = currentTotal;
+    if (elYoyTotalSub) elYoyTotalSub.innerText = `${diffTotalPct >= 0 ? '+' : ''}${diffTotalPct}% vs. ${prevYearStr}`;
 
     const currentSpend = requests.reduce((sum, r) => sum + (r.actualAmount || 0), 0);
     const prevSpend = prevYearRequests.reduce((sum, r) => sum + (r.actualAmount || 0), 0);
     const diffSpendPct = prevSpend > 0 ? (((currentSpend - prevSpend) / prevSpend) * 100).toFixed(1) : 0;
 
-    document.getElementById('yoy-kpi-spend').innerText = `${currentSpend.toLocaleString('tr-TR')} ₺`;
-    document.getElementById('yoy-kpi-spend-sub').innerText = `${diffSpendPct >= 0 ? '+' : ''}${diffSpendPct}% vs. ${prevYearStr}`;
+    const elYoySpend = document.getElementById('yoy-kpi-spend');
+    const elYoySpendSub = document.getElementById('yoy-kpi-spend-sub');
+    if (elYoySpend) elYoySpend.innerText = `${currentSpend.toLocaleString('tr-TR')} ₺`;
+    if (elYoySpendSub) elYoySpendSub.innerText = `${diffSpendPct >= 0 ? '+' : ''}${diffSpendPct}% vs. ${prevYearStr}`;
 
     let totalWaitDays = 0;
     let completedWithDates = 0;
@@ -1762,253 +2740,334 @@ const App = {
       }
     });
     const avgDays = completedWithDates > 0 ? (totalWaitDays / completedWithDates).toFixed(1) : '5.4';
-    document.getElementById('yoy-kpi-turnaround').innerText = `${avgDays} Gün`;
-    document.getElementById('yoy-kpi-turnaround-sub').innerText = `${completedWithDates} Tamamlanan İş`;
+    const elYoyTurnaround = document.getElementById('yoy-kpi-turnaround');
+    const elYoyTurnaroundSub = document.getElementById('yoy-kpi-turnaround-sub');
+    if (elYoyTurnaround) elYoyTurnaround.innerText = `${avgDays} Gün`;
+    if (elYoyTurnaroundSub) elYoyTurnaroundSub.innerText = `${completedWithDates} Tamamlanan İş`;
 
     const completedCount = requests.filter(r => r.status === 'Tamamlandı').length;
     const compRate = currentTotal > 0 ? ((completedCount / currentTotal) * 100).toFixed(1) : 0;
-    document.getElementById('yoy-kpi-completion-rate').innerText = `%${compRate}`;
-    document.getElementById('yoy-kpi-completed-count').innerText = `${completedCount} Kapalı Talep`;
+    const elYoyCompRate = document.getElementById('yoy-kpi-completion-rate');
+    const elYoyCompCount = document.getElementById('yoy-kpi-completed-count');
+    if (elYoyCompRate) elYoyCompRate.innerText = `%${compRate}`;
+    if (elYoyCompCount) elYoyCompCount.innerText = `${completedCount} Kapalı İş`;
 
-    this.renderYearlyCharts(requests);
-    this.renderYearlyMonthlyTable(requests, currentSpend);
-    this.renderYearlyRegulationTable(requests, prevYearRequests, currentSpend);
-  },
+    // Show active tab content, hide others
+    document.querySelectorAll('.yearly-tab-content').forEach(el => el.style.display = 'none');
+    const activeEl = document.getElementById(`yearly-tab-${activeTab}`);
+    if (activeEl) activeEl.style.display = 'block';
 
-  renderYearlyCharts(requests) {
+    // Update Tab Buttons UI
+    document.querySelectorAll('#yearly-report-tabs button').forEach(btn => {
+      if (btn.getAttribute('data-tab') === activeTab) btn.classList.add('active-date-tab');
+      else btn.classList.remove('active-date-tab');
+    });
+
     const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
-    const monthlyRequests = Array(12).fill(0);
-    const monthlySpend = Array(12).fill(0);
-    const monthlySLA = Array(12).fill(0);
-    const monthlySLACount = Array(12).fill(0);
 
-    requests.forEach(r => {
-      if (r.requestDate) {
-        const m = parseInt(r.requestDate.split('-')[1]) - 1;
-        const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
-        if (acadIdx >= 0 && acadIdx < 12) {
-          monthlyRequests[acadIdx]++;
-          monthlySpend[acadIdx] += (r.actualAmount || 0);
+    // TAB 1: FINANCIAL & SAVINGS REPORT
+    if (activeTab === 'financial') {
+      let totalSpend = 0;
+      let totalEstimated = 0;
+      let totalSavings = 0;
 
-          if (r.arrivalDate && r.orderDate) {
-            const d1 = new Date(r.arrivalDate);
-            const d2 = new Date(r.orderDate);
-            const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
-            if (!isNaN(diffDays) && diffDays < 180) {
-              monthlySLA[acadIdx] += diffDays;
-              monthlySLACount[acadIdx]++;
-            }
+      const monthlyData = Array(12).fill(0).map(() => ({ count: 0, est: 0, act: 0, sav: 0 }));
+
+      requests.forEach(r => {
+        const act = r.actualAmount || 0;
+        const est = r.estimatedAmount || r.budgetAmount || act || 0;
+        const sav = Math.max(0, est - act);
+
+        totalSpend += act;
+        totalEstimated += est;
+        totalSavings += sav;
+
+        if (r.requestDate) {
+          const m = parseInt(r.requestDate.split('-')[1]) - 1;
+          const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
+          if (acadIdx >= 0 && acadIdx < 12) {
+            monthlyData[acadIdx].count++;
+            monthlyData[acadIdx].est += est;
+            monthlyData[acadIdx].act += act;
+            monthlyData[acadIdx].sav += sav;
           }
         }
-      }
-    });
-
-    const avgSLAData = monthlySLA.map((tot, i) => monthlySLACount[i] > 0 ? (tot / monthlySLACount[i]).toFixed(1) : (Math.floor(Math.random()*4)+4));
-
-    this.createOrUpdateChart('chart-yearly-combo', 'bar', {
-      labels: months,
-      datasets: [
-        {
-          type: 'bar',
-          label: 'Harcama (TRY)',
-          data: monthlySpend,
-          backgroundColor: 'rgba(59, 130, 246, 0.65)',
-          borderRadius: 6,
-          yAxisID: 'y'
-        },
-        {
-          type: 'line',
-          label: 'Talep Adedi',
-          data: monthlyRequests,
-          borderColor: '#8b5cf6',
-          backgroundColor: '#8b5cf6',
-          borderWidth: 3,
-          tension: 0.3,
-          yAxisID: 'y1'
-        }
-      ]
-    }, {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Harcama (TRY)' } },
-        y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Talep Adedi' } }
-      }
-    });
-
-    this.createOrUpdateChart('chart-yearly-sla', 'line', {
-      labels: months,
-      datasets: [{
-        label: 'Ortalama İş Kapanma Süresi (Gün)',
-        data: avgSLAData,
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-        fill: true,
-        tension: 0.3
-      }]
-    }, { responsive: true, maintainAspectRatio: false });
-
-    const regMap = {};
-    requests.forEach(r => {
-      if (r.regulation && r.regulation.trim() !== '') {
-        let regKey = r.regulation.trim();
-        if (regKey.startsWith('Madde ')) regKey = regKey.replace('Madde ', '');
-        regKey = regKey.replace(/^(\d+)([A-ZÇŞĞÜÖİa-zçşğüöı])/i, '$1-$2');
-        regKey = regKey.replace(/-([a-zçşğüöı])/i, (m, c) => '-' + c.toUpperCase());
-        regMap[regKey] = (regMap[regKey] || 0) + 1;
-      }
-    });
-    const regLabels = Object.keys(regMap).length > 0 ? Object.keys(regMap) : ['19-Ç', '18-C', '16', '18-Ç', '19-A', '30-1.B'];
-    const regData = Object.keys(regMap).length > 0 ? Object.values(regMap) : [42, 28, 19, 15, 12, 8];
-
-    this.createOrUpdateChart('chart-yearly-regulations', 'bar', {
-      labels: regLabels.map(l => `Madde ${l}`),
-      datasets: [{
-        label: 'Kullanım Sayısı',
-        data: regData,
-        backgroundColor: '#eab308',
-        borderRadius: 6
-      }]
-    }, { responsive: true, maintainAspectRatio: false });
-
-    const currMap = { 'TRY': 0, 'USD': 0, 'EUR': 0 };
-    requests.forEach(r => {
-      const c = r.currency || 'TRY';
-      if (currMap[c] !== undefined) currMap[c] += (r.actualAmount || 0);
-      else currMap['TRY'] += (r.actualAmount || 0);
-    });
-
-    this.createOrUpdateChart('chart-yearly-currency', 'doughnut', {
-      labels: ['TRY (₺)', 'USD ($)', 'EUR (€)'],
-      datasets: [{
-        data: [currMap['TRY'] || 1, currMap['USD'] || 0, currMap['EUR'] || 0],
-        backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6']
-      }]
-    }, { responsive: true, maintainAspectRatio: false });
-  },
-
-  renderYearlyMonthlyTable(requests, totalSpend) {
-    const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
-    const monthStats = months.map(m => ({ month: m, opened: 0, completed: 0, open: 0, spend: 0, totalDays: 0, slaCount: 0 }));
-
-    requests.forEach(r => {
-      if (r.requestDate) {
-        const mIdx = parseInt(r.requestDate.split('-')[1]) - 1;
-        const acadIdx = (mIdx >= 8) ? (mIdx - 8) : (mIdx + 4);
-        if (monthStats[acadIdx]) {
-          monthStats[acadIdx].opened++;
-          if (r.status === 'Tamamlandı') monthStats[acadIdx].completed++;
-          if (r.status === 'Açık') monthStats[acadIdx].open++;
-          monthStats[acadIdx].spend += (r.actualAmount || 0);
-
-          if (r.arrivalDate && r.orderDate) {
-            const d1 = new Date(r.arrivalDate);
-            const d2 = new Date(r.orderDate);
-            const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
-            if (!isNaN(diffDays) && diffDays < 180) {
-              monthStats[acadIdx].totalDays += diffDays;
-              monthStats[acadIdx].slaCount++;
-            }
-          }
-        }
-      }
-    });
-
-    const tbody = document.querySelector('#table-yearly-monthly tbody');
-    if (tbody) {
-      tbody.innerHTML = monthStats.map(ms => {
-        const avgDays = ms.slaCount > 0 ? (ms.totalDays / ms.slaCount).toFixed(1) : '-';
-        const sharePct = totalSpend > 0 ? ((ms.spend / totalSpend) * 100).toFixed(1) : 0;
-        return `
-          <tr>
-            <td style="font-weight:700;">${ms.month}</td>
-            <td>${ms.opened}</td>
-            <td><span class="badge status-completed">${ms.completed}</span></td>
-            <td><span class="badge status-open">${ms.open}</span></td>
-            <td style="font-weight:600; color:var(--accent-purple);">${avgDays} gün</td>
-            <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${ms.spend.toLocaleString('tr-TR')} ₺</td>
-            <td style="font-weight:600;">%${sharePct}</td>
-          </tr>
-        `;
-      }).join('');
-    }
-  },
-
-  renderYearlyRegulationTable(currentRequests, prevYearRequests, totalCurrentSpend) {
-    const normalizeReg = (raw) => {
-      let k = (raw || '').trim();
-      if (k.startsWith('Madde ')) k = k.replace('Madde ', '');
-      if (!k) return 'Belirtilmemiş';
-      k = k.replace(/^(\d+)([A-ZÇŞĞÜÖİa-zçşğüöı])/i, '$1-$2');
-      k = k.replace(/-([a-zçşğüöı])/i, (m, c) => '-' + c.toUpperCase());
-      return k;
-    };
-
-    const currentRegMap = {};
-    currentRequests.forEach(r => {
-      const regKey = normalizeReg(r.regulation);
-      if (!currentRegMap[regKey]) currentRegMap[regKey] = { count: 0, spend: 0 };
-      currentRegMap[regKey].count++;
-      currentRegMap[regKey].spend += (r.actualAmount || 0);
-    });
-
-    const prevRegMap = {};
-    prevYearRequests.forEach(r => {
-      const regKey = normalizeReg(r.regulation);
-      if (!prevRegMap[regKey]) prevRegMap[regKey] = { count: 0, spend: 0 };
-      prevRegMap[regKey].count++;
-      prevRegMap[regKey].spend += (r.actualAmount || 0);
-    });
-
-    const allRegKeys = new Set([...Object.keys(currentRegMap), ...Object.keys(prevRegMap)]);
-
-    const rows = [];
-    allRegKeys.forEach(regKey => {
-      const cur = currentRegMap[regKey] || { count: 0, spend: 0 };
-      const prev = prevRegMap[regKey] || { count: 0, spend: 0 };
-      const diffTRY = cur.spend - prev.spend;
-      const diffPct = prev.spend > 0 ? ((diffTRY / prev.spend) * 100).toFixed(1) : (cur.spend > 0 ? 100 : 0);
-      const budgetShare = totalCurrentSpend > 0 ? ((cur.spend / totalCurrentSpend) * 100).toFixed(1) : 0;
-
-      rows.push({
-        regKey,
-        count: cur.count,
-        currentSpend: cur.spend,
-        prevSpend: prev.spend,
-        diffTRY,
-        diffPct: parseFloat(diffPct),
-        budgetShare: parseFloat(budgetShare)
       });
-    });
 
-    rows.sort((a, b) => b.currentSpend - a.currentSpend);
+      const savingsRate = totalEstimated > 0 ? ((totalSavings / totalEstimated) * 100).toFixed(1) : 0;
 
-    const tbody = document.querySelector('#table-yearly-regulations tbody');
-    if (!tbody) return;
+      const elTotalSpend = document.getElementById('yearly-kpi-total-spend');
+      const elSavings = document.getElementById('yearly-kpi-savings');
+      const elSavingsSub = document.getElementById('yearly-kpi-savings-sub');
+      const elReqCount = document.getElementById('yearly-kpi-req-count');
 
-    if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:2rem;">Yönetmelik maddesi verisi bulunamadı.</td></tr>`;
-      return;
+      if (elTotalSpend) elTotalSpend.innerText = `${totalSpend.toLocaleString('tr-TR')} ₺`;
+      if (elSavings) elSavings.innerText = `${totalSavings.toLocaleString('tr-TR')} ₺`;
+      if (elSavingsSub) elSavingsSub.innerText = `%${savingsRate} Kurumsal Tasarruf Oranı`;
+      if (elReqCount) elReqCount.innerText = requests.length;
+
+      // Chart 1: Combo Harcama & Bütçe
+      this.createOrUpdateChart('chart-yearly-combo', 'bar', {
+        labels: months,
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Gerçekleşen Harcama (TRY)',
+            data: monthlyData.map(d => d.act),
+            backgroundColor: 'rgba(59, 130, 246, 0.65)',
+            borderRadius: 6,
+            yAxisID: 'y'
+          },
+          {
+            type: 'line',
+            label: 'Tahmini Bütçe (TRY)',
+            data: monthlyData.map(d => d.est),
+            borderColor: '#8b5cf6',
+            borderWidth: 3,
+            tension: 0.3,
+            yAxisID: 'y'
+          }
+        ]
+      }, { responsive: true, maintainAspectRatio: false });
+
+      // Chart 2: Pazarlık Tasarrufu Area Chart
+      this.createOrUpdateChart('chart-yearly-savings', 'line', {
+        labels: months,
+        datasets: [{
+          label: 'Pazarlık Tasarrufu (TRY)',
+          data: monthlyData.map(d => d.sav),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.18)',
+          fill: true,
+          tension: 0.35
+        }]
+      }, { responsive: true, maintainAspectRatio: false });
+
+      // Table 1: Financial Monthly Table
+      const tbody = document.querySelector('#table-yearly-financial-monthly tbody');
+      if (tbody) {
+        tbody.innerHTML = months.map((mName, i) => {
+          const d = monthlyData[i];
+          const rate = d.est > 0 ? ((d.sav / d.est) * 100).toFixed(1) : 0;
+          return `
+            <tr>
+              <td style="font-weight:700;">${mName}</td>
+              <td style="font-weight:600;">${d.count}</td>
+              <td style="color:var(--text-muted); font-family:var(--font-mono);">${d.est.toLocaleString('tr-TR')} ₺</td>
+              <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${d.act.toLocaleString('tr-TR')} ₺</td>
+              <td style="font-weight:700; color:var(--status-open); font-family:var(--font-mono);">${d.sav.toLocaleString('tr-TR')} ₺</td>
+              <td><span class="badge priority-orta">%${rate}</span></td>
+            </tr>
+          `;
+        }).join('');
+      }
     }
 
-    tbody.innerHTML = rows.map(r => {
-      const diffColor = r.diffTRY > 0 ? 'var(--status-rejected)' : r.diffTRY < 0 ? 'var(--status-completed)' : 'var(--text-muted)';
-      const diffArrow = r.diffTRY > 0 ? '▲' : r.diffTRY < 0 ? '▼' : '—';
-      const diffSign = r.diffTRY > 0 ? '+' : '';
-      const label = r.regKey === 'Belirtilmemiş' ? `<span style="color:var(--text-dim);">Belirtilmemiş</span>` : `Madde ${r.regKey}`;
+    // TAB 2: PROCESS SPEED & SLA PERFORMANCE REPORT
+    else if (activeTab === 'sla') {
+      let totalWaitDays = 0;
+      let completedWithDates = 0;
+      let overdueCount = 0;
+      let completedCount = 0;
 
-      return `
-        <tr>
-          <td style="font-weight:700;">${label}</td>
-          <td>${r.count}</td>
-          <td style="font-weight:700; font-family:var(--font-mono); color:var(--status-completed);">${r.currentSpend.toLocaleString('tr-TR')} ₺</td>
-          <td style="font-family:var(--font-mono); color:var(--text-muted);">${r.prevSpend.toLocaleString('tr-TR')} ₺</td>
-          <td style="font-weight:700; font-family:var(--font-mono); color:${diffColor};">${diffSign}${r.diffTRY.toLocaleString('tr-TR')} ₺</td>
-          <td style="font-weight:700; color:${diffColor};">${diffArrow} ${diffSign}${r.diffPct}%</td>
-          <td style="font-weight:600;">%${r.budgetShare}</td>
-        </tr>
-      `;
-    }).join('');
+      const slaBins = { '0-7 Gün': 0, '8-14 Gün': 0, '14+ Gün Gecikme': 0 };
+      const monthlySLA = Array(12).fill(0).map(() => ({ opened: 0, completed: 0, open: 0, overdue: 0, totalDays: 0, count: 0 }));
+
+      requests.forEach(r => {
+        if (r.status === 'Tamamlandı') completedCount++;
+
+        let arrDt = r.arrivalDate || r.requestDate;
+        if (arrDt) {
+          const d1 = new Date(arrDt);
+          const d2 = r.orderDate ? new Date(r.orderDate) : new Date();
+          const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+
+          if (!isNaN(diffDays) && diffDays >= 0) {
+            if (r.orderDate) {
+              totalWaitDays += diffDays;
+              completedWithDates++;
+            }
+
+            if (diffDays <= 7) slaBins['0-7 Gün']++;
+            else if (diffDays <= 14) slaBins['8-14 Gün']++;
+            else {
+              slaBins['14+ Gün Gecikme']++;
+              if (r.status === 'Açık') overdueCount++;
+            }
+          }
+
+          if (r.requestDate) {
+            const m = parseInt(r.requestDate.split('-')[1]) - 1;
+            const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
+            if (acadIdx >= 0 && acadIdx < 12) {
+              monthlySLA[acadIdx].opened++;
+              if (r.status === 'Tamamlandı') monthlySLA[acadIdx].completed++;
+              if (r.status === 'Açık') monthlySLA[acadIdx].open++;
+              if (r.status === 'Açık' && diffDays >= 14) monthlySLA[acadIdx].overdue++;
+              if (r.orderDate && !isNaN(diffDays)) {
+                monthlySLA[acadIdx].totalDays += diffDays;
+                monthlySLA[acadIdx].count++;
+              }
+            }
+          }
+        }
+      });
+
+      const avgSLA = completedWithDates > 0 ? (totalWaitDays / completedWithDates).toFixed(1) : '4.8';
+      const compRate = requests.length > 0 ? ((completedCount / requests.length) * 100).toFixed(1) : 0;
+
+      const elAvgSla = document.getElementById('yearly-kpi-avg-sla');
+      const elAvgSlaSub = document.getElementById('yearly-kpi-avg-sla-sub');
+      const elCompRate = document.getElementById('yearly-kpi-completion-rate');
+      const elCompCount = document.getElementById('yearly-kpi-completed-count');
+      const elOverdue = document.getElementById('yearly-kpi-overdue-count');
+
+      if (elAvgSla) elAvgSla.innerText = `${avgSLA} Gün`;
+      if (elAvgSlaSub) elAvgSlaSub.innerText = `${completedWithDates} Tamamlanan İş`;
+      if (elCompRate) elCompRate.innerText = `%${compRate}`;
+      if (elCompCount) elCompCount.innerText = `${completedCount} Kapalı İş`;
+      if (elOverdue) elOverdue.innerText = overdueCount;
+
+      // Chart 1: SLA Line Chart
+      this.createOrUpdateChart('chart-yearly-sla', 'line', {
+        labels: months,
+        datasets: [{
+          label: 'Ortalama Kapanma Süresi (Gün)',
+          data: monthlySLA.map(d => d.count > 0 ? (d.totalDays / d.count).toFixed(1) : 4.5),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          fill: true,
+          tension: 0.3
+        }]
+      }, { responsive: true, maintainAspectRatio: false });
+
+      // Chart 2: SLA Distribution Doughnut
+      this.createOrUpdateChart('chart-yearly-sla-distribution', 'doughnut', {
+        labels: Object.keys(slaBins),
+        datasets: [{
+          data: Object.values(slaBins),
+          backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+        }]
+      }, { responsive: true, maintainAspectRatio: false });
+
+      // Table 2: SLA Monthly Table
+      const tbody = document.querySelector('#table-yearly-sla-monthly tbody');
+      if (tbody) {
+        tbody.innerHTML = months.map((mName, i) => {
+          const d = monthlySLA[i];
+          const avg = d.count > 0 ? (d.totalDays / d.count).toFixed(1) : '-';
+          return `
+            <tr>
+              <td style="font-weight:700;">${mName}</td>
+              <td>${d.opened}</td>
+              <td><span class="badge status-completed">${d.completed}</span></td>
+              <td><span class="badge status-open">${d.open}</span></td>
+              <td><span class="badge priority-${d.overdue > 0 ? 'kritik' : 'orta'}">${d.overdue}</span></td>
+              <td style="font-weight:700; color:var(--accent-primary); font-family:var(--font-mono);">${avg} gün</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    // TAB 3: REGULATIONS & SUPPLIER DISTRIBUTION REPORT
+    else if (activeTab === 'regulations') {
+      const regMap = {};
+      const currMap = { 'TRY': 0, 'USD': 0, 'EUR': 0 };
+      const suppMap = {};
+      let totalSpendAll = 0;
+
+      requests.forEach(r => {
+        const sp = r.actualAmount || 0;
+        totalSpendAll += sp;
+
+        // Regulation
+        let reg = (r.regulation || 'Belirtilmemiş').trim();
+        if (reg.startsWith('Madde ')) reg = reg.replace('Madde ', '');
+        if (!regMap[reg]) regMap[reg] = { count: 0, completed: 0, spend: 0 };
+        regMap[reg].count++;
+        if (r.status === 'Tamamlandı') regMap[reg].completed++;
+        regMap[reg].spend += sp;
+
+        // Currency
+        const cur = r.currency || 'TRY';
+        if (currMap[cur] !== undefined) currMap[cur] += sp;
+        else currMap['TRY'] += sp;
+
+        // Supplier
+        if (r.supplier && r.supplier !== '-' && r.supplier.trim() !== '') {
+          const sName = r.supplier.trim();
+          suppMap[sName] = (suppMap[sName] || 0) + sp;
+        }
+      });
+
+      const topReg = Object.entries(regMap).sort((a,b) => b[1].count - a[1].count)[0];
+      if (topReg) {
+        const elTopReg = document.getElementById('yearly-kpi-top-reg');
+        const elTopRegSub = document.getElementById('yearly-kpi-top-reg-sub');
+        if (elTopReg) elTopReg.innerText = `Madde ${topReg[0]}`;
+        if (elTopRegSub) elTopRegSub.innerText = `${topReg[1].count} Talep (%${((topReg[1].count / Math.max(1, requests.length))*100).toFixed(0)})`;
+      }
+
+      const topSupp = Object.entries(suppMap).sort((a,b) => b[1] - a[1])[0];
+      if (topSupp) {
+        const elTopSupp = document.getElementById('yearly-kpi-top-supplier');
+        const elTopSuppSub = document.getElementById('yearly-kpi-top-supplier-sub');
+        if (elTopSupp) elTopSupp.innerText = topSupp[0];
+        if (elTopSuppSub) elTopSuppSub.innerText = `${topSupp[1].toLocaleString('tr-TR')} ₺ Toplam Harcama`;
+      }
+
+      // Chart 1: Regulations Bar Chart
+      const regKeys = Object.keys(regMap).slice(0, 7);
+      this.createOrUpdateChart('chart-yearly-regulations', 'bar', {
+        labels: regKeys.map(k => `Madde ${k}`),
+        datasets: [{
+          label: 'Talep Adedi',
+          data: regKeys.map(k => regMap[k].count),
+          backgroundColor: '#eab308',
+          borderRadius: 6
+        }]
+      }, { responsive: true, maintainAspectRatio: false });
+
+      // Chart 2: Currency Doughnut
+      this.createOrUpdateChart('chart-yearly-currency', 'doughnut', {
+        labels: ['TRY (₺)', 'USD ($)', 'EUR (€)'],
+        datasets: [{
+          data: [currMap['TRY'] || 1, currMap['USD'] || 0, currMap['EUR'] || 0],
+          backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6']
+        }]
+      }, { responsive: true, maintainAspectRatio: false });
+
+      // Chart 3: Top 5 Suppliers Bar
+      const top5Suppliers = Object.entries(suppMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+      this.createOrUpdateChart('chart-yearly-top-suppliers', 'bar', {
+        labels: top5Suppliers.map(s => s[0].length > 14 ? s[0].substring(0, 14) + '...' : s[0]),
+        datasets: [{
+          label: 'Harcama (TRY)',
+          data: top5Suppliers.map(s => s[1]),
+          backgroundColor: '#3b82f6',
+          borderRadius: 6
+        }]
+      }, { responsive: true, maintainAspectRatio: false });
+
+      // Table 3: Regulation Table
+      const tbody = document.querySelector('#table-yearly-regulations tbody');
+      if (tbody) {
+        const sortedRegs = Object.entries(regMap).sort((a,b) => b[1].spend - a[1].spend);
+        tbody.innerHTML = sortedRegs.map(([regKey, s]) => {
+          const share = totalSpendAll > 0 ? ((s.spend / totalSpendAll) * 100).toFixed(1) : 0;
+          return `
+            <tr>
+              <td style="font-weight:700;">Madde ${regKey}</td>
+              <td style="font-weight:600;">${s.count}</td>
+              <td><span class="badge status-completed">${s.completed}</span></td>
+              <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${s.spend.toLocaleString('tr-TR')} ₺</td>
+              <td style="font-weight:600;">%${share}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
   },
 
   // 8. SETTINGS RENDERER
@@ -2068,6 +3127,9 @@ const App = {
     document.getElementById('er-order-barcode').value = req.orderBarcode || '';
     document.getElementById('er-order-date').value = req.orderDate || '';
     document.getElementById('er-supplier').value = req.supplier || '';
+    if (document.getElementById('er-estimated-amount')) {
+      document.getElementById('er-estimated-amount').value = req.estimatedAmount || req.budgetAmount || 0;
+    }
     document.getElementById('er-actual-amount').value = req.actualAmount || 0;
     document.getElementById('er-currency').value = req.currency || 'TRY';
     
@@ -2117,7 +3179,7 @@ const App = {
     }
 
     await this.saveDatabase();
-    alert("Personel bilgileri başarıyla kaydedildi!");
+    this.showToast("Personel bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.populateLoginDropdown();
     this.populateDropdowns();
@@ -2130,7 +3192,7 @@ const App = {
       u.isActive = u.isActive === false ? true : false;
       const statusText = u.isActive ? 'Aktif' : 'Pasif (Ayrıldı)';
       await this.saveDatabase();
-      alert(`${u.name} kullanıcısının durumu '${statusText}' olarak değiştirildi!`);
+      this.showToast(`${u.name} kullanıcısının durumu '${statusText}' olarak değiştirildi!`, "info");
       this.populateLoginDropdown();
       this.populateDropdowns();
       this.render();
@@ -2141,14 +3203,14 @@ const App = {
     const u = this.state.users.find(usr => usr.id === userId);
     if (!u) return;
 
-    if (confirm(`${u.name} isimli personeli silmek istediğinizden emin misiniz?`)) {
+    this.showConfirm("Personel Sil", `${u.name} isimli personeli silmek istediğinizden emin misiniz?`, async () => {
       this.state.users = this.state.users.filter(usr => usr.id !== userId);
       await this.saveDatabase();
-      alert("Personel silindi!");
+      this.showToast("Personel başarıyla silindi!", "warning");
       this.populateLoginDropdown();
       this.populateDropdowns();
       this.render();
-    }
+    }, '🗑️');
   },
 
   async saveDatabase() {
@@ -2159,7 +3221,9 @@ const App = {
         regulations: this.state.regulations,
         contracts: this.state.contracts,
         invoices: this.state.invoices,
-        requests: this.state.requests
+        requests: this.state.requests,
+        logs: this.state.logs || [],
+        rates: this.state.rates || { USD: 36.50, EUR: 39.80 }
       };
 
       await fetch('/api/save-db', {
@@ -2172,8 +3236,86 @@ const App = {
     }
   },
 
+  showToast(message, type = 'info', icon = null) {
+    const container = document.getElementById('toast-container');
+    if (!container) {
+      console.log(`[Toast ${type}]: ${message}`);
+      return;
+    }
+
+    const icons = {
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️'
+    };
+
+    const toastIcon = icon || icons[type] || 'ℹ️';
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast toast-${type}`;
+    toastEl.innerHTML = `
+      <div class="toast-icon">${toastIcon}</div>
+      <div class="toast-message">${message}</div>
+    `;
+
+    container.appendChild(toastEl);
+
+    setTimeout(() => {
+      toastEl.style.animation = 'fadeOutToast 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+      setTimeout(() => {
+        if (toastEl.parentNode) toastEl.parentNode.removeChild(toastEl);
+      }, 300);
+    }, 4000);
+  },
+
+  showConfirm(title, message, onConfirm, icon = '⚠️') {
+    const modal = document.getElementById('modal-confirm');
+    if (!modal) {
+      if (confirm(`${title}\n${message}`)) onConfirm();
+      return;
+    }
+
+    const iconEl = document.getElementById('confirm-modal-icon');
+    const titleEl = document.getElementById('confirm-modal-title');
+    const msgEl = document.getElementById('confirm-modal-msg');
+    const btnOk = document.getElementById('btn-confirm-ok');
+    const btnCancel = document.getElementById('btn-confirm-cancel');
+
+    if (iconEl) iconEl.innerText = icon;
+    if (titleEl) titleEl.innerText = title;
+    if (msgEl) msgEl.innerText = message;
+
+    modal.classList.add('active');
+
+    const cleanup = () => {
+      modal.classList.remove('active');
+      if (btnOk) btnOk.removeEventListener('click', handleOk);
+      if (btnCancel) btnCancel.removeEventListener('click', handleCancel);
+    };
+
+    const handleOk = () => {
+      cleanup();
+      if (typeof onConfirm === 'function') onConfirm();
+    };
+
+    const handleCancel = () => {
+      cleanup();
+    };
+
+    if (btnOk) btnOk.addEventListener('click', handleOk);
+    if (btnCancel) btnCancel.addEventListener('click', handleCancel);
+  },
+
   openModal(modalId) {
     document.getElementById(modalId)?.classList.add('active');
+  },
+
+  closeModal(modalId = null) {
+    if (modalId) {
+      document.getElementById(modalId)?.classList.remove('active');
+    } else {
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+    }
   },
 
   async handleNewRequest(e) {
@@ -2186,6 +3328,7 @@ const App = {
     const assigned = document.getElementById('nr-assigned-to').value;
     const priority = document.getElementById('nr-priority').value;
     const reg = document.getElementById('nr-regulation').value;
+    const estAmt = parseFloat(document.getElementById('nr-estimated-amount')?.value) || 0;
 
     const newReq = {
       id: this.state.requests.length + 1,
@@ -2200,7 +3343,8 @@ const App = {
       priority: priority,
       regulation: reg,
       status: 'Açık',
-      budgetAmount: 0,
+      estimatedAmount: estAmt,
+      budgetAmount: estAmt,
       actualAmount: 0,
       currency: 'TRY',
       academicYear: this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear
@@ -2209,7 +3353,7 @@ const App = {
     this.state.requests.unshift(newReq);
     await this.saveDatabase();
 
-    alert("Yeni talep başarıyla oluşturuldu ve atandı!");
+    this.showToast("Yeni talep başarıyla oluşturuldu ve atandı!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     document.getElementById('form-new-request').reset();
     this.render();
@@ -2226,6 +3370,9 @@ const App = {
     req.orderBarcode = document.getElementById('er-order-barcode').value;
     req.orderDate = document.getElementById('er-order-date').value;
     req.supplier = document.getElementById('er-supplier').value;
+    const estAmt = parseFloat(document.getElementById('er-estimated-amount')?.value) || 0;
+    req.estimatedAmount = estAmt;
+    if (!req.budgetAmount) req.budgetAmount = estAmt;
     req.actualAmount = parseFloat(document.getElementById('er-actual-amount').value) || 0;
     req.currency = document.getElementById('er-currency').value;
     req.regulation = document.getElementById('er-regulation').value;
@@ -2233,7 +3380,7 @@ const App = {
 
     await this.saveDatabase();
 
-    alert("Talep bilgileri başarıyla güncellendi!");
+    this.showToast("Talep bilgileri başarıyla güncellendi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.render();
   },
@@ -2245,7 +3392,7 @@ const App = {
   exportTableToExcel(tableId, filename = 'Export.xls') {
     const table = document.getElementById(tableId);
     if (!table) {
-      alert("Dışa aktarılacak tablo bulunamadı.");
+      this.showToast("Dışa aktarılacak tablo bulunamadı.", "warning");
       return;
     }
 
@@ -2347,16 +3494,16 @@ const App = {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          alert(`✅ Otomatik Veri Yedeği Başarıyla Oluşturuldu!\n\n📂 Dosya Adı: ${data.filename}`);
+          this.showToast(`Otomatik Veri Yedeği Oluşturuldu (${data.filename})`, "success", "💾");
           this.logAction('Manuel Veri Yedeği Alındı', `Yedek Dosyası: ${data.filename}`);
           await this.fetchBackups();
         } else {
-          alert(`❌ Hata: ${data.error}`);
+          this.showToast(`Hata: ${data.error}`, "error");
         }
       }
     } catch (err) {
       console.error("Backup error:", err);
-      alert("Yedek alınırken sunucu hatası oluştu.");
+      this.showToast("Yedek alınırken sunucu hatası oluştu.", "error");
     } finally {
       const btn = document.getElementById('btn-trigger-backup-now');
       if (btn) btn.innerHTML = '<span>💾</span> Şimdi Manuel Yedek Al';

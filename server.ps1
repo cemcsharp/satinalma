@@ -11,6 +11,11 @@ try {
     Write-Host " 🚀 SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (TCMB & REST OK)"
     Write-Host " 🌐 Yerel Erişim: http://localhost:$port/"
     Write-Host "=========================================================="
+    try {
+        Start-Process "http://localhost:$port/"
+    } catch {
+        # Browser launch fallback
+    }
 } catch {
     Write-Host "Could not start listener on port $port : $_"
     exit 1
@@ -50,7 +55,7 @@ function New-DatabaseBackup {
 }
 
 # Create initial backup on server startup if db.json exists
-New-DatabaseBackup -reason "startup"
+$null = New-DatabaseBackup -reason "startup"
 
 function Get-ContentType($filePath) {
     $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
@@ -116,11 +121,18 @@ while ($listener.IsListening) {
                 $eurRate = [double]($eurNode.ForexSelling.Replace(',', '.'))
                 $dateStr = (Get-Date -Format 'dd.MM.yyyy HH:mm')
 
-                $resJson = "{`"success`":true,`"USD`":$usdRate,`"EUR`":$eurRate,`"lastUpdated`":`"$dateStr`"}"
+                $ratesObj = [ordered]@{
+                    success = $true
+                    USD = $usdRate
+                    EUR = $eurRate
+                    lastUpdated = $dateStr
+                }
+                $resJson = $ratesObj | ConvertTo-Json -Compress
                 $resBytes = [System.Text.Encoding]::UTF8.GetBytes($resJson)
                 $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
             } catch {
-                $errJson = "{`"success`":false,`"error`":`"$($_)`"}"
+                $errObj = @{ success = $false; error = "$($_)" }
+                $errJson = $errObj | ConvertTo-Json -Compress
                 $errBytes = [System.Text.Encoding]::UTF8.GetBytes($errJson)
                 $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
             }
@@ -139,12 +151,18 @@ while ($listener.IsListening) {
                 $hasLock = $false
                 try {
                     $hasLock = $mutex.WaitOne(3000)
-                    $utf8Encoding = New-Object System.Text.UTF8Encoding($true)
-                    [System.IO.File]::WriteAllText($dbPath, $bodyJson, $utf8Encoding)
-                    
-                    $response.ContentType = "application/json; charset=utf-8"
-                    $okBytes = [System.Text.Encoding]::UTF8.GetBytes('{"success":true}')
-                    $response.OutputStream.Write($okBytes, 0, $okBytes.Length)
+                    if ($hasLock) {
+                        $utf8Encoding = New-Object System.Text.UTF8Encoding($true)
+                        [System.IO.File]::WriteAllText($dbPath, $bodyJson, $utf8Encoding)
+                        
+                        $response.ContentType = "application/json; charset=utf-8"
+                        $okBytes = [System.Text.Encoding]::UTF8.GetBytes('{"success":true}')
+                        $response.OutputStream.Write($okBytes, 0, $okBytes.Length)
+                    } else {
+                        $response.StatusCode = 500
+                        $errBytes = [System.Text.Encoding]::UTF8.GetBytes('{"success":false,"error":"Mutex lock timeout"}')
+                        $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
+                    }
                 } finally {
                     if ($hasLock) { $mutex.ReleaseMutex() }
                 }
@@ -169,8 +187,8 @@ while ($listener.IsListening) {
                     }
                 }
             }
-            $resJson = $list | ConvertTo-Json -Compress
-            if (-not $resJson) { $resJson = "[]" }
+            $resJson = @($list) | ConvertTo-Json -Compress
+            if (-not $resJson -or $resJson -eq "null") { $resJson = "[]" }
             $resBytes = [System.Text.Encoding]::UTF8.GetBytes($resJson)
             $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
             $response.Close()
@@ -192,7 +210,7 @@ while ($listener.IsListening) {
             continue
         }
 
-        # Static File Serving
+        # Static File Serving (with Path Traversal Guard)
         $filePath = ""
         if ($urlPath -eq "/") {
             $filePath = Join-Path $publicDir "index.html"
@@ -201,17 +219,24 @@ while ($listener.IsListening) {
             $filePath = Join-Path $publicDir $cleanRelPath
         }
 
-        if (Test-Path $filePath -PathType Leaf) {
-            $response.ContentType = Get-ContentType $filePath
-            $bytes = [System.IO.File]::ReadAllBytes($filePath)
+        $fullPath = [System.IO.Path]::GetFullPath($filePath)
+        $fullPublicDir = [System.IO.Path]::GetFullPath($publicDir)
+
+        if ($fullPath.StartsWith($fullPublicDir, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path $fullPath -PathType Leaf)) {
+            $response.ContentType = Get-ContentType $fullPath
+            $bytes = [System.IO.File]::ReadAllBytes($fullPath)
             $response.ContentLength64 = $bytes.Length
-            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            if ($request.HttpMethod -ne "HEAD") {
+                $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            }
         } else {
             $response.StatusCode = 404
             $notFoundBytes = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found")
-            $response.OutputStream.Write($notFoundBytes, 0, $notFoundBytes.Length)
+            if ($request.HttpMethod -ne "HEAD") {
+                $response.OutputStream.Write($notFoundBytes, 0, $notFoundBytes.Length)
+            }
         }
-        $response.Close()
+        try { $response.Close() } catch {}
     } catch {
         Write-Host "Error handling request: $_"
     }
