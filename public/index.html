@@ -487,6 +487,39 @@
           <!-- Active personnel cards injected dynamically -->
         </div>
 
+        <!-- Personel Pazarlık Tasarrufu (Saving) Analizi -->
+        <div class="glass-card" style="margin-bottom: 2rem;">
+          <div class="card-header">
+            <div>
+              <h3 style="display:flex; align-items:center; gap:0.5rem;">🎯 Personel Pazarlık Tasarrufu (Saving) Performansı</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Uzmanların bütçe / ilk teklif tutarı ile gerçekleşen satınalma tutarı arasında sağladığı net tasarruf miktarı
+              </p>
+            </div>
+            <div id="total-savings-summary-badge" style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.35); color: var(--status-completed); font-weight: 700; padding: 0.6rem 1.1rem; border-radius: var(--radius-md); font-size: 0.95rem; font-family: var(--font-mono);">
+              💰 Toplam Tasarruf: 0 ₺
+            </div>
+          </div>
+
+          <div class="table-container" style="margin-top: 0.75rem;">
+            <table class="custom-table" id="table-personnel-savings">
+              <thead>
+                <tr>
+                  <th>Satınalma Uzmanı</th>
+                  <th>Unvanı</th>
+                  <th>Toplam İş</th>
+                  <th>Pazarlıklı İş Sayısı</th>
+                  <th>Tahmini / Bütçe Tutarı</th>
+                  <th>Gerçekleşen Tutar</th>
+                  <th>Sağlanan Net Tasarruf (₺)</th>
+                  <th>Tasarruf Oranı (%)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Delegation Section -->
         <div class="glass-card">
           <div class="card-header">

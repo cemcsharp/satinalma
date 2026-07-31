@@ -1121,9 +1121,11 @@ const App = {
     let totalSavings = 0;
 
     requests.forEach(r => {
-      if (r.estimatedAmount > 0 && r.actualAmount > 0 && r.estimatedAmount > r.actualAmount) {
-        totalEstimated += r.estimatedAmount;
-        totalSavings += (r.estimatedAmount - r.actualAmount);
+      const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+      const actAmt = parseFloat(r.actualAmount) || 0;
+      if (initAmt > 0 && actAmt > 0 && initAmt > actAmt) {
+        totalEstimated += initAmt;
+        totalSavings += (initAmt - actAmt);
       }
     });
 
@@ -1427,7 +1429,20 @@ const App = {
     const activeUsers = this.state.users.filter(u => u.isActive !== false);
     const personMap = {};
     activeUsers.forEach(u => {
-      personMap[u.name] = { user: u, total: 0, open: 0, completed: 0, rejected: 0, critical: 0, high: 0, score: 0, savings: 0 };
+      personMap[u.name] = {
+        user: u,
+        total: 0,
+        open: 0,
+        completed: 0,
+        rejected: 0,
+        critical: 0,
+        high: 0,
+        score: 0,
+        savings: 0,
+        savingsCount: 0,
+        initialTotal: 0,
+        actualTotal: 0
+      };
     });
 
     requests.forEach(r => {
@@ -1441,8 +1456,15 @@ const App = {
         if (r.priority === 'Kritik') p.critical++;
         if (r.priority === 'Yüksek') p.high++;
 
-        if (r.estimatedAmount > 0 && r.actualAmount > 0 && r.estimatedAmount > r.actualAmount) {
-          p.savings += (r.estimatedAmount - r.actualAmount);
+        const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+        const actAmt = parseFloat(r.actualAmount) || 0;
+
+        if (initAmt > 0 && actAmt > 0 && initAmt > actAmt) {
+          const diff = initAmt - actAmt;
+          p.savings += diff;
+          p.savingsCount++;
+          p.initialTotal += initAmt;
+          p.actualTotal += actAmt;
         }
       }
     });
@@ -1453,39 +1475,81 @@ const App = {
 
     const cardsContainer = document.getElementById('workload-cards-container');
     if (cardsContainer) {
-      cardsContainer.innerHTML = Object.values(personMap).map(p => `
-        <div class="workload-card">
-          <div class="workload-header">
-            <div class="person-info">
-              <h4>${p.user.name}</h4>
-              <p>${p.user.title}</p>
-            </div>
-            <div class="workload-score">
-              <div class="score-num">${p.score}</div>
-              <p>Yük Skoru</p>
-            </div>
-          </div>
+      cardsContainer.innerHTML = Object.values(personMap).map(p => {
+        const savingStr = p.savings >= 1000000 
+          ? (p.savings / 1000000).toFixed(2) + 'M ₺' 
+          : p.savings >= 1000 
+            ? (p.savings / 1000).toFixed(1) + 'k ₺' 
+            : p.savings.toLocaleString('tr-TR') + ' ₺';
 
-          <div class="workload-stats">
-            <div class="stat-box">
-              <h5>${p.total}</h5>
-              <p>Toplam</p>
+        return `
+          <div class="workload-card">
+            <div class="workload-header">
+              <div class="person-info">
+                <h4>${p.user.name}</h4>
+                <p>${p.user.title}</p>
+              </div>
+              <div class="workload-score">
+                <div class="score-num">${p.score}</div>
+                <p>Yük Skoru</p>
+              </div>
             </div>
-            <div class="stat-box">
-              <h5 style="color:var(--status-open);">${p.open}</h5>
-              <p>Açık</p>
-            </div>
-            <div class="stat-box">
-              <h5 style="color:var(--status-completed);">${p.completed}</h5>
-              <p>Biten</p>
-            </div>
-            <div class="stat-box">
-              <h5 style="color:var(--status-completed); font-size:0.85rem;" title="Uzmanın Kuruma Kazandırdığı Pazarlık Tasarrufu">🎯 ${p.savings > 0 ? (p.savings / 1000).toFixed(1) + 'k ₺' : '0 ₺'}</h5>
-              <p>Tasarruf</p>
+
+            <div class="workload-stats">
+              <div class="stat-box">
+                <h5>${p.total}</h5>
+                <p>Toplam</p>
+              </div>
+              <div class="stat-box">
+                <h5 style="color:var(--status-open);">${p.open}</h5>
+                <p>Açık</p>
+              </div>
+              <div class="stat-box">
+                <h5 style="color:var(--status-completed);">${p.completed}</h5>
+                <p>Biten</p>
+              </div>
+              <div class="stat-box" style="background: rgba(34, 197, 94, 0.08); border-radius: 6px; padding: 0.35rem 0.2rem;">
+                <h5 style="color:var(--status-completed); font-size:0.88rem;" title="Uzmanın Sağladığı Net Pazarlık Tasarrufu">🎯 ${savingStr}</h5>
+                <p style="color:var(--status-completed); font-weight:700;">Tasarruf</p>
+              </div>
             </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
+    }
+
+    // Render Personnel Savings Table & Summary Badge
+    const grandSavings = Object.values(personMap).reduce((sum, p) => sum + p.savings, 0);
+    const savingsBadge = document.getElementById('total-savings-summary-badge');
+    if (savingsBadge) {
+      savingsBadge.innerHTML = `💰 Toplam Pazarlık Tasarrufu: <strong>${grandSavings.toLocaleString('tr-TR')} ₺</strong>`;
+    }
+
+    const savingsTbody = document.querySelector('#table-personnel-savings tbody');
+    if (savingsTbody) {
+      const sortedPersons = Object.values(personMap).sort((a, b) => b.savings - a.savings);
+      
+      savingsTbody.innerHTML = sortedPersons.map(p => {
+        const ratePct = p.initialTotal > 0 ? ((p.savings / p.initialTotal) * 100).toFixed(1) : '0.0';
+        return `
+          <tr>
+            <td><strong style="color:var(--text-main);">${p.user.name}</strong></td>
+            <td style="font-size:0.82rem; color:var(--text-muted);">${p.user.title}</td>
+            <td><span class="badge" style="background:var(--bg-card);">${p.total} İş</span></td>
+            <td><span class="badge status-open">${p.savingsCount} Pazarlıklı İş</span></td>
+            <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.initialTotal > 0 ? p.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+            <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.actualTotal > 0 ? p.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+            <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.95rem;">
+              ${p.savings > 0 ? '+' + p.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
+            </td>
+            <td>
+              <span class="badge" style="background:${p.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${p.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
+                %${ratePct} Tasarruf
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
     this.renderDelegationTable(requests);
