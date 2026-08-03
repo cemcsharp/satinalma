@@ -71,6 +71,7 @@ const App = {
         this.state.invoices = data.invoices || [];
         this.state.logs = data.logs || [];
         if (data.rates) this.state.rates = data.rates;
+        this.state.dismissedNotifs = JSON.parse(localStorage.getItem('dismissedNotifs') || '[]');
 
         this.populateLoginDropdown();
         this.populateDropdowns();
@@ -574,6 +575,10 @@ const App = {
     document.getElementById('form-guarantee-manage')?.addEventListener('submit', (e) => this.handleSaveGuarantee(e));
     document.getElementById('form-invoice-manage')?.addEventListener('submit', (e) => this.handleSaveInvoice(e));
 
+    // Notification Center Event Listeners
+    document.getElementById('btn-mark-all-notifications-read')?.addEventListener('click', () => this.markAllNotificationsRead());
+    document.getElementById('filter-notif-category')?.addEventListener('change', () => this.renderNotificationsView());
+
     // Delegation Execution
     document.getElementById('btn-execute-delegation')?.addEventListener('click', () => this.handleDelegation());
 
@@ -885,6 +890,7 @@ const App = {
       requests: { title: 'Talep Yönetimi', sub: 'Tüm satınalma taleplerinin filtrelenebilir ve düzenlenebilir ana tablosu' },
       workload: { title: 'İş Yükü & Delegasyon', sub: 'Aktif personellerin iş yük puanları ve hızlı talep devretme' },
       'my-requests': { title: 'Taleplerim (Personel)', sub: 'Tarafınıza atanmış aktif satınalma talepleri ve sipariş girişi' },
+      notifications: { title: 'Bildirim Merkezi', sub: 'Sözleşme vadeleri, teminat bitişleri, ödeme uyarısı ve 14 günden fazla bekleyen taleplere ilişkin tüm bildirimler' },
       contracts: { title: 'Sözleşme Takip', sub: 'Sözleşme süreleri, teminat mektupları ve yaklaşan bitiş uyarıları' },
       guarantees: { title: 'Teminat Mektupları', sub: 'İhale ve iş bazlı banka teminat mektupları, kasa saklama ve vade takibi' },
       invoices: { title: 'Fatura & Muhasebe', sub: 'Vadesi gelen faturalar ve haftalık nakit akış ödeme listesi' },
@@ -944,6 +950,7 @@ const App = {
     else if (view === 'requests') this.renderRequestsTable();
     else if (view === 'workload') this.renderWorkloadView();
     else if (view === 'my-requests') this.renderMyRequestsTable();
+    else if (view === 'notifications') this.renderNotificationsView();
     else if (view === 'contracts') this.renderContracts();
     else if (view === 'guarantees') this.renderGuarantees();
     else if (view === 'invoices') this.renderInvoices();
@@ -954,151 +961,277 @@ const App = {
     else if (view === 'settings') this.renderSettings();
   },
 
-  // 🔔 NOTIFICATION CENTER & ALERTS
-  renderNotifications() {
+  // 🔔 NOTIFICATION CENTER & ALERTS (GÜNCELLENMİŞ VE GELİŞTİRİLMİŞ)
+  getAllNotifications() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const notifs = [];
     const dismissed = this.state.dismissedNotifs || [];
+    const allNotifs = [];
 
-    // 1. 14+ Day SLA Overdue Requests
-    if (!dismissed.includes('sla')) {
-      const overdueRequests = (this.state.requests || []).filter(r => {
-        if (r.status !== 'Açık') return false;
-        const d = new Date(r.arrivalDate || r.requestDate);
-        d.setHours(0, 0, 0, 0);
-        const diff = Math.max(0, Math.ceil((today - d) / (1000 * 60 * 60 * 24)));
-        return diff >= 14;
-      });
+    // 1. SLA 14+ Days Overdue Requests
+    const overdueRequests = (this.state.requests || []).filter(r => {
+      if (r.status !== 'Açık') return false;
+      const d = new Date(r.arrivalDate || r.requestDate);
+      d.setHours(0, 0, 0, 0);
+      const diff = Math.max(0, Math.ceil((today - d) / (1000 * 60 * 60 * 24)));
+      return diff >= 14;
+    });
 
-      if (overdueRequests.length > 0) {
-      notifs.push({
-        type: 'sla',
+    overdueRequests.forEach(r => {
+      const id = `sla_${r.id}`;
+      const d = new Date(r.arrivalDate || r.requestDate);
+      d.setHours(0, 0, 0, 0);
+      const diff = Math.max(0, Math.ceil((today - d) / (1000 * 60 * 60 * 24)));
+
+      allNotifs.push({
+        id: id,
+        category: 'SLA',
         icon: '🚨',
-        title: `${overdueRequests.length} Adet Talep SLA Sınırını (14 Gün) Aştı!`,
-        sub: 'Gecikmiş açık talepleri incelemek için tıklayın',
+        title: `Barkod #${r.requestBarcode || r.id} — ${r.subject || 'Talep'} (${diff} Gün Gecikmede!)`,
+        sub: `Birim: ${r.unit} | Atanan: ${r.assignedTo || 'Atanmadı'} | Geliş: ${r.arrivalDate || r.requestDate}`,
+        date: r.arrivalDate || r.requestDate,
+        isRead: dismissed.includes(id) || dismissed.includes('sla'),
         action: () => {
           this.switchView('requests');
-          const sel = document.getElementById('filter-status');
-          if (sel) {
-            sel.value = 'OVERDUE_14';
-            this.renderRequestsTable();
-          }
+          setTimeout(() => this.viewRequestDetails(r.id), 100);
         }
       });
-      }
-    }
+    });
 
-    // 2. Contracts Expiring in <= 30 Days or Guarantee Expiry in <= 30 Days
-    if (!dismissed.includes('contract')) {
-      const expiringContracts = (this.state.contracts || []).filter(c => {
-        if (c.status !== 'Aktif') return false;
-        let isExpiring = false;
-        if (c.endDate) {
-          const endDt = new Date(c.endDate);
-          const diff = Math.ceil((endDt - today) / (1000 * 60 * 60 * 24));
-          if (diff >= 0 && diff <= 30) isExpiring = true;
+    // 2. Contracts Expiring in <= 30 Days
+    const activeContracts = (this.state.contracts || []).filter(c => c.status === 'Aktif');
+    activeContracts.forEach(c => {
+      if (c.endDate) {
+        const endDt = new Date(c.endDate);
+        endDt.setHours(0, 0, 0, 0);
+        const diff = Math.ceil((endDt - today) / (1000 * 60 * 60 * 24));
+        if (diff >= 0 && diff <= 30) {
+          const id = `contract_${c.id}`;
+          allNotifs.push({
+            id: id,
+            category: 'CONTRACT',
+            icon: '📑',
+            title: `Sözleşme #${c.contractNo || c.id} — ${c.title} (Son ${diff} Gün!)`,
+            sub: `Yüklenici: ${c.supplier} | Bitiş Tarihi: ${c.endDate} | Tutar: ${c.totalAmount?.toLocaleString('tr-TR')} ₺`,
+            date: c.endDate,
+            isRead: dismissed.includes(id) || dismissed.includes('contract'),
+            action: () => {
+              this.switchView('contracts');
+              setTimeout(() => this.viewContractDetails(c.id), 100);
+            }
+          });
         }
-        if (c.guaranteeExpiry) {
-          const gDt = new Date(c.guaranteeExpiry);
-          const diffG = Math.ceil((gDt - today) / (1000 * 60 * 60 * 24));
-          if (diffG >= 0 && diffG <= 30) isExpiring = true;
-        }
-        return isExpiring;
-      });
-
-      if (expiringContracts.length > 0) {
-        notifs.push({
-          type: 'contract',
-          icon: '📑',
-          title: `${expiringContracts.length} Adet Sözleşme / Teminat Süresi Bitiyor!`,
-          sub: 'Son 30 gün kalan aktif anlaşmaları kontrol edin',
-          action: () => {
-            this.switchView('contracts');
-          }
-        });
       }
-    }
+    });
 
-    // 3. Unpaid Invoices Due in <= 7 Days or Overdue
-    if (!dismissed.includes('invoice')) {
-      const dueInvoices = (this.state.invoices || []).filter(i => {
-        if (i.paymentStatus === 'Ödendi') return false;
-        if (i.dueDate) {
-          const dDt = new Date(i.dueDate);
-          const diff = Math.ceil((dDt - today) / (1000 * 60 * 60 * 24));
-          return diff <= 7;
+    // 3. Guarantees Expiring in <= 30 Days
+    const activeGuarantees = (this.state.guarantees || []).filter(g => g.status === 'Aktif' || g.status === 'Vadesi Yaklaşan');
+    activeGuarantees.forEach(g => {
+      if (g.expiryDate) {
+        const expDt = new Date(g.expiryDate);
+        expDt.setHours(0, 0, 0, 0);
+        const diff = Math.ceil((expDt - today) / (1000 * 60 * 60 * 24));
+        if (diff <= 30) {
+          const id = `guarantee_${g.id}`;
+          allNotifs.push({
+            id: id,
+            category: 'GUARANTEE',
+            icon: '🛡️',
+            title: `Teminat Mektubu #${g.letterNo || g.id} — ${g.bankName} (${diff < 0 ? 'Süresi Doldu!' : `Son ${diff} Gün!`})`,
+            sub: `Firma: ${g.supplier} | İhale: ${g.title} | Tutar: ${g.amount?.toLocaleString('tr-TR')} ${g.currency || 'TRY'}`,
+            date: g.expiryDate,
+            isRead: dismissed.includes(id) || dismissed.includes('guarantee'),
+            action: () => {
+              this.switchView('guarantees');
+              setTimeout(() => this.viewGuaranteeDetails(g.id), 100);
+            }
+          });
         }
-        return false;
-      });
-
-      if (dueInvoices.length > 0) {
-        notifs.push({
-          type: 'invoice',
-          icon: '⏳',
-          title: `${dueInvoices.length} Adet Faturanın Vadesi Yaklaştı / Geçti!`,
-          sub: 'Vadesi 7 gün içinde gelen faturaları görüntüleyin',
-          action: () => {
-            this.switchView('invoices');
-          }
-        });
       }
-    }
+    });
+
+    // 4. Invoices Due in <= 7 Days
+    const activeInvoices = (this.state.invoices || []).filter(i => i.paymentStatus !== 'Ödendi');
+    activeInvoices.forEach(i => {
+      if (i.dueDate) {
+        const dDt = new Date(i.dueDate);
+        dDt.setHours(0, 0, 0, 0);
+        const diff = Math.ceil((dDt - today) / (1000 * 60 * 60 * 24));
+        if (diff <= 7) {
+          const id = `invoice_${i.id}`;
+          allNotifs.push({
+            id: id,
+            category: 'INVOICE',
+            icon: '🧾',
+            title: `Fatura #${i.invoiceNo || i.id} — ${i.supplier} (${diff < 0 ? `${Math.abs(diff)} Gün Gecikti!` : diff === 0 ? 'Bugün Vade!' : `${diff} Gün Kaldı`})`,
+            sub: `Vade Tarihi: ${i.dueDate} | Tutar: ${i.amount?.toLocaleString('tr-TR')} ${i.currency || 'TRY'}`,
+            date: i.dueDate,
+            isRead: dismissed.includes(id) || dismissed.includes('invoice'),
+            action: () => {
+              this.switchView('invoices');
+              setTimeout(() => this.viewInvoiceDetails(i.id), 100);
+            }
+          });
+        }
+      }
+    });
+
+    return allNotifs;
+  },
+
+  renderNotifications() {
+    const allNotifs = this.getAllNotifications();
+    const unreadNotifs = allNotifs.filter(n => !n.isRead);
 
     const badge = document.getElementById('notif-badge');
+    const navBadge = document.getElementById('nav-notif-badge');
     const headerCount = document.getElementById('notif-header-count');
     const list = document.getElementById('notif-list');
 
-    const totalNotifs = notifs.length;
+    const unreadCount = unreadNotifs.length;
 
     if (badge) {
-      if (totalNotifs > 0) {
+      if (unreadCount > 0) {
         badge.style.display = 'inline-block';
-        badge.innerText = totalNotifs;
+        badge.innerText = unreadCount;
       } else {
         badge.style.display = 'none';
       }
     }
 
+    if (navBadge) {
+      if (unreadCount > 0) {
+        navBadge.style.display = 'inline-block';
+        navBadge.innerText = unreadCount;
+      } else {
+        navBadge.style.display = 'none';
+      }
+    }
+
     if (headerCount) {
-      headerCount.innerText = `${totalNotifs} Akıllı Uyarı`;
+      headerCount.innerText = `${unreadCount} Okunmamış Bildirim`;
     }
 
     if (list) {
-      if (notifs.length === 0) {
-        list.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">Şu an için kritik uyarı veya bildiriminiz yok.</div>`;
+      if (unreadNotifs.length === 0) {
+        list.innerHTML = `
+          <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+            ✅ Tüm bildirimler okundu. Kritik uyarı bulunmamaktadır.
+          </div>
+        `;
       } else {
-        list.innerHTML = notifs.map((n, idx) => `
-          <div class="notif-item" style="padding-right: 0.5rem;">
-            <div class="notif-item-icon" onclick="App._triggerNotif(${idx})" style="cursor:pointer; flex:1; display:flex; gap:0.5rem; align-items:flex-start;">
-              <span>${n.icon}</span>
-              <div>
-                <div class="notif-item-title">${n.title}</div>
-                <div class="notif-item-sub">${n.sub}</div>
-              </div>
+        list.innerHTML = unreadNotifs.slice(0, 6).map((n, idx) => `
+          <div class="notif-item" style="padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border-color); display:flex; align-items:flex-start; gap:0.6rem; cursor:pointer;" onclick="App._triggerNotifAndRead('${n.id}', ${idx})">
+            <span style="font-size:1.2rem;">${n.icon}</span>
+            <div style="flex:1; min-width:0;">
+              <div class="notif-item-title" style="font-weight:700; font-size:0.82rem; color:var(--text-main); line-height:1.3;">${n.title}</div>
+              <div class="notif-item-sub" style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${n.sub}</div>
             </div>
-            <button onclick="App.dismissNotif('${n.type}')" title="Bu uyarıyı kapat" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1.1rem; padding:0.2rem 0.4rem; flex-shrink:0; border-radius:4px;" onmouseover="this.style.color='var(--status-rejected)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+            <button onclick="event.stopPropagation(); App.dismissNotif('${n.id}')" title="Okundu işaretle ve kaldır" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:0.95rem; padding:0.1rem 0.3rem;" onmouseover="this.style.color='var(--status-rejected)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
           </div>
         `).join('');
-        this._notifActions = notifs.map(n => n.action);
+        this._notifActions = unreadNotifs.slice(0, 6).map(n => n.action);
       }
     }
-  },
 
-  dismissNotif(type) {
-    if (!this.state.dismissedNotifs.includes(type)) {
-      this.state.dismissedNotifs.push(type);
+    if (this.state.currentView === 'notifications') {
+      this.renderNotificationsView();
     }
-    this.renderNotifications();
   },
 
-  _triggerNotif(idx) {
+  _triggerNotifAndRead(notifId, idx) {
+    this.dismissNotif(notifId);
     const dropdown = document.getElementById('notification-dropdown');
     if (dropdown) dropdown.classList.remove('show');
     if (this._notifActions && this._notifActions[idx]) {
       this._notifActions[idx]();
     }
+  },
+
+  dismissNotif(id) {
+    if (!this.state.dismissedNotifs) this.state.dismissedNotifs = [];
+    if (!this.state.dismissedNotifs.includes(id)) {
+      this.state.dismissedNotifs.push(id);
+      localStorage.setItem('dismissedNotifs', JSON.stringify(this.state.dismissedNotifs));
+    }
+    this.renderNotifications();
+  },
+
+  markAllNotificationsRead() {
+    const allNotifs = this.getAllNotifications();
+    if (!this.state.dismissedNotifs) this.state.dismissedNotifs = [];
+
+    allNotifs.forEach(n => {
+      if (!this.state.dismissedNotifs.includes(n.id)) {
+        this.state.dismissedNotifs.push(n.id);
+      }
+    });
+
+    localStorage.setItem('dismissedNotifs', JSON.stringify(this.state.dismissedNotifs));
+    this.showToast("Tüm bildirimler okundu olarak işaretlendi!", "success", "✅");
+    this.renderNotifications();
+  },
+
+  renderNotificationsView() {
+    const container = document.getElementById('notifications-full-list');
+    if (!container) return;
+
+    const categoryFilter = document.getElementById('filter-notif-category')?.value || 'ALL';
+    let allNotifs = this.getAllNotifications();
+
+    if (categoryFilter === 'UNREAD') {
+      allNotifs = allNotifs.filter(n => !n.isRead);
+    } else if (categoryFilter !== 'ALL') {
+      allNotifs = allNotifs.filter(n => n.category === categoryFilter);
+    }
+
+    if (allNotifs.length === 0) {
+      container.innerHTML = `
+        <div class="glass-card" style="text-align: center; padding: 3rem 1.5rem; color: var(--text-muted);">
+          <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
+          <h4 style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 0.25rem;">Seçilen kritere uygun bildirim bulunmuyor</h4>
+          <p style="font-size: 0.85rem;">Tüm kritik uyarılarınız günceldir veya okundu olarak işaretlenmiştir.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = allNotifs.map(n => {
+      let catBadge = '';
+      if (n.category === 'SLA') catBadge = `<span class="badge priority-kritik">🚨 SLA Gecikmesi</span>`;
+      else if (n.category === 'CONTRACT') catBadge = `<span class="badge priority-yüksek">📑 Sözleşme Bitişi</span>`;
+      else if (n.category === 'GUARANTEE') catBadge = `<span class="badge priority-orta">🛡️ Teminat Vadesi</span>`;
+      else if (n.category === 'INVOICE') catBadge = `<span class="badge status-open">🧾 Fatura Ödemesi</span>`;
+
+      return `
+        <div class="glass-card" style="padding: 1.25rem; display: flex; gap: 1rem; align-items: center; justify-content: space-between; opacity: ${n.isRead ? '0.65' : '1'}; border-left: 4px solid ${n.isRead ? 'var(--border-color)' : 'var(--accent-primary)'}; transition: all 0.2s ease;">
+          <div style="display: flex; gap: 1rem; align-items: flex-start; flex: 1;">
+            <div style="font-size: 2rem; background: var(--bg-hover); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); flex-shrink: 0;">${n.icon}</div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
+                ${catBadge}
+                <span style="font-size: 0.78rem; color: var(--text-muted);">📅 ${n.date || 'Bugün'}</span>
+                ${n.isRead ? `<span style="font-size: 0.75rem; color: var(--text-muted);">✓ Okundu</span>` : `<span class="badge status-completed" style="font-size:0.7rem;">YENİ BİLDİRİM</span>`}
+              </div>
+              <h4 style="font-size: 1rem; margin-bottom: 0.35rem; color: var(--text-main); font-weight: 700;">${n.title}</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0; line-height: 1.4;">${n.sub}</p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
+            <button class="btn-primary" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;" onclick="App.dismissNotif('${n.id}'); (${n.action.toString()})()">
+              <span>👁️</span> İncele
+            </button>
+            ${!n.isRead ? `
+              <button class="btn-secondary" style="padding: 0.45rem 0.75rem; font-size: 0.8rem;" onclick="App.dismissNotif('${n.id}')">
+                <span>✕</span> Okundu Yap
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
   },
 
   // 🔍 GLOBAL SEARCH SYSTEM (Ctrl + K)
