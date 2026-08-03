@@ -4337,6 +4337,7 @@ const App = {
         units: this.state.units,
         regulations: this.state.regulations,
         contracts: this.state.contracts,
+        guarantees: this.state.guarantees || [],
         invoices: this.state.invoices,
         requests: this.state.requests,
         logs: this.state.logs || [],

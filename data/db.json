@@ -127,69 +127,68 @@
                           "id":  1,
                           "startDate":  "2025-01-01",
                           "academicYear":  "2025-2026",
-                          "unit":  "Ä°dari ve Mali Ä°şler Daire BaşkanlığÄ±",
+                          "unit":  "Destek Hizmetler MÃ¼dÃ¼rlÃ¼ÄŸÃ¼",
                           "assignedTo":  "Merih AVCI",
-                          "title":  "Piri Reis Kampüsü Güvenlik Hizmet Alımı Sözleşmesi",
+                          "title":  "Piri Reis KampÃ¼sÃ¼ GÃ¼venlik Hizmet AlÄ±mÄ± SÃ¶zleÅŸmesi",
                           "endDate":  "2025-12-31",
                           "guaranteeExpiry":  "2026-01-31",
                           "status":  "Aktif",
                           "contractNo":  "SOZ-2025-001",
-                          "notes":  "Yıllık güvenlik hizmeti sözleşmesi.",
+                          "notes":  "YÄ±llÄ±k gÃ¼venlik hizmeti sÃ¶zleÅŸmesi.",
                           "totalAmount":  450000,
                           "currency":  "TRY",
-                          "supplier":  "Pronet Güvenlik Hizmetleri A.Ş."
+                          "supplier":  "Pronet GÃ¼venlik Hizmetleri A.Å."
                       },
                       {
                           "guaranteeAmount":  10800,
                           "id":  2,
                           "startDate":  "2024-09-01",
                           "academicYear":  "2025-2026",
-                          "unit":  "Bilgi Ä°şlem Daire BaşkanlığÄ±",
+                          "unit":  "Bilgi Ä°ÅŸlem MÃ¼dÃ¼rlÃ¼ÄŸÃ¼",
                           "assignedTo":  "Cem TUR",
-                          "title":  "Bilgi Ä°şlem Sunucu ve Ağ Donanımı Bakım Anlaşması",
+                          "title":  "Bilgi Ä°ÅŸlem Sunucu ve AÄŸ DonanÄ±mÄ± BakÄ±m AnlaÅŸmasÄ±",
                           "endDate":  "2025-08-31",
                           "guaranteeExpiry":  "2025-09-30",
                           "status":  "Aktif",
                           "contractNo":  "SOZ-2025-002",
-                          "notes":  "7/24 donanım bakım ve teknik destek.",
+                          "notes":  "7/24 donanÄ±m bakÄ±m ve teknik destek.",
                           "totalAmount":  180000,
                           "currency":  "TRY",
-                          "supplier":  "Netaş Telekomünikasyon A.Ş."
+                          "supplier":  "NetaÅŸ TelekomÃ¼nikasyon A.Å."
                       },
                       {
+                          "guaranteeAmount":  7500,
                           "id":  3,
-                          "contractNo":  "123456",
-                          "supplier":  "Cme Cem A.Ş.",
-                          "title":  "PC Alım Sözleşmesi",
-                          "unit":  "Ayniyat Saymanlığı",
-                          "assignedTo":  "Cem TUR",
                           "startDate":  "2026-01-10",
+                          "academicYear":  "2025-2026",
+                          "unit":  "Ayniyat SaymanlÄ±ÄŸÄ±",
+                          "assignedTo":  "Cem TUR",
+                          "title":  "PC DonanÄ±m ve Laboratuvar AlÄ±m SÃ¶zleÅŸmesi",
                           "endDate":  "2026-08-10",
-                          "totalAmount":  125000,
-                          "currency":  "TRY",
-                          "exchangeRate":  1,
-                          "guaranteeAmount":  300,
                           "guaranteeExpiry":  "2026-08-10",
                           "status":  "Aktif",
-                          "notes":  "",
-                          "academicYear":  "2025-2026"
+                          "contractNo":  "SOZ-2026-003",
+                          "notes":  "Lab yenileme sÃ¶zleÅŸmesi.",
+                          "totalAmount":  125000,
+                          "currency":  "TRY",
+                          "supplier":  "Cem A.Å."
                       }
                   ],
     "invoices":  [
                      {
-                         "id":  2,
-                         "invoiceNo":  "350",
-                         "supplier":  "Cem A.Ş.",
-                         "invoiceDate":  "2026-06-10",
-                         "dueDate":  "2026-07-25",
-                         "amount":  300,
-                         "currency":  "TRY",
-                         "paymentStatus":  "Ödeme Bekliyor",
+                         "id":  1,
                          "accountingDeliveryDate":  "2026-07-10",
                          "relatedBarcode":  "123456",
-                         "paymentDate":  "2026-08-03",
-                         "notes":  "tamamlandı",
-                         "academicYear":  "2025-2026"
+                         "dueDate":  "2026-07-25",
+                         "supplier":  "Cem A.Å.",
+                         "invoiceNo":  "FAT-2026-0350",
+                         "amount":  12500,
+                         "academicYear":  "2025-2026",
+                         "currency":  "TRY",
+                         "notes":  "PC teslimatÄ± faturalandÄ±rÄ±ldÄ±.",
+                         "paymentDate":  "",
+                         "invoiceDate":  "2026-06-10",
+                         "paymentStatus":  "Ã–deme Bekliyor"
                      }
                  ],
     "requests":  [
@@ -8462,7 +8461,7 @@
                          "assignedTo":  "Merih AVCI",
                          "priority":  "Orta",
                          "regulation":  "",
-                         "status":  "Açık",
+                         "status":  "Tamamlandı",
                          "estimatedAmount":  0,
                          "budgetAmount":  0,
                          "actualAmount":  0,
@@ -21585,6 +21584,55 @@
                      }
                  ],
     "logs":  [
+                 {
+                     "id":  18,
+                     "timestamp":  "03.08.2026 16:35:42",
+                     "user":  "Cem TUR",
+                     "action":  "Toplu Talep Tamamlandı",
+                     "details":  "1 adet talep toplu olarak tamamlandı yapıldı."
+                 },
+                 {
+                     "id":  17,
+                     "timestamp":  "03.08.2026 16:29:27",
+                     "user":  "Cem TUR",
+                     "action":  "Sözleşme Silindi",
+                     "details":  "No: 123456, Konu: PC Alım Sözleşmesi"
+                 },
+                 {
+                     "id":  16,
+                     "timestamp":  "03.08.2026 16:29:25",
+                     "user":  "Cem TUR",
+                     "action":  "Sözleşme Silindi",
+                     "details":  "No: SOZ-2025-001, Konu: Piri Reis Kampüsü Güvenlik Hizmet Alımı Sözleşmesi"
+                 },
+                 {
+                     "id":  15,
+                     "timestamp":  "03.08.2026 16:29:19",
+                     "user":  "Cem TUR",
+                     "action":  "Fatura Silindi",
+                     "details":  "No: 350, Tedarikçi: Cem A.Ş."
+                 },
+                 {
+                     "id":  14,
+                     "timestamp":  "03.08.2026 16:29:16",
+                     "user":  "Cem TUR",
+                     "action":  "Teminat Mektubu Silindi",
+                     "details":  "No: TM-2024-039"
+                 },
+                 {
+                     "id":  13,
+                     "timestamp":  "03.08.2026 16:29:14",
+                     "user":  "Cem TUR",
+                     "action":  "Teminat Mektubu Silindi",
+                     "details":  "No: TM-2025-112"
+                 },
+                 {
+                     "id":  12,
+                     "timestamp":  "03.08.2026 16:29:12",
+                     "user":  "Cem TUR",
+                     "action":  "Teminat Mektubu Silindi",
+                     "details":  "No: TM-2025-084"
+                 },
                  {
                      "id":  11,
                      "timestamp":  "03.08.2026 12:00:47",
