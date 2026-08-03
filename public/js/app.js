@@ -728,6 +728,14 @@ const App = {
       this.exportTableToExcel('table-yearly-personnel-savings', 'Personel_Aylik_Pazarlik_Tasarruf_Matrisi.xls');
     });
 
+    // Unit Analysis Export Listeners
+    document.getElementById('btn-export-unit-excel')?.addEventListener('click', () => {
+      this.exportTableToExcel('table-unit-detailed', 'Kurumsal_Birim_Performans_ve_Harcama_Raporu.xls');
+    });
+    document.getElementById('btn-export-unit-pdf')?.addEventListener('click', () => {
+      window.print();
+    });
+
     // Filter for Unit Analysis
     document.getElementById('filter-unit-search')?.addEventListener('input', () => this.renderUnitAnalysis());
     document.getElementById('select-unit-analysis')?.addEventListener('change', () => this.renderUnitAnalysis());

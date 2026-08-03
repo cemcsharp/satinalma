@@ -1827,3 +1827,40 @@ th.sticky-col-left, th.sticky-col-right {
   }
 }
 
+/* Print Styles for Executive Reports & Tables */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .sidebar, .top-header, .filter-bar, .action-btns, button, .btn-primary, .btn-secondary, .btn-export-excel, .btn-export-pdf, #btn-mobile-menu {
+    display: none !important;
+  }
+  .main-content, .view-section, .table-container, .glass-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  table.custom-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9.5pt !important;
+  }
+  table.custom-table th, table.custom-table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
+    color: #000 !important;
+  }
+  table.custom-table th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
+
