@@ -710,6 +710,11 @@ const App = {
     document.getElementById('btn-export-ps-chart-trend')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-monthly-trend', 'Uzman_Tasarruf_Trendi.png'));
     document.getElementById('btn-export-ps-chart-unit')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-unit-pie', 'Uzman_Birim_Tasarruf_Payi.png'));
 
+    // Export Personnel Monthly Savings Matrix to Excel
+    document.getElementById('btn-export-savings-matrix-excel')?.addEventListener('click', () => {
+      this.exportTableToExcel('table-yearly-personnel-savings', 'Personel_Aylik_Pazarlik_Tasarruf_Matrisi.xls');
+    });
+
     // Filter for Unit Analysis
     document.getElementById('filter-unit-search')?.addEventListener('input', () => this.renderUnitAnalysis());
   },
@@ -3313,7 +3318,7 @@ const App = {
       }
     }
 
-    // TAB 4: PERSONEL PAZARLIK TASARRUFU & AYLIK KIRILIM RAPORU
+    // TAB 4: PERSONEL PAZARLIK TASARRUFU & 12 AYLIK MATRİS RAPORU
     else if (activeTab === 'savings') {
       const activeUsers = this.state.users.filter(u => u.isActive !== false);
       const personMap = {};
@@ -3325,7 +3330,8 @@ const App = {
           savingsCount: 0,
           initialTotal: 0,
           actualTotal: 0,
-          savings: 0
+          savings: 0,
+          monthlySavings: Array(12).fill(0)
         };
       });
 
@@ -3344,6 +3350,18 @@ const App = {
             p.savingsCount++;
             p.initialTotal += initAmt;
             p.actualTotal += actAmt;
+
+            const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
+            if (dtStr) {
+              const d = new Date(dtStr);
+              if (!isNaN(d.getTime())) {
+                const monthIdx = d.getMonth();
+                const acadIdx = monthIdx >= 8 ? (monthIdx - 8) : (monthIdx + 4);
+                if (acadIdx >= 0 && acadIdx < 12) {
+                  p.monthlySavings[acadIdx] += diff;
+                }
+              }
+            }
           }
         }
       });
@@ -3354,41 +3372,75 @@ const App = {
         grandBadge.innerHTML = `💰 Yıllık Toplam Tasarruf: <strong>${grandSavings.toLocaleString('tr-TR')} ₺</strong>`;
       }
 
+      const institutionalMonthly = Array(12).fill(0);
+      let grandInstInitial = 0;
+      Object.values(personMap).forEach(p => {
+        grandInstInitial += p.initialTotal;
+        p.monthlySavings.forEach((sav, idx) => {
+          institutionalMonthly[idx] += sav;
+        });
+      });
+
       const tbody = document.querySelector('#table-yearly-personnel-savings tbody');
+      const tfoot = document.querySelector('#table-yearly-personnel-savings tfoot');
+
       if (tbody) {
         const sortedPersons = Object.values(personMap).sort((a, b) => b.savings - a.savings);
         if (sortedPersons.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:2rem;">Personel verisi bulunamadı.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="16" style="text-align:center; color:var(--text-muted); padding:2rem;">Personel verisi bulunamadı.</td></tr>`;
         } else {
           tbody.innerHTML = sortedPersons.map(p => {
             const ratePct = p.initialTotal > 0 ? ((p.savings / p.initialTotal) * 100).toFixed(1) : '0.0';
             const safeName = p.user.name.replace(/'/g, "\\'");
 
+            const monthTds = p.monthlySavings.map(s => {
+              if (s > 0) return `<td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); background:rgba(34,197,94,0.05);">+${s.toLocaleString('tr-TR')} ₺</td>`;
+              return `<td style="color:var(--text-muted); font-size:0.78rem;">-</td>`;
+            }).join('');
+
             return `
-              <tr style="cursor: pointer;" onclick="App.openPersonnelSavingsDetailView('${safeName}')" title="Kullanıcıya tıklayarak detaylı tasarruf ve KPI raporunu açın">
-                <td><strong style="color:var(--text-main); font-size:0.92rem;">${p.user.name}</strong></td>
-                <td style="font-size:0.82rem; color:var(--text-muted);">${p.user.title}</td>
-                <td><span class="badge" style="background:var(--bg-card);">${p.total} İş</span></td>
-                <td><span class="badge status-open">${p.savingsCount} Pazarlıklı İş</span></td>
-                <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.initialTotal > 0 ? p.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-                <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.actualTotal > 0 ? p.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-                <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.95rem;">
+              <tr style="cursor: pointer;" onclick="App.openPersonnelSavingsDetailView('${safeName}')" title="Kullanıcıya tıklayarak detaylı grafik, birim dağılımı ve iş listesini görün">
+                <td>
+                  <strong style="color:var(--text-main); font-size:0.88rem;">${p.user.name}</strong>
+                  <div style="font-size:0.72rem; color:var(--text-muted);">${p.user.title}</div>
+                </td>
+                ${monthTds}
+                <td style="font-family:var(--font-mono); font-weight:800; color:var(--status-completed); font-size:0.92rem; background:rgba(34,197,94,0.12);">
                   ${p.savings > 0 ? '+' + p.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
                 </td>
                 <td>
                   <span class="badge" style="background:${p.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${p.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
-                    %${ratePct} Tasarruf
+                    %${ratePct}
                   </span>
                 </td>
                 <td>
-                  <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" onclick="event.stopPropagation(); App.openPersonnelSavingsDetailView('${safeName}')">
-                    🔍 Detaylı Raporu Gör
+                  <button class="btn-primary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="event.stopPropagation(); App.openPersonnelSavingsDetailView('${safeName}')">
+                    🔍 Detay
                   </button>
                 </td>
               </tr>
             `;
           }).join('');
         }
+      }
+
+      if (tfoot) {
+        const grandRatePct = grandInstInitial > 0 ? ((grandSavings / grandInstInitial) * 100).toFixed(1) : '0.0';
+        const footMonthTds = institutionalMonthly.map(s => {
+          return `<td style="font-family:var(--font-mono); color:var(--status-completed);">${s > 0 ? '+' + s.toLocaleString('tr-TR') + ' ₺' : '-'}</td>`;
+        }).join('');
+
+        tfoot.innerHTML = `
+          <tr>
+            <td style="color:var(--accent-primary);">🏛️ KURUM GENEL TOPLAMI</td>
+            ${footMonthTds}
+            <td style="font-family:var(--font-mono); font-size:0.92rem; color:var(--status-completed); background:rgba(34,197,94,0.2);">
+              +${grandSavings.toLocaleString('tr-TR')} ₺
+            </td>
+            <td style="color:var(--status-completed);">%${grandRatePct}</td>
+            <td>-</td>
+          </tr>
+        `;
       }
     }
   },
