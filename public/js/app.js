@@ -4193,73 +4193,64 @@ const App = {
   },
 
   exportToCSV() {
-    this.exportTableToExcel('table-requests', `Satinalma_Talepleri_${this.state.selectedYear}.xls`);
+    this.exportTableToExcel('table-requests', `Satinalma_Talepleri_${this.state.selectedYear}.csv`);
   },
 
-  exportTableToExcel(tableId, filename = 'Export.xls') {
+  exportTableToExcel(tableId, filename = 'Export.csv') {
     const table = document.getElementById(tableId);
     if (!table) {
       this.showToast("Dışa aktarılacak tablo bulunamadı.", "warning");
       return;
     }
 
-    if (!filename.endsWith('.xls') && !filename.endsWith('.xlsx')) {
-      filename = filename.replace(/\.[^/.]+$/, "") + ".xls";
+    // Convert extension to .csv so Excel opens natively without format mismatch warning dialogs
+    if (filename.endsWith('.xls') || filename.endsWith('.xlsx')) {
+      filename = filename.replace(/\.(xls|xlsx)$/i, '.csv');
+    }
+    if (!filename.endsWith('.csv')) {
+      filename += '.csv';
     }
 
-    // Build Microsoft Excel XML/HTML Workbook representation
-    let tableHtml = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta http-equiv="content-type" content="text/plain; charset=UTF-8"/>
-        <!--[if gte mso 9]>
-        <xml>
-          <x:ExcelWorkbook>
-            <x:ExcelWorksheets>
-              <x:ExcelWorksheet>
-                <x:Name>Satınalma Takip Raporu</x:Name>
-                <x:WorksheetOptions>
-                  <x:DisplayGridlines/>
-                </x:WorksheetOptions>
-              </x:ExcelWorksheet>
-            </x:ExcelWorksheets>
-          </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
-        <style>
-          table { border-collapse: collapse; width: 100%; font-family: Segoe UI, sans-serif; font-size: 11pt; }
-          th { background-color: #1e293b; color: #ffffff; font-weight: bold; border: 1px solid #94a3b8; padding: 8px; text-align: left; }
-          td { border: 1px solid #cbd5e1; padding: 6px; color: #0f172a; }
-        </style>
-      </head>
-      <body>
-        <table>
-    `;
-
+    let csvContent = '';
     const rows = table.querySelectorAll('tr');
+    
     rows.forEach(row => {
-      tableHtml += '<tr>';
+      // Skip hidden rows unless it's tfoot or header
+      if (row.offsetParent === null && !row.closest('tfoot')) return;
+
       const cols = row.querySelectorAll('th, td');
+      const rowData = [];
+
       cols.forEach(col => {
+        // Skip action buttons column
         if (col.querySelector('.action-btns') || col.classList.contains('no-export')) return;
-        const tag = col.tagName.toLowerCase();
-        let text = col.innerText.replace(/\n/g, ' ').trim();
-        tableHtml += `<${tag}>${text}</${tag}>`;
+        
+        let text = col.innerText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+        // Clean button text inside cells if any
+        text = text.replace(/🔍\s*Detay/g, '').trim();
+
+        // Escape double quotes for CSV
+        text = text.replace(/"/g, '""');
+        
+        // Wrap in quotes if text contains semicolon or special chars
+        if (text.includes(';') || text.includes('"') || text.includes('\n')) {
+          text = `"${text}"`;
+        }
+        rowData.push(text);
       });
-      tableHtml += '</tr>';
+
+      if (rowData.length > 0) {
+        csvContent += rowData.join(';') + '\r\n';
+      }
     });
 
-    tableHtml += `
-        </table>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob(['\uFEFF' + tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    // UTF-8 BOM (\uFEFF) ensures Excel opens Turkish characters (Ş, Ğ, Ç, İ, Ö, Ü, ₺) perfectly
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
+    
     this.logAction('Excel Dışa Aktarıldı', `Tablo: ${tableId}, Dosya: ${filename}`);
   },
 
