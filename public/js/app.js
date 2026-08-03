@@ -110,6 +110,19 @@ const App = {
     });
   },
 
+  getAcademicYearFromDate(dateStr) {
+    if (!dateStr) return this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear;
+    const yr = d.getFullYear();
+    const m = d.getMonth();
+    if (m >= 8) {
+      return `${yr}-${yr + 1}`;
+    } else {
+      return `${yr - 1}-${yr}`;
+    }
+  },
+
   populateYearSelect() {
     // Akademik yılı Ağustos 1 başlangıç - Temmuz 31 bitiş olarak hesapla
     // Bugünün tarihine ve verilerdeki tüm yıllara göre selector'ü otomatik doldur
@@ -1940,11 +1953,12 @@ const App = {
         guaranteeExpiry,
         status,
         notes,
-        academicYear: this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear
+        academicYear: this.getAcademicYearFromDate(startDate || endDate)
       };
       this.state.contracts.push(newContract);
     }
 
+    this.populateYearSelect();
     this.logAction(id ? 'Sözleşme Güncellendi' : 'Yeni Sözleşme Eklendi', `No: ${contractNo}, Tutar: ${totalAmount} ${currency} (Sabit Kur: ${rateVal} ₺)`);
     await this.saveDatabase();
     this.showToast("Sözleşme bilgileri başarıyla kaydedildi!", "success");
@@ -2539,11 +2553,12 @@ const App = {
         relatedBarcode,
         paymentDate,
         notes,
-        academicYear: this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear
+        academicYear: this.getAcademicYearFromDate(invoiceDate || dueDate)
       };
       this.state.invoices.push(newInvoice);
     }
 
+    this.populateYearSelect();
     await this.saveDatabase();
     this.showToast("Fatura bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
@@ -3980,10 +3995,11 @@ const App = {
       budgetAmount: estAmt,
       actualAmount: 0,
       currency: 'TRY',
-      academicYear: this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear
+      academicYear: this.getAcademicYearFromDate(arrDate)
     };
 
     this.state.requests.unshift(newReq);
+    this.populateYearSelect();
     await this.saveDatabase();
 
     this.showToast("Yeni talep başarıyla oluşturuldu ve atandı!", "success");
