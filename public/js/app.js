@@ -1862,9 +1862,9 @@ const App = {
           <td><span class="badge status-${c.status === 'Aktif' ? 'completed' : 'rejected'}">${c.status}</span></td>
           <td>
             <div class="action-btns">
-              <a href="#contract/${c.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'contract', ${c.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
-              <button class="btn-icon" onclick="App.openContractModal(${c.id})" title="Düzenle">✏️</button>
-              <button class="btn-icon" onclick="App.deleteContract(${c.id})" title="Sözleşmeyi Sil">🗑️</button>
+              <a href="#contract/${c.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'contract', '${c.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
+              <button class="btn-icon" onclick="App.openContractModal('${c.id}')" title="Düzenle">✏️</button>
+              <button class="btn-icon" onclick="App.deleteContract('${c.id}')" title="Sözleşmeyi Sil">🗑️</button>
             </div>
           </td>
         </tr>
@@ -1874,7 +1874,7 @@ const App = {
 
   openContractModal(contractId = null) {
     if (contractId) {
-      const c = this.state.contracts.find(item => item.id === contractId);
+      const c = this.state.contracts.find(item => String(item.id) === String(contractId));
       if (!c) return;
       document.getElementById('cm-id').value = c.id;
       document.getElementById('cm-no').value = c.contractNo;
@@ -2056,8 +2056,11 @@ const App = {
 
   // VIEW DETAILS MODAL HANDLERS
   viewRequestDetails(requestId) {
-    const req = this.state.requests.find(r => r.id === requestId);
-    if (!req) return;
+    const req = this.state.requests.find(r => String(r.id) === String(requestId));
+    if (!req) {
+      this.showToast(`Talep (#${requestId}) bilgileri bulunamadı.`, "error");
+      return;
+    }
 
     this.state.currentActiveDetail = { type: 'request', data: req };
     document.getElementById('view-details-title').innerText = `📋 Talep Detayı #${req.requestBarcode || req.id}`;
@@ -2136,8 +2139,11 @@ const App = {
   },
 
   viewContractDetails(contractId) {
-    const c = this.state.contracts.find(item => item.id === contractId);
-    if (!c) return;
+    const c = this.state.contracts.find(item => String(item.id) === String(contractId));
+    if (!c) {
+      this.showToast(`Sözleşme (#${contractId}) bilgileri bulunamadı.`, "error");
+      return;
+    }
 
     this.state.currentActiveDetail = { type: 'contract', data: c };
     document.getElementById('view-details-title').innerText = `📑 Sözleşme Detayı #${c.contractNo}`;
@@ -2188,8 +2194,11 @@ const App = {
   },
 
   viewInvoiceDetails(invoiceId) {
-    const inv = this.state.invoices.find(item => item.id === invoiceId);
-    if (!inv) return;
+    const inv = this.state.invoices.find(item => String(item.id) === String(invoiceId));
+    if (!inv) {
+      this.showToast(`Fatura (#${invoiceId}) bilgileri bulunamadı.`, "error");
+      return;
+    }
 
     this.state.currentActiveDetail = { type: 'invoice', data: inv };
     document.getElementById('view-details-title').innerText = `🧾 Fatura Detayı #${inv.invoiceNo}`;
@@ -2495,7 +2504,7 @@ const App = {
 
   openInvoiceModal(invoiceId = null) {
     if (invoiceId) {
-      const inv = this.state.invoices.find(item => item.id === invoiceId);
+      const inv = this.state.invoices.find(item => String(item.id) === String(invoiceId));
       if (!inv) return;
       document.getElementById('im-id').value = inv.id;
       document.getElementById('im-no').value = inv.invoiceNo;
@@ -2534,7 +2543,7 @@ const App = {
     const notes = document.getElementById('im-notes').value.trim();
 
     if (id) {
-      const inv = this.state.invoices.find(item => item.id === parseInt(id));
+      const inv = this.state.invoices.find(item => String(item.id) === String(id));
       if (inv) {
         inv.invoiceNo = invoiceNo;
         inv.supplier = supplier;
@@ -2575,7 +2584,7 @@ const App = {
   },
 
   async markInvoiceAsPaid(invoiceId) {
-    const inv = this.state.invoices.find(item => item.id === invoiceId);
+    const inv = this.state.invoices.find(item => String(item.id) === String(invoiceId));
     if (!inv) return;
 
     this.showConfirm("Fatura Ödeme Onayı", `Fatura #${inv.invoiceNo} (${inv.amount.toLocaleString('tr-TR')} ₺) ödenmiş olarak işaretlensin mi?`, async () => {
@@ -3748,7 +3757,7 @@ const App = {
 
   openUserModal(userId = null) {
     if (userId) {
-      const u = this.state.users.find(usr => usr.id === userId);
+      const u = this.state.users.find(usr => String(usr.id) === String(userId));
       if (!u) return;
       document.getElementById('um-id').value = u.id;
       document.getElementById('um-name').value = u.name;
@@ -3769,8 +3778,11 @@ const App = {
   },
 
   openEditModal(requestId) {
-    const req = this.state.requests.find(r => r.id === requestId);
-    if (!req) return;
+    const req = this.state.requests.find(r => String(r.id) === String(requestId));
+    if (!req) {
+      this.showToast(`Düzenlenecek talep kaydı (#${requestId}) bulunamadı.`, "error");
+      return;
+    }
 
     document.getElementById('er-id').value = req.id;
     document.getElementById('er-status').value = req.status;
@@ -3809,7 +3821,7 @@ const App = {
     const isActive = document.getElementById('um-is-active').value === 'true';
 
     if (id) {
-      const u = this.state.users.find(usr => usr.id === parseInt(id));
+      const u = this.state.users.find(usr => String(usr.id) === String(id));
       if (u) {
         u.name = name;
         u.title = title;
@@ -3844,7 +3856,7 @@ const App = {
   },
 
   async toggleUserStatus(userId) {
-    const u = this.state.users.find(usr => usr.id === userId);
+    const u = this.state.users.find(usr => String(usr.id) === String(userId));
     if (u) {
       u.isActive = u.isActive === false ? true : false;
       const statusText = u.isActive ? 'Aktif' : 'Pasif (Ayrıldı)';
@@ -3857,11 +3869,11 @@ const App = {
   },
 
   async deleteUser(userId) {
-    const u = this.state.users.find(usr => usr.id === userId);
+    const u = this.state.users.find(usr => String(usr.id) === String(userId));
     if (!u) return;
 
     this.showConfirm("Personel Sil", `${u.name} isimli personeli silmek istediğinizden emin misiniz?`, async () => {
-      this.state.users = this.state.users.filter(usr => usr.id !== userId);
+      this.state.users = this.state.users.filter(usr => String(usr.id) !== String(userId));
       await this.saveDatabase();
       this.showToast("Personel başarıyla silindi!", "warning");
       this.populateLoginDropdown();
