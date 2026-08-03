@@ -1975,12 +1975,12 @@ const App = {
   },
 
   async deleteRequest(requestId) {
-    const req = this.state.requests.find(r => r.id === requestId);
+    const req = this.state.requests.find(r => r.id == requestId);
     if (!req) return;
 
     const barcodeText = req.requestBarcode ? `Barkod #${req.requestBarcode}` : 'Talep';
     this.showConfirm("Talebi Sil", `${barcodeText} - "${req.subject}" başlıklı talebi silmek istediğinizden emin misiniz?`, async () => {
-      this.state.requests = this.state.requests.filter(r => r.id !== requestId);
+      this.state.requests = this.state.requests.filter(r => r.id != requestId);
       this.logAction('Talep Silindi', `Barkod: ${req.requestBarcode || '-'}, Konu: ${req.subject}`);
       await this.saveDatabase();
       this.showToast("Talep başarıyla silindi!", "warning");
@@ -1989,24 +1989,24 @@ const App = {
   },
 
   async deleteContract(contractId) {
-    const c = this.state.contracts.find(item => item.id === contractId);
+    const c = this.state.contracts.find(item => item.id == contractId);
     if (!c) return;
 
     this.showConfirm("Sözleşmeyi Sil", `Sözleşme #${c.contractNo} ("${c.title}") silinecek. Emin misiniz?`, async () => {
-      this.state.contracts = this.state.contracts.filter(item => item.id !== contractId);
+      this.state.contracts = this.state.contracts.filter(item => item.id != contractId);
       this.logAction('Sözleşme Silindi', `No: ${c.contractNo}, Konu: ${c.title}`);
       await this.saveDatabase();
-      this.showToast("Sözleşme başarıyla silindi!", "warning");
+      this.showToast("Sözleşme başarıyla silindi!", "success");
       this.renderContracts();
     }, '🗑️');
   },
 
   async deleteInvoice(invoiceId) {
-    const inv = this.state.invoices.find(item => item.id === invoiceId);
+    const inv = this.state.invoices.find(item => item.id == invoiceId);
     if (!inv) return;
 
     this.showConfirm("Faturayı Sil", `Fatura #${inv.invoiceNo} (${inv.supplier}) silinecek. Emin misiniz?`, async () => {
-      this.state.invoices = this.state.invoices.filter(item => item.id !== invoiceId);
+      this.state.invoices = this.state.invoices.filter(item => item.id != invoiceId);
       this.logAction('Fatura Silindi', `No: ${inv.invoiceNo}, Tedarikçi: ${inv.supplier}`);
       await this.saveDatabase();
       this.showToast("Fatura başarıyla silindi!", "warning");
