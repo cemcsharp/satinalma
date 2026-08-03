@@ -725,6 +725,30 @@ const App = {
     document.getElementById('btn-export-ps-chart-trend')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-monthly-trend', 'Uzman_Tasarruf_Trendi.png'));
     document.getElementById('btn-export-ps-chart-unit')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-unit-pie', 'Uzman_Birim_Tasarruf_Payi.png'));
 
+    // Export Yearly Report to Excel (Dynamic Active Tab Exporter)
+    document.getElementById('btn-export-yearly-excel')?.addEventListener('click', () => {
+      const activeTab = this.state.yearlyActiveTab || 'financial';
+      let tableId = 'table-yearly-personnel-savings';
+      
+      if (activeTab === 'savings' || activeTab === 'personnel') {
+        tableId = 'table-yearly-personnel-savings';
+      } else {
+        const visibleTable = document.querySelector('#view-yearly-report table:not([style*="display: none"])');
+        if (visibleTable && visibleTable.id) {
+          tableId = visibleTable.id;
+        } else {
+          tableId = 'table-yearly-personnel-savings';
+        }
+      }
+
+      const tableEl = document.getElementById(tableId);
+      if (tableEl) {
+        this.exportTableToExcel(tableId, `Yillik_Satinalma_Faaliyet_ve_Tasarruf_Raporu_${this.state.selectedYear}.xls`);
+      } else {
+        this.exportToCSV();
+      }
+    });
+
     // Global Print / PDF Export Listeners across all views
     document.getElementById('btn-export-requests-pdf')?.addEventListener('click', () => {
       this.printSection('view-requests', 'SATİNALMA TALEPLERİ VE SİPARİŞ TAKİP LİSTESİ');
