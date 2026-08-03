@@ -1536,10 +1536,6 @@ const App = {
                 <h5 style="color:var(--status-completed);">${p.completed}</h5>
                 <p>Biten</p>
               </div>
-              <div class="stat-box" style="background: rgba(34, 197, 94, 0.08); border-radius: 6px; padding: 0.35rem 0.2rem;">
-                <h5 style="color:var(--status-completed); font-size:0.88rem;" title="Uzmanın Sağladığı Net Pazarlık Tasarrufu">🎯 ${savingStr}</h5>
-                <p style="color:var(--status-completed); font-weight:700;">Tasarruf</p>
-              </div>
             </div>
           </div>
         `;

@@ -910,7 +910,7 @@ table.custom-table tbody tr:hover {
 
 .workload-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.5rem;
   text-align: center;
   background: rgba(0, 0, 0, 0.1);
