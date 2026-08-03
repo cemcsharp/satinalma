@@ -1140,13 +1140,17 @@ const App = {
     }
   },
 
-  _triggerNotifAndRead(notifId, idx) {
+  handleNotifAction(notifId) {
+    const allNotifs = this.getAllNotifications();
+    const notif = allNotifs.find(n => n.id === notifId);
     this.dismissNotif(notifId);
-    const dropdown = document.getElementById('notification-dropdown');
-    if (dropdown) dropdown.classList.remove('show');
-    if (this._notifActions && this._notifActions[idx]) {
-      this._notifActions[idx]();
+    if (notif && typeof notif.action === 'function') {
+      notif.action();
     }
+  },
+
+  _triggerNotifAndRead(notifId, idx) {
+    this.handleNotifAction(notifId);
   },
 
   dismissNotif(id) {
@@ -1220,7 +1224,7 @@ const App = {
           </div>
 
           <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
-            <button class="btn-primary" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;" onclick="App.dismissNotif('${n.id}'); (${n.action.toString()})()">
+            <button class="btn-primary" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;" onclick="App.handleNotifAction('${n.id}')">
               <span>👁️</span> İncele
             </button>
             ${!n.isRead ? `
