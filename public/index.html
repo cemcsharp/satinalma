@@ -107,6 +107,9 @@
         <li class="nav-item" data-view="contracts">
           <button><span class="nav-icon">📑</span><span>Sözleşmeler</span></button>
         </li>
+        <li class="nav-item" data-view="guarantees">
+          <button><span class="nav-icon">🛡️</span><span>Teminat Mektupları</span></button>
+        </li>
         <li class="nav-item" data-view="invoices">
           <button><span class="nav-icon">🧾</span><span>Faturalar</span></button>
         </li>
@@ -736,6 +739,110 @@
                 <th>Teminat Tutarı</th>
                 <th>Durum</th>
                 <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5.5 GUARANTEES MANAGEMENT VIEW (TEMİNAT MEKTUP YÖNETİMİ) -->
+      <section id="view-guarantees" class="view-section" style="display: none;">
+        <div class="card-header" style="margin-bottom: 1.5rem;">
+          <div>
+            <h3>🛡️ İhale ve İş Bazlı Teminat Mektupları Yönetimi</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">İhale, iş ve sözleşmelere ilişkin banka teminat mektupları, kasa saklama takibi, iade ve vade kontrolleri</p>
+          </div>
+          <button class="btn-primary" id="btn-open-add-guarantee">
+            <span>➕</span> Yeni Teminat Mektubu Ekle
+          </button>
+        </div>
+
+        <!-- Top 4 KPI Cards for Guarantees -->
+        <div class="grid-4" style="margin-bottom: 1.5rem;">
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon blue">🛡️</div>
+            <div class="kpi-data">
+              <h3 id="guarantee-kpi-total-volume">0 ₺</h3>
+              <p>Toplam Teminat Hacmi</p>
+              <div class="kpi-sub">Güvence Altındaki Tutar</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon green">📄</div>
+            <div class="kpi-data">
+              <h3 id="guarantee-kpi-active-count">0</h3>
+              <p>Kasada / Aktif Mektup</p>
+              <div class="kpi-sub">Yürürlükteki Mektuplar</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon yellow">🚨</div>
+            <div class="kpi-data">
+              <h3 id="guarantee-kpi-expiring-count">0</h3>
+              <p>Vadesi Yaklaşan (< 30 Gün)</p>
+              <div class="kpi-sub" style="color:var(--priority-kritik);">Kasa Uyarısı / Yenileme</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon purple">↩️</div>
+            <div class="kpi-data">
+              <h3 id="guarantee-kpi-returned-count">0</h3>
+              <p>İade Edilen Mektuplar</p>
+              <div class="kpi-sub">Firmaya İade Yapıldı</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <div class="search-input-box" style="min-width: 240px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-guarantee-search" placeholder="Mektup no, banka, ihale, tedarikçi ara...">
+          </div>
+
+          <select class="filter-select" id="filter-guarantee-status">
+            <option value="ALL">Tüm Durumlar</option>
+            <option value="Aktif">🟢 Aktif / Kasada</option>
+            <option value="EXPIRING">🔴 Vadesi 30 Gün İçinde Dolanlar</option>
+            <option value="İade Edildi">↩️ Firmaya İade Edilenler</option>
+            <option value="Nakte Çevrildi">⚡ Nakte Çevrilenler (İrad)</option>
+          </select>
+
+          <select class="filter-select" id="filter-guarantee-type">
+            <option value="ALL">Tüm Teminat Türleri</option>
+            <option value="Kesin Teminat Mektubu">Kesin Teminat</option>
+            <option value="Geçici Teminat Mektubu">Geçici Teminat</option>
+            <option value="Avans Teminat Mektubu">Avans Teminatı</option>
+            <option value="Bakım / Garanti Teminatı">Bakım / Garanti</option>
+          </select>
+
+          <button class="btn-export-excel" id="btn-export-guarantees-excel">
+            <span>📥</span> Excel İndir
+          </button>
+          <button class="btn-export-pdf" id="btn-export-guarantees-pdf">
+            <span>🖨️</span> PDF / Yazdır
+          </button>
+        </div>
+
+        <!-- Guarantees Table -->
+        <div class="table-container">
+          <table class="custom-table" id="table-guarantees">
+            <thead>
+              <tr>
+                <th>Mektup No</th>
+                <th>Banka Adı</th>
+                <th>Teminat Türü</th>
+                <th>İlişkili İhale / İş / Sözleşme</th>
+                <th>Tedarikçi / Yüklenici</th>
+                <th>Teminat Tutarı</th>
+                <th>Vade / Bitiş Tarihi</th>
+                <th>Kasa Konumu</th>
+                <th>Durum</th>
+                <th style="text-align: center;">İşlemler</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -2164,6 +2271,106 @@
         <strong>Onaylayan</strong><br><br><br><br>
         <span>Genel Sekreter</span>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT GUARANTEE LETTER -->
+  <div id="modal-guarantee-form" class="modal-overlay">
+    <div class="modal-content" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 id="guarantee-modal-title">🛡️ Yeni Teminat Mektubu Kaydı</h3>
+        <button class="close-modal">&times;</button>
+      </div>
+
+      <form id="form-guarantee-manage">
+        <input type="hidden" id="gm-id">
+
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Teminat Mektup / Ref No <span class="required">*</span></label>
+            <input type="text" id="gm-letter-no" placeholder="ör: TM-2026-0042" required>
+          </div>
+
+          <div class="form-group">
+            <label>Düzenleyen Banka Adı <span class="required">*</span></label>
+            <input type="text" id="gm-bank-name" placeholder="ör: Garanti BBVA, İş Bankası" required>
+          </div>
+
+          <div class="form-group">
+            <label>Teminat Türü <span class="required">*</span></label>
+            <select id="gm-type" required>
+              <option value="Kesin Teminat Mektubu">Kesin Teminat Mektubu</option>
+              <option value="Geçici Teminat Mektubu">Geçici Teminat Mektubu</option>
+              <option value="Avans Teminat Mektubu">Avans Teminat Mektubu</option>
+              <option value="Bakım / Garanti Teminatı">Bakım / Garanti Teminatı</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Durumu <span class="required">*</span></label>
+            <select id="gm-status" required>
+              <option value="Aktif">Aktif (Kasada)</option>
+              <option value="Vadesi Yaklaşan">Vadesi Yaklaşan</option>
+              <option value="İade Edildi">Firmaya İade Edildi</option>
+              <option value="Nakte Çevrildi">Nakte Çevrildi (İrad Kaydedildi)</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width">
+            <label>İlişkili İhale / İş / Sözleşme Adı <span class="required">*</span></label>
+            <input type="text" id="gm-title" placeholder="ör: Kampüs Güvenlik Hizmet İhalesi" required>
+          </div>
+
+          <div class="form-group">
+            <label>Tedarikçi / Yüklenici Firma <span class="required">*</span></label>
+            <input type="text" id="gm-supplier" placeholder="ör: Pronet Güvenlik Hizmetleri A.Ş." required>
+          </div>
+
+          <div class="form-group">
+            <label>Sorumlu Birim</label>
+            <select id="gm-unit"></select>
+          </div>
+
+          <div class="form-group">
+            <label>Teminat Tutarı <span class="required">*</span></label>
+            <input type="number" step="0.01" id="gm-amount" placeholder="0.00" required>
+          </div>
+
+          <div class="form-group">
+            <label>Para Birimi</label>
+            <select id="gm-currency">
+              <option value="TRY">₺ - Türk Lirası (TRY)</option>
+              <option value="USD">$ - Amerikan Doları (USD)</option>
+              <option value="EUR">€ - Euro (EUR)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Veriliş / Düzenleme Tarihi</label>
+            <input type="date" id="gm-issue-date">
+          </div>
+
+          <div class="form-group">
+            <label>Son Geçerlilik / Vade Tarihi <span class="required">*</span></label>
+            <input type="date" id="gm-expiry-date" required>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Fiziki Kasa / Saklama Konumu</label>
+            <input type="text" id="gm-storage-location" placeholder="ör: Mali İşler Çelik Kasa #1, Rektörlük Kasası">
+          </div>
+
+          <div class="form-group full-width">
+            <label>Özel Notlar & Açıklama</label>
+            <textarea id="gm-notes" rows="2" placeholder="Teminat şartları, iade koşulları veya ek notlar..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.25rem;">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary">💾 Teminat Kaydını Kaydet</button>
+        </div>
+      </form>
     </div>
   </div>
 

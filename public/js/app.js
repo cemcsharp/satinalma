@@ -67,6 +67,7 @@ const App = {
         this.state.units = data.units || [];
         this.state.regulations = data.regulations || [];
         this.state.contracts = data.contracts || [];
+        this.state.guarantees = data.guarantees || [];
         this.state.invoices = data.invoices || [];
         this.state.logs = data.logs || [];
         if (data.rates) this.state.rates = data.rates;
@@ -507,6 +508,15 @@ const App = {
       }
     });
 
+    // Filters for Guarantees (Teminat Mektupları)
+    ['filter-guarantee-search', 'filter-guarantee-status', 'filter-guarantee-type'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', () => this.renderGuarantees());
+        el.addEventListener('change', () => this.renderGuarantees());
+      }
+    });
+
     // Filters for Invoices & Date Period Tabs
     ['filter-invoice-search', 'filter-invoice-status'].forEach(id => {
       const el = document.getElementById(id);
@@ -547,6 +557,7 @@ const App = {
     document.getElementById('btn-open-new-request')?.addEventListener('click', () => this.openModal('modal-new-request'));
     document.getElementById('btn-open-add-user')?.addEventListener('click', () => this.openUserModal());
     document.getElementById('btn-open-add-contract')?.addEventListener('click', () => this.openContractModal());
+    document.getElementById('btn-open-add-guarantee')?.addEventListener('click', () => this.openGuaranteeModal());
     document.getElementById('btn-open-add-invoice')?.addEventListener('click', () => this.openInvoiceModal());
 
     document.querySelectorAll('.close-modal').forEach(btn => {
@@ -560,6 +571,7 @@ const App = {
     document.getElementById('form-edit-request')?.addEventListener('submit', (e) => this.handleEditRequest(e));
     document.getElementById('form-user-manage')?.addEventListener('submit', (e) => this.handleSaveUser(e));
     document.getElementById('form-contract-manage')?.addEventListener('submit', (e) => this.handleSaveContract(e));
+    document.getElementById('form-guarantee-manage')?.addEventListener('submit', (e) => this.handleSaveGuarantee(e));
     document.getElementById('form-invoice-manage')?.addEventListener('submit', (e) => this.handleSaveInvoice(e));
 
     // Delegation Execution
@@ -759,6 +771,12 @@ const App = {
     document.getElementById('btn-export-contracts-pdf')?.addEventListener('click', () => {
       this.printSection('view-contracts', 'RESMİ SÖZLEŞMELER VE TEMİNAT MEKTUPLARI RAPORU');
     });
+    document.getElementById('btn-export-guarantees-excel')?.addEventListener('click', () => {
+      this.exportTableToExcel('table-guarantees', 'Teminat_Mektuplari_Cetveli.csv');
+    });
+    document.getElementById('btn-export-guarantees-pdf')?.addEventListener('click', () => {
+      this.printSection('view-guarantees', 'İHALE VE İŞ BAZLI TEMİNAT MEKTUPLARI YÖNETİM RAPORU');
+    });
     document.getElementById('btn-export-invoices-pdf')?.addEventListener('click', () => {
       this.printSection('view-invoices', 'RESMİ FATURALAR VE MUHASEBE ÖDEME ÇİZELGESİ RAPORU');
     });
@@ -868,6 +886,7 @@ const App = {
       workload: { title: 'İş Yükü & Delegasyon', sub: 'Aktif personellerin iş yük puanları ve hızlı talep devretme' },
       'my-requests': { title: 'Taleplerim (Personel)', sub: 'Tarafınıza atanmış aktif satınalma talepleri ve sipariş girişi' },
       contracts: { title: 'Sözleşme Takip', sub: 'Sözleşme süreleri, teminat mektupları ve yaklaşan bitiş uyarıları' },
+      guarantees: { title: 'Teminat Mektupları', sub: 'İhale ve iş bazlı banka teminat mektupları, kasa saklama ve vade takibi' },
       invoices: { title: 'Fatura & Muhasebe', sub: 'Vadesi gelen faturalar ve haftalık nakit akış ödeme listesi' },
       'unit-analysis': { title: 'Birim Analizi', sub: 'Üniversite birimlerinin talep ve harcama detayları' },
       'supplier-analysis': { title: 'Tedarikçi Analizi', sub: 'En yüksek harcama yapılan tedarikçilerin sıralaması' },
@@ -926,6 +945,7 @@ const App = {
     else if (view === 'workload') this.renderWorkloadView();
     else if (view === 'my-requests') this.renderMyRequestsTable();
     else if (view === 'contracts') this.renderContracts();
+    else if (view === 'guarantees') this.renderGuarantees();
     else if (view === 'invoices') this.renderInvoices();
     else if (view === 'unit-analysis') this.renderUnitAnalysis();
     else if (view === 'supplier-analysis') this.renderSupplierAnalysis();
@@ -2424,6 +2444,303 @@ const App = {
     setTimeout(() => {
       document.body.classList.remove('printing-detail');
     }, 1000);
+  },
+
+  // 5.5 GUARANTEES MANAGER & RENDERER (TEMİNAT MEKTUPLARI YÖNETİMİ)
+  renderGuarantees() {
+    const guarantees = this.state.guarantees || [];
+    const searchText = document.getElementById('filter-guarantee-search')?.value.toLowerCase().trim() || '';
+    const selectedStatus = document.getElementById('filter-guarantee-status')?.value || 'ALL';
+    const selectedType = document.getElementById('filter-guarantee-type')?.value || 'ALL';
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const thirtyDaysLater = new Date(today);
+    thirtyDaysLater.setDate(today.getDate() + 30);
+
+    let totalVolume = 0;
+    let activeCount = 0;
+    let expiringCount = 0;
+    let returnedCount = 0;
+
+    guarantees.forEach(g => {
+      const amt = (g.amount || 0);
+      if (g.status === 'Aktif' || g.status === 'Vadesi Yaklaşan') {
+        totalVolume += amt;
+        activeCount++;
+      }
+      if (g.status === 'İade Edildi') {
+        returnedCount++;
+      }
+
+      if (g.expiryDate) {
+        const exp = new Date(g.expiryDate);
+        exp.setHours(0,0,0,0);
+        if (exp >= today && exp <= thirtyDaysLater && g.status !== 'İade Edildi' && g.status !== 'Nakte Çevrildi') {
+          expiringCount++;
+        }
+      }
+    });
+
+    const elVol = document.getElementById('guarantee-kpi-total-volume');
+    const elAct = document.getElementById('guarantee-kpi-active-count');
+    const elExp = document.getElementById('guarantee-kpi-expiring-count');
+    const elRet = document.getElementById('guarantee-kpi-returned-count');
+
+    if (elVol) elVol.innerText = `${totalVolume.toLocaleString('tr-TR')} ₺`;
+    if (elAct) elAct.innerText = activeCount;
+    if (elExp) elExp.innerText = expiringCount;
+    if (elRet) elRet.innerText = returnedCount;
+
+    // Filtering logic
+    const filtered = guarantees.filter(g => {
+      if (selectedStatus !== 'ALL') {
+        if (selectedStatus === 'EXPIRING') {
+          if (!g.expiryDate) return false;
+          const exp = new Date(g.expiryDate);
+          exp.setHours(0,0,0,0);
+          if (!(exp >= today && exp <= thirtyDaysLater && g.status !== 'İade Edildi' && g.status !== 'Nakte Çevrildi')) {
+            return false;
+          }
+        } else if (g.status !== selectedStatus) {
+          return false;
+        }
+      }
+
+      if (selectedType !== 'ALL' && g.type !== selectedType) return false;
+
+      if (searchText) {
+        const q = searchText;
+        const matchNo = (g.letterNo || '').toLowerCase().includes(q);
+        const matchBank = (g.bankName || '').toLowerCase().includes(q);
+        const matchTitle = (g.title || '').toLowerCase().includes(q);
+        const matchSup = (g.supplier || '').toLowerCase().includes(q);
+        const matchLoc = (g.storageLocation || '').toLowerCase().includes(q);
+        if (!matchNo && !matchBank && !matchTitle && !matchSup && !matchLoc) return false;
+      }
+
+      return true;
+    });
+
+    const tbody = document.querySelector('#table-guarantees tbody');
+    if (!tbody) return;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtrelere uygun teminat mektubu kaydı bulunamadı.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(g => {
+      const expDate = g.expiryDate ? new Date(g.expiryDate) : null;
+      let badgeClass = 'status-completed';
+      let statusStr = g.status;
+
+      if (g.status === 'İade Edildi') {
+        badgeClass = 'priority-orta';
+      } else if (g.status === 'Nakte Çevrildi') {
+        badgeClass = 'priority-kritik';
+      } else if (expDate) {
+        expDate.setHours(0,0,0,0);
+        if (expDate < today) {
+          badgeClass = 'priority-kritik';
+          statusStr = '🔴 Süresi Doldu!';
+        } else if (expDate <= thirtyDaysLater) {
+          badgeClass = 'priority-yuksek';
+          statusStr = '🚨 Vadesi Yaklaşan';
+        }
+      }
+
+      return `
+        <tr>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary);">${g.letterNo}</td>
+          <td style="font-weight: 700;">🏦 ${g.bankName}</td>
+          <td><span class="badge priority-orta" style="font-size:0.75rem;">${g.type}</span></td>
+          <td style="font-weight: 600; max-width:240px;" title="${g.title}">${g.title}</td>
+          <td style="font-weight: 600;">${g.supplier}</td>
+          <td style="font-weight: 800; color: var(--status-completed); font-family: var(--font-mono);">${(g.amount || 0).toLocaleString('tr-TR')} ${g.currency || 'TRY'}</td>
+          <td style="font-weight: 600; color: ${badgeClass === 'priority-kritik' ? 'var(--status-rejected)' : 'var(--text-main)'};">${g.expiryDate || '-'}</td>
+          <td style="font-size:0.8rem; color:var(--text-muted);">🔒 ${g.storageLocation || 'Kasada'}</td>
+          <td><span class="badge ${badgeClass}">${statusStr}</span></td>
+          <td style="text-align: center;">
+            <div class="action-btns" style="justify-content: center;">
+              <button class="btn-icon" onclick="App.viewGuaranteeDetails('${g.id}')" title="Görüntüle">👁️</button>
+              <button class="btn-icon" onclick="App.openGuaranteeModal('${g.id}')" title="Düzenle">✏️</button>
+              ${g.status !== 'İade Edildi' ? `<button class="btn-icon" onclick="App.returnGuaranteeToFirm('${g.id}')" title="Firmaya İade Et">↩️</button>` : ''}
+              <button class="btn-icon" onclick="App.deleteGuarantee('${g.id}')" title="Sil">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  openGuaranteeModal(id = null) {
+    const unitSelect = document.getElementById('gm-unit');
+    if (unitSelect && this.state.units) {
+      unitSelect.innerHTML = this.state.units.map(u => `<option value="${u}">${u}</option>`).join('');
+    }
+
+    if (id) {
+      const g = this.state.guarantees.find(item => String(item.id) === String(id));
+      if (!g) return;
+      document.getElementById('gm-id').value = g.id;
+      document.getElementById('gm-letter-no').value = g.letterNo;
+      document.getElementById('gm-bank-name').value = g.bankName;
+      document.getElementById('gm-type').value = g.type;
+      document.getElementById('gm-status').value = g.status;
+      document.getElementById('gm-title').value = g.title;
+      document.getElementById('gm-supplier').value = g.supplier;
+      if (unitSelect) unitSelect.value = g.unit || '';
+      document.getElementById('gm-amount').value = g.amount;
+      document.getElementById('gm-currency').value = g.currency || 'TRY';
+      document.getElementById('gm-issue-date').value = g.issueDate || '';
+      document.getElementById('gm-expiry-date').value = g.expiryDate || '';
+      document.getElementById('gm-storage-location').value = g.storageLocation || '';
+      document.getElementById('gm-notes').value = g.notes || '';
+      document.getElementById('guarantee-modal-title').innerText = `✏️ Teminat Mektubu #${g.letterNo} Düzenle`;
+    } else {
+      document.getElementById('gm-id').value = '';
+      document.getElementById('form-guarantee-manage').reset();
+      document.getElementById('guarantee-modal-title').innerText = '🛡️ Yeni Teminat Mektubu Kaydı';
+    }
+    this.openModal('modal-guarantee-form');
+  },
+
+  async handleSaveGuarantee(e) {
+    e.preventDefault();
+    const id = document.getElementById('gm-id').value;
+    const letterNo = document.getElementById('gm-letter-no').value.trim();
+    const bankName = document.getElementById('gm-bank-name').value.trim();
+    const type = document.getElementById('gm-type').value;
+    const status = document.getElementById('gm-status').value;
+    const title = document.getElementById('gm-title').value.trim();
+    const supplier = document.getElementById('gm-supplier').value.trim();
+    const unit = document.getElementById('gm-unit')?.value || 'Destek Hizmetler Müdürlüğü';
+    const amount = parseFloat(document.getElementById('gm-amount').value) || 0;
+    const currency = document.getElementById('gm-currency').value;
+    const issueDate = document.getElementById('gm-issue-date').value;
+    const expiryDate = document.getElementById('gm-expiry-date').value;
+    const storageLocation = document.getElementById('gm-storage-location').value.trim();
+    const notes = document.getElementById('gm-notes').value.trim();
+
+    if (!this.state.guarantees) this.state.guarantees = [];
+
+    if (id) {
+      const g = this.state.guarantees.find(item => String(item.id) === String(id));
+      if (g) {
+        g.letterNo = letterNo;
+        g.bankName = bankName;
+        g.type = type;
+        g.status = status;
+        g.title = title;
+        g.supplier = supplier;
+        g.unit = unit;
+        g.amount = amount;
+        g.currency = currency;
+        g.issueDate = issueDate;
+        g.expiryDate = expiryDate;
+        g.storageLocation = storageLocation;
+        g.notes = notes;
+        this.showToast(`Teminat Mektubu #${letterNo} başarıyla güncellendi!`, "success", "🛡️");
+        this.logAction('Teminat Mektubu Güncellendi', `No: ${letterNo}, Tutar: ${amount} ${currency}`);
+      }
+    } else {
+      const newId = this.state.guarantees.length > 0 ? Math.max(...this.state.guarantees.map(item => item.id || 0)) + 1 : 1;
+      const newG = {
+        id: newId,
+        letterNo,
+        bankName,
+        type,
+        status,
+        title,
+        supplier,
+        unit,
+        amount,
+        currency,
+        issueDate,
+        expiryDate,
+        storageLocation: storageLocation || 'Mali İşler Kasası',
+        notes,
+        assignedTo: this.state.currentUser ? this.state.currentUser.name : 'Satınalma Uzmanı'
+      };
+      this.state.guarantees.unshift(newG);
+      this.showToast(`Yeni Teminat Mektubu #${letterNo} başarıyla kaydedildi!`, "success", "🛡️");
+      this.logAction('Yeni Teminat Mektubu Eklendi', `No: ${letterNo}, Banka: ${bankName}, Tutar: ${amount} ${currency}`);
+    }
+
+    await this.saveDatabase();
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+    this.renderGuarantees();
+  },
+
+  async returnGuaranteeToFirm(id) {
+    const g = this.state.guarantees.find(item => String(item.id) === String(id));
+    if (!g) return;
+
+    this.showConfirm("Firmaya İade Onayı", `Teminat Mektubu #${g.letterNo} (${g.supplier} - ${g.amount.toLocaleString('tr-TR')} ${g.currency}) firmaya iade edilmiş olarak işaretlensin mi?`, async () => {
+      g.status = 'İade Edildi';
+      g.returnDate = new Date().toISOString().split('T')[0];
+      await this.saveDatabase();
+      this.showToast(`Teminat Mektubu #${g.letterNo} firmaya iade edildi!`, "success", "↩️");
+      this.logAction('Teminat Mektubu İade Edildi', `No: ${g.letterNo}, Firma: ${g.supplier}`);
+      this.renderGuarantees();
+    }, '↩️');
+  },
+
+  async deleteGuarantee(id) {
+    const g = this.state.guarantees.find(item => String(item.id) === String(id));
+    if (!g) return;
+
+    this.showConfirm("Teminat Mektubu Silme", `Teminat Mektubu #${g.letterNo} kaydını tamamen silmek istediğinize emin misiniz?`, async () => {
+      this.state.guarantees = this.state.guarantees.filter(item => String(item.id) !== String(id));
+      await this.saveDatabase();
+      this.showToast(`Teminat mektubu kaydı silindi!`, "info", "🗑️");
+      this.logAction('Teminat Mektubu Silindi', `No: ${g.letterNo}`);
+      this.renderGuarantees();
+    }, '🗑️');
+  },
+
+  viewGuaranteeDetails(id) {
+    const g = this.state.guarantees.find(item => String(item.id) === String(id));
+    if (!g) return;
+
+    document.getElementById('view-details-title').innerText = `🛡️ Teminat Mektubu #${g.letterNo}`;
+    const body = document.getElementById('view-details-body');
+    if (body) {
+      body.innerHTML = `
+        <div style="border: 2px solid var(--accent-primary); padding: 1.25rem; border-radius: var(--radius-md); background: var(--bg-card); margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">TEMİNAT MEKTUP NO</div>
+              <div style="font-size: 1.4rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-primary);">${g.letterNo}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">MEKTUP DURUMU</div>
+              <span class="badge ${g.status === 'İade Edildi' ? 'priority-orta' : 'status-completed'}">${g.status}</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; font-size: 0.88rem; margin-bottom: 1rem;">
+            <div><strong>Düzenleyen Banka:</strong> 🏦 ${g.bankName}</div>
+            <div><strong>Teminat Türü:</strong> ${g.type}</div>
+            <div style="grid-column: span 2;"><strong>İlişkili İhale / İş:</strong> ${g.title}</div>
+            <div><strong>Yüklenici Firma:</strong> ${g.supplier}</div>
+            <div><strong>Sorumlu Birim:</strong> ${g.unit || '-'}</div>
+            <div><strong>Düzenleme Tarihi:</strong> ${g.issueDate || '-'}</div>
+            <div><strong>Son Geçerlilik (Vade):</strong> ${g.expiryDate || '-'}</div>
+            <div><strong>Kasa Saklama Konumu:</strong> 🔒 ${g.storageLocation || 'Mali İşler Kasası'}</div>
+            <div><strong>Teminat Tutarı:</strong> <span style="font-size: 1.15rem; font-weight: 800; color: var(--status-completed); font-family: var(--font-mono);">${(g.amount || 0).toLocaleString('tr-TR')} ${g.currency || 'TRY'}</span></div>
+          </div>
+
+          <div style="border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.25rem;">AÇIKLAMA VE NOTLAR:</div>
+            <div style="font-size: 0.88rem; line-height: 1.5; white-space: pre-wrap; background: var(--bg-hover); padding: 0.75rem; border-radius: var(--radius-sm); color: var(--text-main);">${g.notes || 'Açıklama girilmemiş.'}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    this.openModal('modal-view-details');
   },
 
   // 6. INVOICES & WEEKLY PAYMENT SCHEDULE RENDERER (FATURA & HAFTALIK ÖDEME LİSTESİ)
