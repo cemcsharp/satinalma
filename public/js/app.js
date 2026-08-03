@@ -1454,9 +1454,9 @@ const App = {
         <td style="font-weight:700; font-family:var(--font-mono);">${r.actualAmount > 0 ? r.actualAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
         <td class="sticky-col-right">
           <div class="action-btns">
-            <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', ${r.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
-            <button class="btn-icon" onclick="App.openEditModal(${r.id})" title="Düzenle / Sipariş Gir">✏️</button>
-            <button class="btn-icon" onclick="App.deleteRequest(${r.id})" title="Talebi Sil">🗑️</button>
+            <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
+            <button class="btn-icon" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>
+            <button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil">🗑️</button>
           </div>
         </td>
       </tr>
@@ -1731,9 +1731,9 @@ const App = {
         <td style="font-weight:700;">${r.actualAmount > 0 ? r.actualAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
         <td>
           <div class="action-btns">
-            <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', ${r.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
-            <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" onclick="App.openEditModal(${r.id})">Sipariş Gir / Güncelle</button>
-            <button class="btn-icon" onclick="App.deleteRequest(${r.id})" title="Talebi Sil">🗑️</button>
+            <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
+            <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" onclick="App.openEditModal('${r.id}')">Sipariş Gir / Güncelle</button>
+            <button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil">🗑️</button>
           </div>
         </td>
       </tr>
@@ -1975,12 +1975,15 @@ const App = {
   },
 
   async deleteRequest(requestId) {
-    const req = this.state.requests.find(r => r.id == requestId);
-    if (!req) return;
+    const req = this.state.requests.find(r => String(r.id) === String(requestId));
+    if (!req) {
+      this.showToast(`Silinecek talep kaydı (#${requestId}) bulunamadı.`, "error");
+      return;
+    }
 
     const barcodeText = req.requestBarcode ? `Barkod #${req.requestBarcode}` : 'Talep';
     this.showConfirm("Talebi Sil", `${barcodeText} - "${req.subject}" başlıklı talebi silmek istediğinizden emin misiniz?`, async () => {
-      this.state.requests = this.state.requests.filter(r => r.id != requestId);
+      this.state.requests = this.state.requests.filter(r => String(r.id) !== String(requestId));
       this.logAction('Talep Silindi', `Barkod: ${req.requestBarcode || '-'}, Konu: ${req.subject}`);
       await this.saveDatabase();
       this.showToast("Talep başarıyla silindi!", "warning");
@@ -1989,11 +1992,14 @@ const App = {
   },
 
   async deleteContract(contractId) {
-    const c = this.state.contracts.find(item => item.id == contractId);
-    if (!c) return;
+    const c = this.state.contracts.find(item => String(item.id) === String(contractId));
+    if (!c) {
+      this.showToast(`Silinecek sözleşme kaydı (#${contractId}) bulunamadı.`, "error");
+      return;
+    }
 
     this.showConfirm("Sözleşmeyi Sil", `Sözleşme #${c.contractNo} ("${c.title}") silinecek. Emin misiniz?`, async () => {
-      this.state.contracts = this.state.contracts.filter(item => item.id != contractId);
+      this.state.contracts = this.state.contracts.filter(item => String(item.id) !== String(contractId));
       this.logAction('Sözleşme Silindi', `No: ${c.contractNo}, Konu: ${c.title}`);
       await this.saveDatabase();
       this.showToast("Sözleşme başarıyla silindi!", "success");
@@ -2002,11 +2008,14 @@ const App = {
   },
 
   async deleteInvoice(invoiceId) {
-    const inv = this.state.invoices.find(item => item.id == invoiceId);
-    if (!inv) return;
+    const inv = this.state.invoices.find(item => String(item.id) === String(invoiceId));
+    if (!inv) {
+      this.showToast(`Silinecek fatura kaydı (#${invoiceId}) bulunamadı.`, "error");
+      return;
+    }
 
     this.showConfirm("Faturayı Sil", `Fatura #${inv.invoiceNo} (${inv.supplier}) silinecek. Emin misiniz?`, async () => {
-      this.state.invoices = this.state.invoices.filter(item => item.id != invoiceId);
+      this.state.invoices = this.state.invoices.filter(item => String(item.id) !== String(invoiceId));
       this.logAction('Fatura Silindi', `No: ${inv.invoiceNo}, Tedarikçi: ${inv.supplier}`);
       await this.saveDatabase();
       this.showToast("Fatura başarıyla silindi!", "warning");
@@ -3919,39 +3928,45 @@ const App = {
   showConfirm(title, message, onConfirm, icon = '⚠️') {
     const modal = document.getElementById('modal-confirm');
     if (!modal) {
-      if (confirm(`${title}\n${message}`)) onConfirm();
+      if (confirm(`${title}\n${message}`)) {
+        if (typeof onConfirm === 'function') onConfirm();
+      }
       return;
     }
 
     const iconEl = document.getElementById('confirm-modal-icon');
     const titleEl = document.getElementById('confirm-modal-title');
     const msgEl = document.getElementById('confirm-modal-msg');
-    const btnOk = document.getElementById('btn-confirm-ok');
-    const btnCancel = document.getElementById('btn-confirm-cancel');
+    let btnOk = document.getElementById('btn-confirm-ok');
+    let btnCancel = document.getElementById('btn-confirm-cancel');
 
     if (iconEl) iconEl.innerText = icon;
     if (titleEl) titleEl.innerText = title;
     if (msgEl) msgEl.innerText = message;
 
+    if (btnOk && btnOk.parentNode) {
+      const newOk = btnOk.cloneNode(true);
+      btnOk.parentNode.replaceChild(newOk, btnOk);
+      btnOk = newOk;
+    }
+    if (btnCancel && btnCancel.parentNode) {
+      const newCancel = btnCancel.cloneNode(true);
+      btnCancel.parentNode.replaceChild(newCancel, btnCancel);
+      btnCancel = newCancel;
+    }
+
     modal.classList.add('active');
 
-    const cleanup = () => {
+    btnOk?.addEventListener('click', (e) => {
+      e?.preventDefault();
       modal.classList.remove('active');
-      if (btnOk) btnOk.removeEventListener('click', handleOk);
-      if (btnCancel) btnCancel.removeEventListener('click', handleCancel);
-    };
-
-    const handleOk = () => {
-      cleanup();
       if (typeof onConfirm === 'function') onConfirm();
-    };
+    });
 
-    const handleCancel = () => {
-      cleanup();
-    };
-
-    if (btnOk) btnOk.addEventListener('click', handleOk);
-    if (btnCancel) btnCancel.addEventListener('click', handleCancel);
+    btnCancel?.addEventListener('click', (e) => {
+      e?.preventDefault();
+      modal.classList.remove('active');
+    });
   },
 
   openModal(modalId) {
