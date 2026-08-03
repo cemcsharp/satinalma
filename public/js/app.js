@@ -725,27 +725,39 @@ const App = {
     document.getElementById('btn-export-ps-chart-trend')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-monthly-trend', 'Uzman_Tasarruf_Trendi.png'));
     document.getElementById('btn-export-ps-chart-unit')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-unit-pie', 'Uzman_Birim_Tasarruf_Payi.png'));
 
-    // Export Personnel Monthly Savings Matrix to Excel
-    document.getElementById('btn-export-savings-matrix-excel')?.addEventListener('click', () => {
-      this.exportTableToExcel('table-yearly-personnel-savings', 'Personel_Aylik_Pazarlik_Tasarruf_Matrisi.xls');
+    // Global Print / PDF Export Listeners across all views
+    document.getElementById('btn-export-requests-pdf')?.addEventListener('click', () => {
+      this.printSection('view-requests', 'SATİNALMA TALEPLERİ VE SİPARİŞ TAKİP LİSTESİ');
     });
-
-    // Unit Analysis Export Listeners
-    document.getElementById('btn-export-unit-excel')?.addEventListener('click', () => {
-      this.exportTableToExcel('table-unit-detailed', 'Kurumsal_Birim_Performans_ve_Harcama_Raporu.xls');
+    document.getElementById('btn-export-my-requests-pdf')?.addEventListener('click', () => {
+      this.printSection('view-my-requests', 'BENİM SATİNALMA TALEPLERİM RAPORU');
+    });
+    document.getElementById('btn-export-contracts-pdf')?.addEventListener('click', () => {
+      this.printSection('view-contracts', 'RESMİ SÖZLEŞMELER VE TEMİNAT MEKTUPLARI RAPORU');
+    });
+    document.getElementById('btn-export-invoices-pdf')?.addEventListener('click', () => {
+      this.printSection('view-invoices', 'RESMİ FATURALAR VE MUHASEBE ÖDEME ÇİZELGESİ RAPORU');
+    });
+    document.getElementById('btn-export-delegation-pdf')?.addEventListener('click', () => {
+      this.printSection('view-workload', 'SATİNALMA PERSONELİ İŞ YÜKÜ VE DELEGASYON RAPORU');
     });
     document.getElementById('btn-export-unit-pdf')?.addEventListener('click', () => {
       this.printSection('view-unit-analysis', 'KURUMSAL BİRİM PERFORMANS VE HARCAMA RAPORU');
     });
-
-    // Supplier Analysis Export PDF
     document.getElementById('btn-export-supplier-pdf')?.addEventListener('click', () => {
       this.printSection('view-supplier-analysis', 'TEDARİKÇİ BAZLI HARCAMA VE İŞ HACMİ RAPORU');
     });
-
-    // Yearly Report Print PDF
     document.getElementById('btn-print-yearly-report')?.addEventListener('click', () => {
       this.printSection('view-yearly-report', 'YILLIK SATİNALMA FAALİYET VE KARŞILAŞTIRMA RAPORU');
+    });
+    document.getElementById('btn-export-personnel-savings-pdf')?.addEventListener('click', () => {
+      this.printSection('view-personnel-savings-detail', 'PERSONEL PAZARLIK VE TASARRUF PERFORMANS RAPORU');
+    });
+    document.getElementById('btn-export-activity-logs-pdf')?.addEventListener('click', () => {
+      this.printSection('view-activity-logs', 'SİSTEM AKTİVİTE VE İŞLEM LOGLARI RAPORU');
+    });
+    document.getElementById('btn-export-logs-pdf')?.addEventListener('click', () => {
+      this.printSection('view-activity-logs', 'SİSTEM AKTİVİTE VE İŞLEM LOGLARI RAPORU');
     });
 
     // Filter for Unit Analysis
@@ -4227,40 +4239,52 @@ const App = {
     this.logAction('Excel Dışa Aktarıldı', `Tablo: ${tableId}, Dosya: ${filename}`);
   },
 
-  printSection(sectionId, docTitle = 'SATİNALMA MÜDÜRLÜĞÜ FAALİYET VE HARCAMA RAPORU') {
-    const secEl = document.getElementById(sectionId);
-    const printDoc = document.getElementById('printable-official-document');
-    const printBody = document.getElementById('print-doc-body');
-    const printDate = document.getElementById('print-doc-date');
-    const printTitle = document.querySelector('#printable-official-document .print-header div:nth-child(2)');
+  printSection(sectionId = null, docTitle = 'SATİNALMA MÜDÜRLÜĞÜ FAALİYET VE HARCAMA RAPORU') {
+    let secEl = sectionId ? document.getElementById(sectionId) : null;
+    if (!secEl) {
+      secEl = document.querySelector('.view-section:not([style*="display: none"]):not([style*="display:none"])');
+    }
 
-    const todayStr = new Date().toLocaleDateString('tr-TR');
-    const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
-    const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
-
-    if (printDate) printDate.innerText = `Belge Tarihi: ${todayStr} | Dönem: ${yearStr} | Raporlayan: ${userStr}`;
-    if (printTitle) printTitle.innerText = docTitle;
-
-    if (!secEl || !printBody || !printDoc) {
+    if (!secEl) {
       window.print();
       return;
     }
 
-    // Clone section to preserve original DOM
-    const clone = secEl.cloneNode(true);
+    let banner = secEl.querySelector('.print-header-banner');
+    let createdBanner = false;
 
-    // Remove buttons, filter bars, action buttons, search inputs
-    clone.querySelectorAll('.filter-bar, button, .action-btns, .btn-primary, .btn-secondary, .btn-export-excel, .btn-export-pdf, input, select, .search-input-box').forEach(el => el.remove());
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.className = 'print-header-banner';
+      createdBanner = true;
 
-    // Fix table containers so they expand fully
-    clone.querySelectorAll('.table-container').forEach(tc => {
-      tc.style.maxHeight = 'none';
-      tc.style.overflow = 'visible';
-    });
+      const todayStr = new Date().toLocaleDateString('tr-TR');
+      const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
+      const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
 
-    printBody.innerHTML = clone.innerHTML;
+      banner.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+          <div style="text-align:left;">
+            <div style="font-size:1.3rem; font-weight:800; color:#0f172a; letter-spacing:0.02em;">T.C. PİRİ REİS ÜNİVERSİTESİ</div>
+            <div style="font-size:1rem; font-weight:700; color:#1e3a8a; margin-top:0.2rem;">${docTitle}</div>
+          </div>
+          <div style="text-align:right; font-size:0.8rem; color:#475569; line-height:1.4;">
+            <div><strong>Tarih:</strong> ${todayStr}</div>
+            <div><strong>Dönem:</strong> ${yearStr}</div>
+            <div><strong>Raporlayan:</strong> ${userStr}</div>
+          </div>
+        </div>
+      `;
+      secEl.insertBefore(banner, secEl.firstChild);
+    }
 
+    secEl.classList.add('active-print');
     window.print();
+
+    if (createdBanner && banner) {
+      banner.remove();
+    }
+    secEl.classList.remove('active-print');
   },
 
   async fetchBackups() {

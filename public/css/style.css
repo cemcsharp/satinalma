@@ -1828,11 +1828,11 @@ th.sticky-col-left, th.sticky-col-right {
 }
 
 /* ============================================================ */
-/* OFFICIAL INSTITUTIONAL PRINT & PDF DOCUMENT STYLES           */
+/* UNIVERSAL PRINT & PDF ENGINE FOR ALL ACTIVE PAGES & VIEWS    */
 /* Crisp White Background, High-Contrast Black Text, Signatures */
 /* ============================================================ */
 
-.print-only {
+.print-only, .print-header-banner {
   display: none !important;
 }
 
@@ -1842,102 +1842,134 @@ th.sticky-col-left, th.sticky-col-right {
     margin: 8mm;
   }
 
-  /* Hide web app UI */
-  body * {
-    visibility: hidden;
-  }
-
-  /* Show ONLY #printable-official-document and its children */
-  #printable-official-document,
-  #printable-official-document * {
-    visibility: visible;
-  }
-
-  #printable-official-document {
-    display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100% !important;
+  html, body {
     background: #ffffff !important;
-    color: #000000 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    font-family: 'Segoe UI', Arial, sans-serif !important;
-    font-size: 10pt !important;
-  }
-
-  #printable-official-document h3,
-  #printable-official-document h4 {
     color: #0f172a !important;
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+    font-size: 10pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  #printable-official-document p {
-    color: #475569 !important;
+  /* Hide Non-Printable UI Chrome (Sidebar, Top Header, Filters, Buttons, Inputs) */
+  .sidebar,
+  .top-header,
+  .filter-bar,
+  .action-btns,
+  button,
+  .btn-primary,
+  .btn-secondary,
+  .btn-export-excel,
+  .btn-export-pdf,
+  .btn-icon,
+  #btn-mobile-menu,
+  .pagination-bar,
+  #sidebar-overlay,
+  .close-modal,
+  .search-input-box {
+    display: none !important;
   }
 
-  #printable-official-document .glass-card,
-  #printable-official-document .kpi-card {
+  /* Main Container Full Expansion */
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Show ONLY the currently active view section */
+  .view-section {
+    display: none !important;
+  }
+
+  .view-section.active-print,
+  .view-section:not([style*="display: none"]):not([style*="display:none"]) {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Display Print Header Banner when present */
+  .print-header-banner {
+    display: block !important;
+    border-bottom: 2px solid #0f172a !important;
+    padding-bottom: 0.75rem !important;
+    margin-bottom: 1.25rem !important;
+    break-after: avoid;
+  }
+
+  /* Print Cards & Glass Cards */
+  .glass-card, .kpi-card, .unit-dashboard-card {
     background: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
     box-shadow: none !important;
-    color: #000000 !important;
-    padding: 0.75rem !important;
-    margin-bottom: 1rem !important;
+    color: #0f172a !important;
+    padding: 1rem !important;
+    margin-bottom: 1.25rem !important;
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .grid-4, .grid-3, .grid-2 {
+    display: grid !important;
+    gap: 1rem !important;
     break-inside: avoid;
   }
 
-  #printable-official-document .grid-4,
-  #printable-official-document .grid-2,
-  #printable-official-document .grid-3 {
-    display: grid !important;
-    gap: 0.75rem !important;
+  /* Force Full Table Expansion (No Scrollbars or Truncation) */
+  .table-container {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    width: 100% !important;
   }
 
-  #printable-official-document table.custom-table {
+  table.custom-table {
     width: 100% !important;
     border-collapse: collapse !important;
-    margin-top: 0.75rem !important;
     font-size: 9pt !important;
+    margin-top: 0.5rem !important;
   }
 
-  #printable-official-document table.custom-table th,
-  #printable-official-document table.custom-table td {
+  table.custom-table th, 
+  table.custom-table td {
     border: 1px solid #94a3b8 !important;
     padding: 6px 8px !important;
-    color: #000000 !important;
+    color: #0f172a !important;
     background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  #printable-official-document table.custom-table th {
+  table.custom-table th {
     background-color: #f1f5f9 !important;
     font-weight: bold !important;
     color: #0f172a !important;
   }
 
-  #printable-official-document .badge {
+  /* Badges & Canvas Elements */
+  .badge {
     border: 1px solid #94a3b8 !important;
-    background: #f8fafc !important;
+    background: #f1f5f9 !important;
     color: #0f172a !important;
     font-weight: bold !important;
     padding: 2px 6px !important;
     border-radius: 4px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  #printable-official-document canvas {
+  canvas {
     max-width: 100% !important;
     height: auto !important;
     break-inside: avoid;
   }
 
-  .print-signatures {
-    margin-top: 2.5rem !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    text-align: center !important;
-    break-inside: avoid;
+  .print-only {
+    display: block !important;
   }
 }
 
