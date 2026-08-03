@@ -730,6 +730,7 @@ const App = {
 
     // Filter for Unit Analysis
     document.getElementById('filter-unit-search')?.addEventListener('input', () => this.renderUnitAnalysis());
+    document.getElementById('select-unit-analysis')?.addEventListener('change', () => this.renderUnitAnalysis());
   },
 
   async fetchTCMBRates() {
@@ -2693,7 +2694,7 @@ const App = {
     }, '👉');
   },
 
-  // 7. UNIT ANALYSIS RENDERER (REDESIGNED DASHBOARD)
+  // 7. UNIT ANALYSIS RENDERER (EXECUTIVE ANALYTICS REPORT)
   renderUnitAnalysis() {
     const requests = this.getFilteredRequests();
     const selectedUnit = document.getElementById('select-unit-analysis')?.value || 'ALL';
@@ -2702,15 +2703,26 @@ const App = {
     const unitMap = {};
     const unitSLA = {};
     let grandTotalSpend = 0;
+    let grandTotalReq = 0;
+    let grandCompletedReq = 0;
+    let grandOpenReq = 0;
+    let grandSlaDays = 0;
+    let grandSlaCount = 0;
 
     requests.forEach(r => {
-      const uName = r.unit;
+      const uName = r.unit || 'Diğer / Belirtilmemiş';
       if (!unitMap[uName]) unitMap[uName] = { total: 0, completed: 0, open: 0, spend: 0 };
       if (!unitSLA[uName]) unitSLA[uName] = { totalDays: 0, count: 0 };
 
       unitMap[uName].total++;
-      if (r.status === 'Tamamlandı') unitMap[uName].completed++;
-      if (r.status === 'Açık') unitMap[uName].open++;
+      grandTotalReq++;
+      if (r.status === 'Tamamlandı') {
+        unitMap[uName].completed++;
+        grandCompletedReq++;
+      } else {
+        unitMap[uName].open++;
+        grandOpenReq++;
+      }
       
       const sp = (r.actualAmount || 0);
       unitMap[uName].spend += sp;
@@ -2723,6 +2735,8 @@ const App = {
         if (!isNaN(diffDays) && diffDays >= 0 && diffDays < 180) {
           unitSLA[uName].totalDays += diffDays;
           unitSLA[uName].count++;
+          grandSlaDays += diffDays;
+          grandSlaCount++;
         }
       }
     });
@@ -2735,7 +2749,7 @@ const App = {
     const elSpenderSub = document.getElementById('unit-kpi-top-spender-sub');
     if (elSpender && topSpender) {
       elSpender.innerText = topSpender[0];
-      if (elSpenderSub) elSpenderSub.innerText = `${topSpender[1].spend.toLocaleString('tr-TR')} ₺ Toplam Harcama`;
+      if (elSpenderSub) elSpenderSub.innerText = `${topSpender[1].spend.toLocaleString('tr-TR')} ₺ Harcama`;
     }
 
     // 2. Top Demander KPI
@@ -2758,10 +2772,10 @@ const App = {
       if (fastest) {
         const avg = (fastest[1].totalDays / fastest[1].count).toFixed(1);
         elFastest.innerText = fastest[0];
-        if (elFastestSub) elFastestSub.innerText = `${avg} Gün Ort. Temin Süresi`;
+        if (elFastestSub) elFastestSub.innerText = `${avg} Gün Ort. Temin`;
       } else {
         elFastest.innerText = '-';
-        if (elFastestSub) elFastestSub.innerText = 'Süresi tamamlanmış veri yok';
+        if (elFastestSub) elFastestSub.innerText = 'Veri yok';
       }
     }
 
@@ -2825,88 +2839,149 @@ const App = {
       }
     });
 
-    // 3. Render Interactive Unit Dashboard Cards Grid
-    const cardsContainer = document.getElementById('unit-cards-container');
-    if (cardsContainer) {
-      if (filteredEntries.length === 0) {
-        cardsContainer.innerHTML = `<div style="grid-column: span 3; text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun birim bulunamadı.</div>`;
-      } else {
-        cardsContainer.innerHTML = filteredEntries.map(([uName, s]) => {
-          const share = grandTotalSpend > 0 ? ((s.spend / grandTotalSpend) * 100).toFixed(1) : 0;
-          const sla = unitSLA[uName] && unitSLA[uName].count > 0 ? (unitSLA[uName].totalDays / unitSLA[uName].count).toFixed(1) : '-';
-
-          // Dynamic Progress Color
-          let fillClass = 'progress-fill-green';
-          if (share > 20) fillClass = 'progress-fill-yellow';
-          if (share > 35) fillClass = 'progress-fill-red';
-
-          return `
-            <div class="unit-dashboard-card">
-              <div>
-                <div class="unit-card-title">
-                  <h4>🏢 ${uName}</h4>
-                  <span class="badge priority-orta">%${share} Bütçe Payı</span>
-                </div>
-
-                <div style="font-size: 1.35rem; font-weight: 800; color: var(--status-completed); font-family: var(--font-mono); margin-bottom: 0.5rem;">
-                  ${s.spend.toLocaleString('tr-TR')} ₺
-                </div>
-
-                <div class="budget-progress-container">
-                  <div class="budget-progress-header">
-                    <span>Kurum Bütçe Payı Oranı</span>
-                    <span>%${share}</span>
-                  </div>
-                  <div class="budget-progress-track">
-                    <div class="budget-progress-fill ${fillClass}" style="width: ${Math.min(100, Math.max(6, share * 2.2))}%;"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem; margin-top: 0.5rem; font-size: 0.8rem;">
-                <div>
-                  <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">${s.total}</div>
-                  <div style="color: var(--text-muted); font-size: 0.72rem;">Toplam</div>
-                </div>
-                <div>
-                  <div style="font-weight: 700; color: var(--status-completed); font-size: 0.95rem;">${s.completed}</div>
-                  <div style="color: var(--text-muted); font-size: 0.72rem;">Biten</div>
-                </div>
-                <div>
-                  <div style="font-weight: 700; color: var(--status-open); font-size: 0.95rem;">${sla} gün</div>
-                  <div style="color: var(--text-muted); font-size: 0.72rem;">Ort. SLA</div>
-                </div>
-              </div>
-            </div>
-          `;
-        }).join('');
-      }
-    }
-
-    // 4. Render Detailed Unit Table
+    // 3. Render Detailed Executive Unit Table
     const tbody = document.querySelector('#table-unit-detailed tbody');
     if (tbody) {
       if (filteredEntries.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun birim kaydı bulunamadı.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun birim kaydı bulunamadı.</td></tr>`;
       } else {
-        tbody.innerHTML = filteredEntries.map(([uName, s]) => {
-          const share = grandTotalSpend > 0 ? ((s.spend / grandTotalSpend) * 100).toFixed(1) : 0;
-          const sla = unitSLA[uName] && unitSLA[uName].count > 0 ? (unitSLA[uName].totalDays / unitSLA[uName].count).toFixed(1) + ' gün' : '-';
+        tbody.innerHTML = filteredEntries.map(([uName, s], idx) => {
+          const shareNum = grandTotalSpend > 0 ? (s.spend / grandTotalSpend) * 100 : 0;
+          const shareStr = shareNum.toFixed(1);
+          const slaVal = unitSLA[uName] && unitSLA[uName].count > 0 ? (unitSLA[uName].totalDays / unitSLA[uName].count) : null;
+          const slaStr = slaVal !== null ? `${slaVal.toFixed(1)} gün` : '-';
+          
+          let slaBadge = `<span style="font-size:0.8rem; color:var(--text-muted);">${slaStr}</span>`;
+          if (slaVal !== null) {
+            if (slaVal < 10) slaBadge = `<span class="badge status-completed">${slaVal.toFixed(1)} gün</span>`;
+            else if (slaVal < 20) slaBadge = `<span class="badge priority-orta">${slaVal.toFixed(1)} gün</span>`;
+            else slaBadge = `<span class="badge priority-kritik">${slaVal.toFixed(1)} gün</span>`;
+          }
+
+          const safeName = uName.replace(/'/g, "\\'");
 
           return `
             <tr>
-              <td style="font-weight:700;">🏢 ${uName}</td>
+              <td style="font-weight:700; color:var(--text-muted);">${idx + 1}</td>
+              <td style="font-weight:700; color:var(--text-main);">🏢 ${uName}</td>
               <td style="font-weight:600;">${s.total}</td>
               <td><span class="badge status-completed">${s.completed}</span></td>
               <td><span class="badge status-open">${s.open}</span></td>
-              <td style="font-weight:600;">%${share}</td>
-              <td style="color:var(--text-muted); font-size:0.85rem;">${sla}</td>
+              <td>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <div style="flex:1; background:var(--bg-hover); height:6px; border-radius:3px; overflow:hidden;">
+                    <div style="width:${Math.min(100, shareNum)}%; background:var(--accent-primary); height:100%;"></div>
+                  </div>
+                  <span style="font-weight:700; font-size:0.82rem; min-width:42px;">%${shareStr}</span>
+                </div>
+              </td>
+              <td>${slaBadge}</td>
               <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${s.spend.toLocaleString('tr-TR')} ₺</td>
+              <td style="text-align:center;">
+                <button class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="App.viewUnitAnalysisDetail('${safeName}')">🔍 Detay</button>
+              </td>
             </tr>
           `;
         }).join('');
       }
     }
+
+    // 4. Update Footer Totals
+    const fTotalReq = document.getElementById('unit-foot-total-req');
+    const fCompletedReq = document.getElementById('unit-foot-completed-req');
+    const fOpenReq = document.getElementById('unit-foot-open-req');
+    const fAvgSla = document.getElementById('unit-foot-avg-sla');
+    const fTotalSpend = document.getElementById('unit-foot-total-spend');
+
+    if (fTotalReq) fTotalReq.innerText = grandTotalReq;
+    if (fCompletedReq) fCompletedReq.innerText = grandCompletedReq;
+    if (fOpenReq) fOpenReq.innerText = grandOpenReq;
+    if (fAvgSla) fAvgSla.innerText = grandSlaCount > 0 ? (grandSlaDays / grandSlaCount).toFixed(1) + ' gün' : '-';
+    if (fTotalSpend) fTotalSpend.innerText = `${grandTotalSpend.toLocaleString('tr-TR')} ₺`;
+  },
+
+  // DEDICATED UNIT ANALYSIS DETAIL MODAL HANDLER
+  viewUnitAnalysisDetail(unitName) {
+    const allRequests = this.getFilteredRequests();
+    const unitRequests = allRequests.filter(r => r.unit === unitName);
+
+    let completedCount = 0;
+    let openCount = 0;
+    let totalSpend = 0;
+    let slaDays = 0;
+    let slaCount = 0;
+
+    unitRequests.forEach(r => {
+      if (r.status === 'Tamamlandı') completedCount++;
+      else openCount++;
+      totalSpend += (r.actualAmount || 0);
+
+      if (r.arrivalDate && r.orderDate) {
+        const d1 = new Date(r.arrivalDate);
+        const d2 = new Date(r.orderDate);
+        const diff = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+        if (!isNaN(diff) && diff < 180) {
+          slaDays += diff;
+          slaCount++;
+        }
+      }
+    });
+
+    const avgSla = slaCount > 0 ? (slaDays / slaCount).toFixed(1) + ' Gün' : '-';
+
+    document.getElementById('view-details-title').innerText = `🏢 ${unitName} — Birim Detay Raporu`;
+    const body = document.getElementById('view-details-body');
+    if (body) {
+      body.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; text-align: center;">
+          <div style="background: var(--bg-card); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">TOPLAM TALEP</div>
+            <div style="font-size: 1.25rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.2rem;">${unitRequests.length}</div>
+          </div>
+          <div style="background: var(--bg-card); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">TAMAMLANAN</div>
+            <div style="font-size: 1.25rem; font-weight: 800; color: var(--status-completed); margin-top: 0.2rem;">${completedCount}</div>
+          </div>
+          <div style="background: var(--bg-card); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">ORT. SLA SÜRESİ</div>
+            <div style="font-size: 1.25rem; font-weight: 800; color: var(--accent-purple); margin-top: 0.2rem;">${avgSla}</div>
+          </div>
+          <div style="background: var(--bg-card); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">TOPLAM HARCAMA</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: var(--status-completed); font-family: var(--font-mono); margin-top: 0.2rem;">${totalSpend.toLocaleString('tr-TR')} ₺</div>
+          </div>
+        </div>
+
+        <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+          <table class="custom-table" style="font-size: 0.85rem;">
+            <thead>
+              <tr>
+                <th>Barkod</th>
+                <th>Konu</th>
+                <th>Sorumlu Personel</th>
+                <th>Geliş Tarihi</th>
+                <th>Durum</th>
+                <th>Harcama (₺)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${unitRequests.map(r => `
+                <tr>
+                  <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary);">${r.requestBarcode || '-'}</td>
+                  <td style="font-weight: 600;">${r.subject}</td>
+                  <td>${r.assignedTo}</td>
+                  <td style="color: var(--text-muted);">${r.arrivalDate || r.requestDate}</td>
+                  <td><span class="badge status-${r.status?.toLowerCase()}">${r.status}</span></td>
+                  <td style="font-weight: 700; font-family: var(--font-mono);">${r.actualAmount > 0 ? r.actualAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    this.openModal('modal-view-details');
   },
 
   // 8. SUPPLIER ANALYSIS RENDERER

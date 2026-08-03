@@ -858,23 +858,32 @@
 
       <!-- 7. UNIT ANALYSIS VIEW -->
       <section id="view-unit-analysis" class="view-section" style="display: none;">
+        <!-- Header & Action Bar -->
+        <div class="card-header" style="margin-bottom: 1.25rem;">
+          <div>
+            <h3>🏢 Kurumsal Birim Analizi ve Bütçe Dağılım Raporu</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">İdari ve akademik birimlerin kurumsal bütçe kullanım oranları, talep yükleri ve süreç hızları (SLA)</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-export-excel" id="btn-export-unit-excel">
+              <span>📥</span> Excel İndir
+            </button>
+            <button class="btn-primary" id="btn-export-unit-pdf">
+              <span>🖨️</span> PDF / Yazdır
+            </button>
+          </div>
+        </div>
+
         <!-- Filter Toolbar -->
         <div class="filter-bar" style="margin-bottom: 1.25rem;">
-          <div class="search-input-box" style="min-width: 240px;">
+          <div class="search-input-box" style="min-width: 260px;">
             <span class="search-icon">🔍</span>
-            <input type="text" id="filter-unit-search" placeholder="Birim adı ile ara...">
+            <input type="text" id="filter-unit-search" placeholder="Birim adı ile filtrele...">
           </div>
 
           <select class="filter-select" id="select-unit-analysis">
             <option value="ALL">Tüm Birimler Özeti</option>
           </select>
-
-          <button class="btn-secondary" id="btn-export-unit-excel">
-            <span>📥</span> Excel İndir
-          </button>
-          <button class="btn-export-pdf" id="btn-export-unit-pdf">
-            <span>🖨️</span> PDF / Yazdır
-          </button>
         </div>
 
         <!-- 4 Top KPI Cards Grid -->
@@ -943,34 +952,40 @@
           </div>
         </div>
 
-        <!-- Interactive Unit Dashboard Cards Grid -->
-        <div class="card-header" style="margin-bottom: 1rem;">
-          <h3>🏢 Birim Bazlı İlerleme & Bütçe Yönetim Kartları</h3>
-          <p style="font-size: 0.82rem; color: var(--text-muted);">Birimlerin bütçe kullanım oranları, canlı talep durumları ve süreç hızları</p>
-        </div>
-        <div class="grid-3" id="unit-cards-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
-          <!-- Unit Cards Injected Dynamically -->
-        </div>
-
-        <!-- Detailed Unit Table -->
+        <!-- Executive Detailed Unit Performance Table -->
         <div class="glass-card">
           <div class="card-header">
-            <h3>📜 Detaylı Birim Harcama ve İş Yükü Cetveli</h3>
+            <h3>📜 Birim Performans, Süreç ve Harcama Cetveli</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">Birim bazlı harcama payları, açık/tamamlanan talepler ve temin süreleri</p>
           </div>
-          <div class="table-container" style="max-height: 450px; overflow-y: auto;">
+          <div class="table-container" style="max-height: 550px; overflow-y: auto;">
             <table class="custom-table" id="table-unit-detailed">
               <thead>
                 <tr>
+                  <th style="width: 45px;">#</th>
                   <th>Birim Adı</th>
-                  <th>Talep Sayısı</th>
+                  <th>Talep Adedi</th>
                   <th>Tamamlanan</th>
                   <th>Açık / İşlemde</th>
-                  <th>Bütçe Kullanım %</th>
-                  <th>Ort. Temin Gün</th>
-                  <th>Harcama Tutarı (TRY)</th>
+                  <th>Bütçe Payı %</th>
+                  <th>Ort. Temin (SLA)</th>
+                  <th>Toplam Harcama (₺)</th>
+                  <th style="text-align: center; width: 120px;">İşlemler</th>
                 </tr>
               </thead>
               <tbody></tbody>
+              <tfoot>
+                <tr style="font-weight: 800; background: var(--bg-hover); border-top: 2px solid var(--border-color);" id="tfoot-unit-totals">
+                  <td colspan="2">KURUMSAL GENEL TOPLAM</td>
+                  <td id="unit-foot-total-req">0</td>
+                  <td id="unit-foot-completed-req">0</td>
+                  <td id="unit-foot-open-req">0</td>
+                  <td>%100.0</td>
+                  <td id="unit-foot-avg-sla">-</td>
+                  <td id="unit-foot-total-spend" style="color: var(--status-completed); font-family: var(--font-mono); font-size: 1.05rem;">0 ₺</td>
+                  <td>-</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
