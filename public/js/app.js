@@ -719,7 +719,9 @@ const App = {
       const uName = (this.state.currentSavingsUser || 'Personel').replace(/\s+/g, '_');
       this.exportTableToExcel('table-ps-jobs-list', `${uName}_Pazarlik_Tasarruf_Raporu.xls`);
     });
-    document.getElementById('btn-export-personnel-savings-pdf')?.addEventListener('click', () => this.printSection('view-personnel-savings-detail'));
+    document.getElementById('btn-export-personnel-savings-pdf')?.addEventListener('click', () => {
+      this.printSection('view-personnel-savings-detail', 'PERSONEL PAZARLIK VE TASARRUF PERFORMANS RAPORU');
+    });
     document.getElementById('btn-export-ps-chart-trend')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-monthly-trend', 'Uzman_Tasarruf_Trendi.png'));
     document.getElementById('btn-export-ps-chart-unit')?.addEventListener('click', () => this.exportChartToPNG('chart-ps-unit-pie', 'Uzman_Birim_Tasarruf_Payi.png'));
 
@@ -733,7 +735,17 @@ const App = {
       this.exportTableToExcel('table-unit-detailed', 'Kurumsal_Birim_Performans_ve_Harcama_Raporu.xls');
     });
     document.getElementById('btn-export-unit-pdf')?.addEventListener('click', () => {
-      window.print();
+      this.printSection('view-unit-analysis', 'KURUMSAL BİRİM PERFORMANS VE HARCAMA RAPORU');
+    });
+
+    // Supplier Analysis Export PDF
+    document.getElementById('btn-export-supplier-pdf')?.addEventListener('click', () => {
+      this.printSection('view-supplier-analysis', 'TEDARİKÇİ BAZLI HARCAMA VE İŞ HACMİ RAPORU');
+    });
+
+    // Yearly Report Print PDF
+    document.getElementById('btn-print-yearly-report')?.addEventListener('click', () => {
+      this.printSection('view-yearly-report', 'YILLIK SATİNALMA FAALİYET VE KARŞILAŞTIRMA RAPORU');
     });
 
     // Filter for Unit Analysis
@@ -4215,8 +4227,46 @@ const App = {
     this.logAction('Excel Dışa Aktarıldı', `Tablo: ${tableId}, Dosya: ${filename}`);
   },
 
-  printSection(sectionId) {
+  printSection(sectionId, docTitle = 'SATİNALMA MÜDÜRLÜĞÜ KURUMSAL RAPORU') {
+    const targetEl = document.getElementById(sectionId) || document.getElementById('app');
+    if (!targetEl) {
+      window.print();
+      return;
+    }
+
+    let headerEl = targetEl.querySelector('.print-official-header');
+    let createdTemp = false;
+
+    if (!headerEl) {
+      headerEl = document.createElement('div');
+      headerEl.className = 'print-official-header';
+      createdTemp = true;
+
+      const todayStr = new Date().toLocaleDateString('tr-TR');
+      const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
+      const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
+
+      headerEl.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--accent-primary); padding-bottom:0.75rem; margin-bottom:1.25rem;">
+          <div style="text-align:left;">
+            <div style="font-size:1.25rem; font-weight:800; color:var(--text-main);">T.C. PİRİ REİS ÜNİVERSİTESİ</div>
+            <div style="font-size:0.95rem; font-weight:700; color:var(--accent-primary); margin-top:0.2rem;">${docTitle}</div>
+          </div>
+          <div style="text-align:right; font-size:0.78rem; color:var(--text-muted); line-height:1.4;">
+            <div><strong>Tarih:</strong> ${todayStr}</div>
+            <div><strong>Dönem:</strong> ${yearStr}</div>
+            <div><strong>Raporlayan:</strong> ${userStr}</div>
+          </div>
+        </div>
+      `;
+      targetEl.insertBefore(headerEl, targetEl.firstChild);
+    }
+
     window.print();
+
+    if (createdTemp && headerEl) {
+      headerEl.remove();
+    }
   },
 
   async fetchBackups() {
