@@ -4227,46 +4227,40 @@ const App = {
     this.logAction('Excel Dışa Aktarıldı', `Tablo: ${tableId}, Dosya: ${filename}`);
   },
 
-  printSection(sectionId, docTitle = 'SATİNALMA MÜDÜRLÜĞÜ KURUMSAL RAPORU') {
-    const targetEl = document.getElementById(sectionId) || document.getElementById('app');
-    if (!targetEl) {
+  printSection(sectionId, docTitle = 'SATİNALMA MÜDÜRLÜĞÜ FAALİYET VE HARCAMA RAPORU') {
+    const secEl = document.getElementById(sectionId);
+    const printDoc = document.getElementById('printable-official-document');
+    const printBody = document.getElementById('print-doc-body');
+    const printDate = document.getElementById('print-doc-date');
+    const printTitle = document.querySelector('#printable-official-document .print-header div:nth-child(2)');
+
+    const todayStr = new Date().toLocaleDateString('tr-TR');
+    const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
+    const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
+
+    if (printDate) printDate.innerText = `Belge Tarihi: ${todayStr} | Dönem: ${yearStr} | Raporlayan: ${userStr}`;
+    if (printTitle) printTitle.innerText = docTitle;
+
+    if (!secEl || !printBody || !printDoc) {
       window.print();
       return;
     }
 
-    let headerEl = targetEl.querySelector('.print-official-header');
-    let createdTemp = false;
+    // Clone section to preserve original DOM
+    const clone = secEl.cloneNode(true);
 
-    if (!headerEl) {
-      headerEl = document.createElement('div');
-      headerEl.className = 'print-official-header';
-      createdTemp = true;
+    // Remove buttons, filter bars, action buttons, search inputs
+    clone.querySelectorAll('.filter-bar, button, .action-btns, .btn-primary, .btn-secondary, .btn-export-excel, .btn-export-pdf, input, select, .search-input-box').forEach(el => el.remove());
 
-      const todayStr = new Date().toLocaleDateString('tr-TR');
-      const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
-      const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
+    // Fix table containers so they expand fully
+    clone.querySelectorAll('.table-container').forEach(tc => {
+      tc.style.maxHeight = 'none';
+      tc.style.overflow = 'visible';
+    });
 
-      headerEl.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--accent-primary); padding-bottom:0.75rem; margin-bottom:1.25rem;">
-          <div style="text-align:left;">
-            <div style="font-size:1.25rem; font-weight:800; color:var(--text-main);">T.C. PİRİ REİS ÜNİVERSİTESİ</div>
-            <div style="font-size:0.95rem; font-weight:700; color:var(--accent-primary); margin-top:0.2rem;">${docTitle}</div>
-          </div>
-          <div style="text-align:right; font-size:0.78rem; color:var(--text-muted); line-height:1.4;">
-            <div><strong>Tarih:</strong> ${todayStr}</div>
-            <div><strong>Dönem:</strong> ${yearStr}</div>
-            <div><strong>Raporlayan:</strong> ${userStr}</div>
-          </div>
-        </div>
-      `;
-      targetEl.insertBefore(headerEl, targetEl.firstChild);
-    }
+    printBody.innerHTML = clone.innerHTML;
 
     window.print();
-
-    if (createdTemp && headerEl) {
-      headerEl.remove();
-    }
   },
 
   async fetchBackups() {

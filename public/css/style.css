@@ -1828,12 +1828,12 @@ th.sticky-col-left, th.sticky-col-right {
 }
 
 /* ============================================================ */
-/* OFFICIAL INSTITUTIONAL PRINT & PDF STYLES                    */
-/* Preserves 100% Rich Screen Aesthetics, Cards, Colors & Badges */
+/* OFFICIAL INSTITUTIONAL PRINT & PDF DOCUMENT STYLES           */
+/* Crisp White Background, High-Contrast Black Text, Signatures */
 /* ============================================================ */
 
-.print-official-header {
-  display: none;
+.print-only {
+  display: none !important;
 }
 
 @media print {
@@ -1842,88 +1842,102 @@ th.sticky-col-left, th.sticky-col-right {
     margin: 8mm;
   }
 
-  html, body {
-    background: var(--bg-body) !important;
-    color: var(--text-main) !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    font-size: 11px !important;
+  /* Hide web app UI */
+  body * {
+    visibility: hidden;
   }
 
-  .print-official-header {
+  /* Show ONLY #printable-official-document and its children */
+  #printable-official-document,
+  #printable-official-document * {
+    visibility: visible;
+  }
+
+  #printable-official-document {
     display: block !important;
-  }
-
-  .sidebar,
-  .top-header,
-  .filter-bar,
-  .action-btns,
-  button,
-  .btn-primary,
-  .btn-secondary,
-  .btn-export-excel,
-  .btn-export-pdf,
-  .btn-icon,
-  #btn-mobile-menu,
-  .pagination-bar,
-  #sidebar-overlay,
-  .close-modal {
-    display: none !important;
-  }
-
-  .main-content {
-    margin-left: 0 !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     padding: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    margin: 0 !important;
+    font-family: 'Segoe UI', Arial, sans-serif !important;
+    font-size: 10pt !important;
   }
 
-  .view-section {
-    display: block !important;
+  #printable-official-document h3,
+  #printable-official-document h4 {
+    color: #0f172a !important;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
   }
 
-  .glass-card, .kpi-card, .unit-dashboard-card {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-color) !important;
+  #printable-official-document p {
+    color: #475569 !important;
+  }
+
+  #printable-official-document .glass-card,
+  #printable-official-document .kpi-card {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
     box-shadow: none !important;
-    break-inside: avoid;
+    color: #000000 !important;
+    padding: 0.75rem !important;
     margin-bottom: 1rem !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    break-inside: avoid;
   }
 
-  .table-container {
-    max-height: none !important;
-    overflow: visible !important;
-    width: 100% !important;
+  #printable-official-document .grid-4,
+  #printable-official-document .grid-2,
+  #printable-official-document .grid-3 {
+    display: grid !important;
+    gap: 0.75rem !important;
   }
 
-  table.custom-table {
+  #printable-official-document table.custom-table {
     width: 100% !important;
     border-collapse: collapse !important;
+    margin-top: 0.75rem !important;
     font-size: 9pt !important;
   }
 
-  table.custom-table th, 
-  table.custom-table td {
+  #printable-official-document table.custom-table th,
+  #printable-official-document table.custom-table td {
+    border: 1px solid #94a3b8 !important;
     padding: 6px 8px !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    color: #000000 !important;
+    background: #ffffff !important;
   }
 
-  .badge {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  #printable-official-document table.custom-table th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
+    color: #0f172a !important;
   }
 
-  canvas {
+  #printable-official-document .badge {
+    border: 1px solid #94a3b8 !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    font-weight: bold !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+  }
+
+  #printable-official-document canvas {
     max-width: 100% !important;
     height: auto !important;
     break-inside: avoid;
   }
 
-  .print-only {
-    display: block !important;
+  .print-signatures {
+    margin-top: 2.5rem !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    text-align: center !important;
+    break-inside: avoid;
   }
 }
 
