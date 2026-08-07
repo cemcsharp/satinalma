@@ -317,17 +317,18 @@ const App = {
       return;
     }
 
-    // Bilgi Güvenliği ve Gizlilik: Yalnızca BİREBİR TAM EŞLEŞEN barkod veya sipariş numarası gösterilir
+    // Barkod, Sipariş No veya Konu Araması
     const matches = (this.state.requests || []).filter(r => {
       const reqBc = r.requestBarcode?.toString().toLowerCase().trim() || '';
       const ordBc = r.orderBarcode?.toString().toLowerCase().trim() || '';
-      return reqBc === cleanQ || ordBc === cleanQ;
-    });
+      const subj = r.subject?.toLowerCase().trim() || '';
+      return reqBc === cleanQ || ordBc === cleanQ || (cleanQ.length >= 3 && subj.includes(cleanQ));
+    }).slice(0, 5);
 
     if (matches.length === 0) {
       resultsBox.innerHTML = `
         <div style="padding: 1.5rem; text-align: center; color: var(--status-rejected); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
-          ⚠️ "${query}" numaralı bir talep kaydı bulunamadı. Lütfen barkod numaranızı eksiksiz girdiğinizden emin olun.
+          ⚠️ "${query}" ile eşleşen bir talep kaydı bulunamadı. Lütfen barkod numaranızı veya talep konusunu kontrol edin.
         </div>
       `;
       return;
