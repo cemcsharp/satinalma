@@ -422,9 +422,216 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log('==========================================================');
-  console.log(' 🚀 SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (REST API Modu)');
-  console.log(` 🌐 Erişim: http://localhost:${PORT}/`);
-  console.log('==========================================================');
+async function initDatabaseSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        title VARCHAR(255),
+        role VARCHAR(50) DEFAULT 'USER',
+        "isActive" BOOLEAN DEFAULT true,
+        password VARCHAR(255) DEFAULT '123456'
+      );
+
+      CREATE TABLE IF NOT EXISTS requests (
+        id SERIAL PRIMARY KEY,
+        "requestBarcode" VARCHAR(100),
+        subject VARCHAR(550),
+        unit VARCHAR(255),
+        "arrivalDate" VARCHAR(100),
+        "assignedTo" VARCHAR(255),
+        priority VARCHAR(50),
+        status VARCHAR(50),
+        "estimatedAmount" NUMERIC,
+        "actualAmount" NUMERIC,
+        currency VARCHAR(20) DEFAULT 'TRY',
+        supplier VARCHAR(255),
+        "orderBarcode" VARCHAR(100),
+        "orderDate" VARCHAR(100),
+        regulation VARCHAR(100),
+        description TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS contracts (
+        id SERIAL PRIMARY KEY,
+        "contractNo" VARCHAR(100),
+        title VARCHAR(255),
+        supplier VARCHAR(255),
+        unit VARCHAR(255),
+        "startDate" VARCHAR(100),
+        "endDate" VARCHAR(100),
+        "totalAmount" NUMERIC,
+        currency VARCHAR(20) DEFAULT 'TRY',
+        "assignedTo" VARCHAR(255),
+        status VARCHAR(50),
+        description TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        "invoiceNo" VARCHAR(100),
+        supplier VARCHAR(255),
+        "invoiceDate" VARCHAR(100),
+        amount NUMERIC,
+        currency VARCHAR(20) DEFAULT 'TRY',
+        "requestBarcode" VARCHAR(100),
+        status VARCHAR(50),
+        description TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS guarantees (
+        id SERIAL PRIMARY KEY,
+        "letterNo" VARCHAR(100),
+        bank VARCHAR(255),
+        supplier VARCHAR(255),
+        "guaranteeAmount" NUMERIC,
+        currency VARCHAR(20) DEFAULT 'TRY',
+        "issueDate" VARCHAR(100),
+        "expiryDate" VARCHAR(100),
+        status VARCHAR(50),
+        description TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS logs (
+        id SERIAL PRIMARY KEY,
+        timestamp VARCHAR(100),
+        "user" VARCHAR(255),
+        action VARCHAR(255),
+        details TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS units (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS regulations (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS rates (
+        id SERIAL PRIMARY KEY,
+        currency VARCHAR(20) UNIQUE NOT NULL,
+        rate NUMERIC
+      );
+    `);
+
+    // Check if database is empty (users table has 0 rows)
+    const userCheck = await pool.query('SELECT COUNT(*) FROM users');
+    if (parseInt(userCheck.rows[0].count, 10) === 0) {
+      console.log('🌱 Veritabanı boş, başlangıç verileri (Seed Data / Backup) yükleniyor...');
+      
+      const BACKUP_DIR = path.join(__dirname, 'backups');
+      const backupFiles = fs.existsSync(BACKUP_DIR) ? fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json')) : [];
+      
+      if (backupFiles.length > 0) {
+        backupFiles.sort().reverse();
+        const latestBackupPath = path.join(BACKUP_DIR, backupFiles[0]);
+        console.log(`📦 Yedek dosyasından veriler çekiliyor: ${backupFiles[0]}`);
+        const seedData = JSON.parse(fs.readFileSync(latestBackupPath, 'utf8'));
+
+        if (seedData.users) {
+          for (const u of seedData.users) {
+            await pool.query(
+              'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
+              [u.name, u.title, u.role, u.isActive !== false, u.password || '123456']
+            );
+          }
+        }
+
+        if (seedData.units) {
+          for (const un of seedData.units) {
+            const uName = typeof un === 'object' ? un.name : un;
+            await pool.query('INSERT INTO units (name) VALUES ($1) ON CONFLICT DO NOTHING', [uName]);
+          }
+        }
+
+        if (seedData.regulations) {
+          for (const r of seedData.regulations) {
+            const rName = typeof r === 'object' ? r.name : r;
+            await pool.query('INSERT INTO regulations (name) VALUES ($1) ON CONFLICT DO NOTHING', [rName]);
+          }
+        }
+
+        if (seedData.rates) {
+          for (const rt of seedData.rates) {
+            await pool.query('INSERT INTO rates (currency, rate) VALUES ($1, $2) ON CONFLICT DO NOTHING', [rt.currency, rt.rate]);
+          }
+        }
+
+        if (seedData.requests) {
+          for (const req of seedData.requests) {
+            delete req.id;
+            const keys = Object.keys(req);
+            const cols = keys.map(k => `"${k}"`).join(', ');
+            const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+            const values = keys.map(k => sanitizeVal(req[k], k));
+            await pool.query(`INSERT INTO requests (${cols}) VALUES (${placeholders})`, values);
+          }
+        }
+
+        if (seedData.contracts) {
+          for (const c of seedData.contracts) {
+            delete c.id;
+            const keys = Object.keys(c);
+            const cols = keys.map(k => `"${k}"`).join(', ');
+            const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+            const values = keys.map(k => sanitizeVal(c[k], k));
+            await pool.query(`INSERT INTO contracts (${cols}) VALUES (${placeholders})`, values);
+          }
+        }
+
+        if (seedData.invoices) {
+          for (const inv of seedData.invoices) {
+            delete inv.id;
+            const keys = Object.keys(inv);
+            const cols = keys.map(k => `"${k}"`).join(', ');
+            const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+            const values = keys.map(k => sanitizeVal(inv[k], k));
+            await pool.query(`INSERT INTO invoices (${cols}) VALUES (${placeholders})`, values);
+          }
+        }
+
+        if (seedData.guarantees) {
+          for (const g of seedData.guarantees) {
+            delete g.id;
+            const keys = Object.keys(g);
+            const cols = keys.map(k => `"${k}"`).join(', ');
+            const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+            const values = keys.map(k => sanitizeVal(g[k], k));
+            await pool.query(`INSERT INTO guarantees (${cols}) VALUES (${placeholders})`, values);
+          }
+        }
+
+        if (seedData.logs) {
+          for (const l of seedData.logs) {
+            delete l.id;
+            await pool.query(
+              'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+              [l.timestamp, l.user, l.action, l.details]
+            );
+          }
+        }
+        console.log('✅ Tüm başlangıç verileri veritabanına aktarıldı!');
+      } else {
+        await pool.query(
+          'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
+          ['Merih AVCI', 'Satınalma Müdürü', 'ADMIN', true, '123456']
+        );
+      }
+    }
+  } catch (err) {
+    console.error('Veritabanı ilklendirme hatası:', err.message);
+  }
+}
+
+initDatabaseSchema().then(() => {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('==========================================================');
+    console.log(' 🚀 SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (REST API Modu)');
+    console.log(` 🌐 Erişim: http://localhost:${PORT}/`);
+    console.log('==========================================================');
+  });
 });
