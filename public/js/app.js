@@ -177,7 +177,7 @@ const App = {
 
   populateDropdowns() {
     // Populate unit dropdowns
-    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'cm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit'];
+    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'er-unit', 'cm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit'];
     unitSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -4752,6 +4752,7 @@ const App = {
         <tr>
           <td style="font-weight:600;">${name}</td>
           <td style="text-align:center;">
+            <button class="btn-icon" onclick="App.handleEditUnit(${id}, '${name.replace(/'/g, "\\'")}')" title="Birim Adını Düzenle">✏️</button>
             <button class="btn-icon" onclick="App.handleDeleteUnit(${id}, '${name.replace(/'/g, "\\'")}')" title="Birimi Sil">🗑️</button>
           </td>
         </tr>
@@ -4799,6 +4800,30 @@ const App = {
     } catch (err) {
       console.error(err);
       this.showToast("Birim eklenirken hata oluştu.", "error");
+    }
+  },
+
+  async handleEditUnit(id, oldName) {
+    const newName = prompt("Birim Adını Düzenleyin:", oldName);
+    if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+    const cleanName = newName.trim();
+    try {
+      await this.apiSync('units', 'PUT', { name: cleanName }, id);
+      const unitObj = this.state.units.find(u => (typeof u === 'object' ? u.id : u) === id);
+      if (unitObj && typeof unitObj === 'object') unitObj.name = cleanName;
+      
+      // Update unit name across all loaded requests in memory
+      this.state.requests.forEach(r => {
+        if (r.unit === oldName) r.unit = cleanName;
+      });
+
+      this.renderUnitsSettings();
+      this.populateDropdowns();
+      this.render();
+      this.showToast(`Birim adı "${cleanName}" olarak güncellendi.`, "success", "✏️");
+    } catch (err) {
+      console.error(err);
+      this.showToast("Birim güncellenirken hata oluştu.", "error");
     }
   },
 
@@ -5164,6 +5189,29 @@ const App = {
     this.render();
   },
 
+  openEditModal(reqId) {
+    const req = this.state.requests.find(r => String(r.id) === String(reqId));
+    if (!req) return;
+
+    document.getElementById('er-id').value = req.id;
+    document.getElementById('er-status').value = req.status || 'Açık';
+    if (document.getElementById('er-unit')) document.getElementById('er-unit').value = req.unit || '';
+    if (document.getElementById('er-assigned-to')) document.getElementById('er-assigned-to').value = req.assignedTo || '';
+    document.getElementById('er-order-barcode').value = req.orderBarcode || '';
+    document.getElementById('er-order-date').value = req.orderDate || '';
+    document.getElementById('er-supplier').value = req.supplier || '';
+    if (document.getElementById('er-estimated-amount')) document.getElementById('er-estimated-amount').value = req.estimatedAmount || '';
+    document.getElementById('er-actual-amount').value = req.actualAmount || '';
+    document.getElementById('er-currency').value = req.currency || 'TRY';
+    if (document.getElementById('er-regulation')) document.getElementById('er-regulation').value = req.regulation || '';
+    document.getElementById('er-description').value = req.description || '';
+
+    const titleEl = document.getElementById('edit-modal-title');
+    if (titleEl) titleEl.innerText = `✏️ Talep #${req.requestBarcode || req.id} Düzenle`;
+
+    this.openModal('modal-edit-request');
+  },
+
   async handleEditRequest(e) {
     e.preventDefault();
     const id = parseInt(document.getElementById('er-id').value);
@@ -5171,6 +5219,7 @@ const App = {
     if (!req) return;
 
     req.status = document.getElementById('er-status').value;
+    if (document.getElementById('er-unit')) req.unit = document.getElementById('er-unit').value;
     req.assignedTo = document.getElementById('er-assigned-to').value;
     req.orderBarcode = document.getElementById('er-order-barcode').value;
     req.orderDate = document.getElementById('er-order-date').value;
