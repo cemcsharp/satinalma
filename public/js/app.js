@@ -2513,6 +2513,14 @@ const App = {
     return amount * rate;
   },
 
+  formatMoney(amount, currency = 'TRY') {
+    const num = parseFloat(amount) || 0;
+    const curr = currency || 'TRY';
+    const symbolMap = { 'TRY': '₺', 'USD': '$', 'EUR': '€' };
+    const sym = symbolMap[curr] || curr;
+    return `${num.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${sym}`;
+  },
+
   async deleteRequest(requestId) {
     const req = this.state.requests.find(r => String(r.id) === String(requestId));
     if (!req) {
