@@ -5060,10 +5060,13 @@ const App = {
     }, '🗑️');
   },
 
-  async apiSync(table, method, data = null) {
+  async apiSync(table, method, data = null, customId = null) {
     let url = `/api/${table}`;
-    if ((method === 'PUT' || method === 'DELETE') && data !== null) {
-      const id = typeof data === 'object' ? data.id : data;
+    const id = customId !== null && customId !== undefined
+      ? customId
+      : (data !== null && typeof data === 'object' ? data.id : data);
+
+    if ((method === 'PUT' || method === 'DELETE') && id !== null && id !== undefined) {
       url += `/${id}`;
     }
     
