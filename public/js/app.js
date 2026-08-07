@@ -285,7 +285,7 @@ const App = {
     }
 
     const validPass = user.password || '123';
-    if (passInput === validPass || passInput === '123456' || passInput === '123') {
+    if (passInput === validPass) {
       this.state.currentUser = user;
       this.state.isLoggedIn = true;
       localStorage.setItem('loggedInUserId', user.id);
