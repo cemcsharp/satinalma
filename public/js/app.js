@@ -121,14 +121,16 @@ const App = {
   populateLoginDropdown() {
     const loginSelect = document.getElementById('login-screen-user-select');
     if (!loginSelect) return;
-    loginSelect.innerHTML = '';
+    const currentVal = loginSelect.value;
     
     // Sort active users first
-    const sortedUsers = [...this.state.users].sort((a,b) => (b.isActive?1:0) - (a.isActive?1:0));
+    const sortedUsers = [...(this.state.users || [])].sort((a,b) => (b.isActive?1:0) - (a.isActive?1:0));
+    let html = '<option value="">-- Lütfen Personel Seçin --</option>';
     sortedUsers.forEach(u => {
       const statusLabel = u.isActive !== false ? '' : ' (Pasif/Ayrıldı)';
-      loginSelect.innerHTML += `<option value="${u.id}">${u.name} - ${u.title}${statusLabel}</option>`;
+      html += `<option value="${u.id}" ${String(u.id) === String(currentVal) ? 'selected' : ''}>${u.name} - ${u.title}${statusLabel}</option>`;
     });
+    loginSelect.innerHTML = html;
   },
 
   getAcademicYearFromDate(dateStr) {
@@ -1114,6 +1116,7 @@ const App = {
 
   render() {
     if (!this.state.isLoggedIn) return;
+    this.populateDropdowns();
     this.renderNotifications();
     const view = this.state.currentView;
     if (view === 'dashboard') this.renderDashboard();
