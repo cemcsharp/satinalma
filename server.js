@@ -631,6 +631,17 @@ async function initDatabaseSchema() {
           }
         }
 
+        if (seedData.tenders) {
+          for (const t of seedData.tenders) {
+            delete t.id;
+            const keys = Object.keys(t);
+            const cols = keys.map(k => `"${k}"`).join(', ');
+            const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+            const values = keys.map(k => sanitizeVal(t[k], k));
+            await pool.query(`INSERT INTO tenders (${cols}) VALUES (${placeholders})`, values);
+          }
+        }
+
         if (seedData.logs) {
           for (const l of seedData.logs) {
             delete l.id;
