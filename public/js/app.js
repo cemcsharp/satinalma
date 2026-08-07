@@ -96,6 +96,7 @@ const App = {
         this.populateLoginDropdown();
         this.populateDropdowns();
         this.populateYearSelect();
+        this.syncRatesInputUI();
 
         // Restore login session from localStorage
         const savedUserId = localStorage.getItem('loggedInUserId');
@@ -4649,9 +4650,24 @@ const App = {
         `;
       }).join('');
     }
+    this.syncRatesInputUI();
     this.renderUnitsSettings();
     this.renderRegulationsSettings();
     this.renderBackupsTableSettings();
+  },
+
+  syncRatesInputUI() {
+    const usdInput = document.getElementById('setting-rate-usd');
+    const eurInput = document.getElementById('setting-rate-eur');
+    const dateLabel = document.getElementById('rate-last-updated');
+
+    if (usdInput && this.state.rates && this.state.rates.USD) usdInput.value = this.state.rates.USD;
+    if (eurInput && this.state.rates && this.state.rates.EUR) eurInput.value = this.state.rates.EUR;
+    if (dateLabel) {
+      dateLabel.innerText = this.state.rates && this.state.rates.lastUpdated
+        ? `Son Güncelleme: ${this.state.rates.lastUpdated}`
+        : 'Son Güncelleme: -';
+    }
   },
 
   async renderBackupsTableSettings() {

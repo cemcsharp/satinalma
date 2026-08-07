@@ -141,7 +141,10 @@ const server = http.createServer(async (req, res) => {
       ]);
 
       const ratesObj = {};
-      rates.rows.forEach(r => ratesObj[r.currency] = r.rate);
+      rates.rows.forEach(r => {
+        ratesObj[r.currency] = r.rate;
+        if (r.lastUpdated) ratesObj.lastUpdated = r.lastUpdated;
+      });
 
       const payload = {
         users, requests, contracts, invoices, guarantees, logs,
@@ -244,9 +247,12 @@ const server = http.createServer(async (req, res) => {
            const client = await pool.connect();
            try {
              await client.query('BEGIN');
+             await client.query('CREATE TABLE IF NOT EXISTS rates (currency VARCHAR(10) PRIMARY KEY, rate NUMERIC(12,4), "lastUpdated" VARCHAR(100))');
+             await client.query('ALTER TABLE rates ADD COLUMN IF NOT EXISTS "lastUpdated" VARCHAR(100)');
              await client.query('TRUNCATE rates');
-             if (data.rates && data.rates.USD) await client.query('INSERT INTO rates ("currency", "rate") VALUES ($1, $2)', ['USD', data.rates.USD]);
-             if (data.rates && data.rates.EUR) await client.query('INSERT INTO rates ("currency", "rate") VALUES ($1, $2)', ['EUR', data.rates.EUR]);
+             const lastUp = (data.rates && data.rates.lastUpdated) ? data.rates.lastUpdated : new Date().toLocaleString('tr-TR');
+             if (data.rates && data.rates.USD) await client.query('INSERT INTO rates ("currency", "rate", "lastUpdated") VALUES ($1, $2, $3)', ['USD', data.rates.USD, lastUp]);
+             if (data.rates && data.rates.EUR) await client.query('INSERT INTO rates ("currency", "rate", "lastUpdated") VALUES ($1, $2, $3)', ['EUR', data.rates.EUR, lastUp]);
              await client.query('COMMIT');
              res.writeHead(200);
              res.end(JSON.stringify({ success: true }));
