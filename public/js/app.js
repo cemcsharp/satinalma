@@ -1487,14 +1487,32 @@ const App = {
       }]
     }, { responsive: true, maintainAspectRatio: false });
 
+    const commonChartOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: {
+        padding: { right: 15, left: 5, top: 10, bottom: 5 }
+      },
+      plugins: {
+        legend: {
+          labels: { boxWidth: 12, font: { size: 11 } }
+        }
+      }
+    };
+
     const months = ['Eyl', 'Eki', 'Kas', 'Ara', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu'];
     const monthlyCounts = Array(12).fill(0);
 
     requests.forEach(r => {
-      if (r.requestDate) {
-        const m = parseInt(r.requestDate.split('-')[1]) - 1;
-        const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
-        monthlyCounts[acadIdx]++;
+      const dStr = r.arrivalDate || r.requestDate;
+      if (dStr) {
+        let m = -1;
+        if (dStr.includes('-')) m = parseInt(dStr.split('-')[1]) - 1;
+        else if (dStr.includes('.')) m = parseInt(dStr.split('.')[1]) - 1;
+        if (m >= 0 && m < 12) {
+          const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
+          monthlyCounts[acadIdx]++;
+        }
       }
     });
 
@@ -1508,23 +1526,47 @@ const App = {
         fill: true,
         tension: 0.4
       }]
-    }, { responsive: true, maintainAspectRatio: false });
+    }, {
+      ...commonChartOpts,
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: false }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { font: { size: 10 } }
+        }
+      }
+    });
 
     const unitMap = {};
     requests.forEach(r => {
-      unitMap[r.unit] = (unitMap[r.unit] || 0) + 1;
+      if (r.unit) unitMap[r.unit] = (unitMap[r.unit] || 0) + 1;
     });
     const sortedUnits = Object.entries(unitMap).sort((a,b)=>b[1]-a[1]).slice(0, 8);
 
     this.createOrUpdateChart('chart-unit-bar', 'bar', {
-      labels: sortedUnits.map(u => u[0].length > 15 ? u[0].substring(0, 15) + '...' : u[0]),
+      labels: sortedUnits.map(u => u[0].length > 12 ? u[0].substring(0, 12) + '...' : u[0]),
       datasets: [{
         label: 'Talep Adedi',
         data: sortedUnits.map(u => u[1]),
         backgroundColor: '#3b82f6',
         borderRadius: 6
       }]
-    }, { responsive: true, maintainAspectRatio: false });
+    }, {
+      ...commonChartOpts,
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 9 }, maxRotation: 30 }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { font: { size: 10 } }
+        }
+      }
+    });
 
     const activeUserNames = this.state.users.filter(u => u.isActive !== false).map(u => u.name);
     const personMap = {};
@@ -1544,7 +1586,19 @@ const App = {
         backgroundColor: '#06b6d4',
         borderRadius: 6
       }]
-    }, { responsive: true, maintainAspectRatio: false });
+    }, {
+      ...commonChartOpts,
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 10 }, maxRotation: 0 }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { font: { size: 10 } }
+        }
+      }
+    });
   },
 
   createOrUpdateChart(canvasId, type, data, options) {
