@@ -89,6 +89,7 @@ const App = {
         this.state.contracts = data.contracts || [];
         this.state.guarantees = data.guarantees || [];
         this.state.invoices = data.invoices || [];
+        this.state.tenders = data.tenders || [];
         this.state.logs = data.logs || [];
         if (data.rates) this.state.rates = data.rates;
         this.state.dismissedNotifs = JSON.parse(localStorage.getItem('dismissedNotifs') || '[]');
@@ -189,7 +190,7 @@ const App = {
 
   populateDropdowns() {
     // Populate unit dropdowns
-    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'er-unit', 'cm-unit', 'gm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit'];
+    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'er-unit', 'cm-unit', 'gm-unit', 'tm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit', 'filter-tender-unit'];
     unitSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -662,6 +663,7 @@ const App = {
     document.getElementById('btn-open-add-contract')?.addEventListener('click', () => this.openContractModal());
     document.getElementById('btn-open-add-guarantee')?.addEventListener('click', () => this.openGuaranteeModal());
     document.getElementById('btn-open-add-invoice')?.addEventListener('click', () => this.openInvoiceModal());
+    document.getElementById('btn-open-add-tender')?.addEventListener('click', () => this.openTenderModal());
 
     // Settings Action Buttons (Birim & Yönetmelik Maddesi & Backup & Excel Import)
     document.getElementById('btn-add-unit')?.addEventListener('click', () => this.handleAddUnit());
@@ -695,6 +697,7 @@ const App = {
     document.getElementById('form-contract-manage')?.addEventListener('submit', (e) => this.handleSaveContract(e));
     document.getElementById('form-guarantee-manage')?.addEventListener('submit', (e) => this.handleSaveGuarantee(e));
     document.getElementById('form-invoice-manage')?.addEventListener('submit', (e) => this.handleSaveInvoice(e));
+    document.getElementById('form-tender-manage')?.addEventListener('submit', (e) => this.handleSaveTender(e));
 
     // Notification Center Event Listeners
     document.getElementById('btn-mark-all-notifications-read')?.addEventListener('click', () => this.markAllNotificationsRead());
@@ -911,6 +914,12 @@ const App = {
     document.getElementById('btn-export-guarantees-excel')?.addEventListener('click', () => {
       this.exportTableToExcel('table-guarantees', 'Teminat_Mektuplari_Cetveli.csv');
     });
+    document.getElementById('btn-export-tenders-excel')?.addEventListener('click', () => {
+      this.exportTableToExcel('table-tenders', 'Ihale_Planlama_ve_Surec_Cetveli.csv');
+    });
+    document.getElementById('btn-export-tenders-pdf')?.addEventListener('click', () => {
+      this.printSection('view-tenders', 'İHALE PLANLAYICISI VE SÜREÇ YÖNETİM RAPORU');
+    });
     document.getElementById('btn-export-guarantees-pdf')?.addEventListener('click', () => {
       this.printSection('view-guarantees', 'İHALE VE İŞ BAZLI TEMİNAT MEKTUPLARI YÖNETİM RAPORU');
     });
@@ -939,9 +948,13 @@ const App = {
       this.printSection('view-activity-logs', 'SİSTEM AKTİVİTE VE İŞLEM LOGLARI RAPORU');
     });
 
-    // Filter for Unit Analysis
+    // Filter for Unit Analysis & Tenders
     document.getElementById('filter-unit-search')?.addEventListener('input', () => this.renderUnitAnalysis());
     document.getElementById('select-unit-analysis')?.addEventListener('change', () => this.renderUnitAnalysis());
+
+    document.getElementById('filter-tender-search')?.addEventListener('input', () => this.renderTenders());
+    document.getElementById('filter-tender-status')?.addEventListener('change', () => this.renderTenders());
+    document.getElementById('filter-tender-unit')?.addEventListener('change', () => this.renderTenders());
   },
 
   async fetchTCMBRates() {
@@ -1165,6 +1178,7 @@ const App = {
     else if (view === 'contracts') this.renderContracts();
     else if (view === 'guarantees') this.renderGuarantees();
     else if (view === 'invoices') this.renderInvoices();
+    else if (view === 'tenders') this.renderTenders();
     else if (view === 'unit-analysis') this.renderUnitAnalysis();
     else if (view === 'supplier-analysis') this.renderSupplierAnalysis();
     else if (view === 'yearly-report') this.renderYearlyReport();
@@ -3190,6 +3204,267 @@ const App = {
       `;
     }
 
+    this.openModal('modal-view-details');
+  },
+
+  // 🏛️ İHALE PLANLAYICISI & SÜREÇ YÖNETİMİ
+  renderTenders() {
+    const tbody = document.getElementById('tbody-tenders-list');
+    if (!tbody) return;
+
+    if (!this.state.tenders) this.state.tenders = [];
+
+    const searchQuery = (document.getElementById('filter-tender-search')?.value || '').toLowerCase().trim();
+    const statusFilter = document.getElementById('filter-tender-status')?.value || 'ALL';
+    const unitFilter = document.getElementById('filter-tender-unit')?.value || 'ALL';
+
+    // 1. KPI Calculations
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const in30Days = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+    let upcomingCount = 0;
+    let ongoingCount = 0;
+    let completedCount = 0;
+    let totalVolumeTRY = 0;
+
+    this.state.tenders.forEach(t => {
+      const estAmt = parseFloat(t.estimatedAmount) || 0;
+      const rate = (t.currency && t.currency !== 'TRY') ? (this.state.rates[t.currency] || 1) : 1;
+      totalVolumeTRY += (estAmt * rate);
+
+      if (t.status === 'Tamamlandı') {
+        completedCount++;
+      } else if (['Şartname Hazırlığı', 'İlanda', 'Teklif Aşamasında', 'İhale Yapıldı / Değerlendirmede'].includes(t.status)) {
+        ongoingCount++;
+      }
+
+      if (t.tenderDate) {
+        const tDate = new Date(t.tenderDate);
+        if (tDate >= today && tDate <= in30Days && t.status !== 'Tamamlandı' && t.status !== 'İptal Edildi') {
+          upcomingCount++;
+        }
+      }
+    });
+
+    const elUp = document.getElementById('tender-kpi-upcoming');
+    const elOng = document.getElementById('tender-kpi-ongoing');
+    const elComp = document.getElementById('tender-kpi-completed');
+    const elVol = document.getElementById('tender-kpi-total-volume');
+
+    if (elUp) elUp.innerText = upcomingCount;
+    if (elOng) elOng.innerText = ongoingCount;
+    if (elComp) elComp.innerText = completedCount;
+    if (elVol) elVol.innerText = this.formatMoney(totalVolumeTRY, 'TRY');
+
+    // 2. Filter Table Rows
+    const filtered = this.state.tenders.filter(t => {
+      const matchSearch = !searchQuery ||
+        (t.tenderNo || '').toLowerCase().includes(searchQuery) ||
+        (t.title || '').toLowerCase().includes(searchQuery) ||
+        (t.unit || '').toLowerCase().includes(searchQuery) ||
+        (t.relatedBarcode || '').toLowerCase().includes(searchQuery) ||
+        (t.winnerSupplier || '').toLowerCase().includes(searchQuery) ||
+        (t.assignedTo || '').toLowerCase().includes(searchQuery);
+
+      const matchStatus = statusFilter === 'ALL' || t.status === statusFilter;
+      const matchUnit = unitFilter === 'ALL' || t.unit === unitFilter;
+
+      return matchSearch && matchStatus && matchUnit;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtrelere uygun ihale kaydı bulunamadı.</td></tr>`;
+      return;
+    }
+
+    const statusBadgeClass = {
+      'Planlandı': 'status-open',
+      'Şartname Hazırlığı': 'priority-yuksek',
+      'İlanda': 'status-in-review',
+      'Teklif Aşamasında': 'priority-orta',
+      'İhale Yapıldı / Değerlendirmede': 'priority-kritik',
+      'Tamamlandı': 'status-completed',
+      'İptal Edildi': 'status-rejected'
+    };
+
+    const statusBadgeIcon = {
+      'Planlandı': '📅',
+      'Şartname Hazırlığı': '⏳',
+      'İlanda': '🔔',
+      'Teklif Aşamasında': '⚖️',
+      'İhale Yapıldı / Değerlendirmede': '🏛️',
+      'Tamamlandı': '✅',
+      'İptal Edildi': '❌'
+    };
+
+    tbody.innerHTML = filtered.map(t => {
+      const stClass = statusBadgeClass[t.status] || 'status-open';
+      const stIcon = statusBadgeIcon[t.status] || '📋';
+
+      const estText = t.estimatedAmount ? `${this.formatMoney(t.estimatedAmount, t.currency || 'TRY')}` : '-';
+      const actText = t.actualAmount ? `${this.formatMoney(t.actualAmount, t.currency || 'TRY')}` : '';
+
+      const barcodeHtml = t.relatedBarcode
+        ? `<span class="badge priority-yuksek" style="cursor:pointer;" onclick="App.searchBarcode('${t.relatedBarcode}')" title="Talebe Git">Barkod #${t.relatedBarcode}</span>`
+        : '<span style="color:var(--text-muted); font-size:0.8rem;">-</span>';
+
+      return `
+        <tr>
+          <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-primary);">${t.tenderNo || '-'}</td>
+          <td style="font-weight:600; max-width:240px;">${t.title || '-'}</td>
+          <td>
+            <div style="font-weight:600;">${t.tenderDate || '-'}</div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">${t.tenderTime || ''}</div>
+          </td>
+          <td>${t.unit || '-'}</td>
+          <td>${barcodeHtml}</td>
+          <td><span style="font-size:0.82rem; font-weight:600;">${t.regulation || '-'}</span></td>
+          <td style="font-weight:700;">${estText}</td>
+          <td style="font-size:0.85rem;">
+            <div>${t.winnerSupplier || '-'}</div>
+            ${actText ? `<div style="font-size:0.78rem; color:var(--status-completed); font-weight:600;">${actText}</div>` : ''}
+          </td>
+          <td>${t.assignedTo || '-'}</td>
+          <td><span class="badge ${stClass}">${stIcon} ${t.status || 'Planlandı'}</span></td>
+          <td>
+            <div class="action-btns" style="justify-content:center;">
+              <button class="btn-icon" onclick="App.viewTenderDetails('${t.id}')" title="Detayları İncele">👁️</button>
+              <button class="btn-icon" onclick="App.openTenderModal('${t.id}')" title="Düzenle">✏️</button>
+              <button class="btn-icon" onclick="App.deleteTender('${t.id}')" title="Sil">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  openTenderModal(id = null) {
+    const unitSelect = document.getElementById('tm-unit');
+    if (unitSelect && this.state.units) {
+      unitSelect.innerHTML = '<option value="">Birim Seçin</option>' + this.state.units.map(u => {
+        const uName = typeof u === 'object' ? u.name : u;
+        return `<option value="${uName}">${uName}</option>`;
+      }).join('');
+    }
+
+    const assignedSelect = document.getElementById('tm-assigned-to');
+    if (assignedSelect && this.state.users) {
+      assignedSelect.innerHTML = '<option value="">Sorumlu Uzman Seçin</option>' + this.state.users.filter(u => u.isActive !== false).map(u => {
+        return `<option value="${u.name}">${u.name} (${u.title})</option>`;
+      }).join('');
+    }
+
+    if (id) {
+      const t = this.state.tenders.find(item => String(item.id) === String(id));
+      if (!t) return;
+      document.getElementById('tm-id').value = t.id;
+      document.getElementById('tm-tender-no').value = t.tenderNo || '';
+      document.getElementById('tm-status').value = t.status || 'Planlandı';
+      document.getElementById('tm-title').value = t.title || '';
+      document.getElementById('tm-tender-date').value = t.tenderDate || '';
+      document.getElementById('tm-tender-time').value = t.tenderTime || '14:00';
+      if (unitSelect) unitSelect.value = t.unit || '';
+      document.getElementById('tm-related-barcode').value = t.relatedBarcode || '';
+      document.getElementById('tm-regulation').value = t.regulation || '';
+      if (assignedSelect) assignedSelect.value = t.assignedTo || '';
+      document.getElementById('tm-estimated-amount').value = t.estimatedAmount || '';
+      document.getElementById('tm-currency').value = t.currency || 'TRY';
+      document.getElementById('tm-winner-supplier').value = t.winnerSupplier || '';
+      document.getElementById('tm-actual-amount').value = t.actualAmount || '';
+      document.getElementById('tm-notes').value = t.notes || '';
+      document.getElementById('tender-modal-title').innerText = `✏️ İhale #${t.tenderNo} Düzenle`;
+    } else {
+      document.getElementById('tm-id').value = '';
+      document.getElementById('form-tender-manage').reset();
+      document.getElementById('tender-modal-title').innerText = '🏛️ Yeni İhale Planlama Kaydı';
+    }
+    this.openModal('modal-tender-form');
+  },
+
+  async handleSaveTender(e) {
+    e.preventDefault();
+    const id = document.getElementById('tm-id').value;
+    const tenderNo = document.getElementById('tm-tender-no').value.trim();
+    const status = document.getElementById('tm-status').value;
+    const title = document.getElementById('tm-title').value.trim();
+    const tenderDate = document.getElementById('tm-tender-date').value;
+    const tenderTime = document.getElementById('tm-tender-time').value || '14:00';
+    const unit = document.getElementById('tm-unit').value;
+    const relatedBarcode = document.getElementById('tm-related-barcode').value.trim();
+    const regulation = document.getElementById('tm-regulation').value;
+    const assignedTo = document.getElementById('tm-assigned-to').value;
+    const estimatedAmount = parseFloat(document.getElementById('tm-estimated-amount').value) || 0;
+    const currency = document.getElementById('tm-currency').value;
+    const winnerSupplier = document.getElementById('tm-winner-supplier').value.trim();
+    const actualAmount = parseFloat(document.getElementById('tm-actual-amount').value) || 0;
+    const notes = document.getElementById('tm-notes').value.trim();
+
+    const tenderObj = {
+      tenderNo, status, title, tenderDate, tenderTime, unit,
+      relatedBarcode, regulation, assignedTo, estimatedAmount,
+      currency, winnerSupplier, actualAmount, notes
+    };
+
+    if (id) {
+      tenderObj.id = parseInt(id);
+      await this.apiSync('tenders', 'PUT', tenderObj);
+      const index = this.state.tenders.findIndex(item => String(item.id) === String(id));
+      if (index !== -1) this.state.tenders[index] = { ...this.state.tenders[index], ...tenderObj };
+      this.showToast(`İhale kaydı (#${tenderNo}) güncellendi!`, "success", "✏️");
+      this.logAction('İhale Güncellendi', `No: ${tenderNo}, Konu: ${title}`);
+    } else {
+      const res = await this.apiSync('tenders', 'POST', tenderObj);
+      if (res && res.id) tenderObj.id = res.id;
+      this.state.tenders.unshift(tenderObj);
+      this.showToast(`Yeni ihale planı (#${tenderNo}) oluşturuldu!`, "success", "🏛️");
+      this.logAction('Yeni İhale Planlandı', `No: ${tenderNo}, Konu: ${title}, Tarih: ${tenderDate}`);
+    }
+
+    this.closeModal('modal-tender-form');
+    this.renderTenders();
+  },
+
+  async deleteTender(id) {
+    const t = this.state.tenders.find(item => String(item.id) === String(id));
+    if (!t) return;
+
+    this.showConfirm("İhale Kaydı Silme", `İhale No #${t.tenderNo} (${t.title}) kaydını silmek istediğinize emin misiniz?`, async () => {
+      await this.apiSync('tenders', 'DELETE', t.id);
+      this.state.tenders = this.state.tenders.filter(item => String(item.id) !== String(id));
+      this.showToast(`İhale kaydı silindi!`, "info", "🗑️");
+      this.logAction('İhale Kaydı Silindi', `No: ${t.tenderNo}`);
+      this.renderTenders();
+    }, '🗑️');
+  },
+
+  viewTenderDetails(id) {
+    const t = this.state.tenders.find(item => String(item.id) === String(id));
+    if (!t) return;
+
+    document.getElementById('view-details-title').innerText = `🏛️ İhale #${t.tenderNo} — Detaylar`;
+    const body = document.getElementById('view-details-body');
+    if (body) {
+      body.innerHTML = `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; font-size:0.9rem;">
+          <div><strong>İhale No / Kodu:</strong> <span style="font-family:var(--font-mono); color:var(--accent-primary); font-weight:700;">${t.tenderNo}</span></div>
+          <div><strong>Aşama Durumu:</strong> <span class="badge priority-yuksek">${t.status}</span></div>
+          <div style="grid-column: span 2;"><strong>İhale Konusu:</strong> <h4 style="margin:0.25rem 0 0 0;">${t.title}</h4></div>
+          <div><strong>İhale Oturum Tarihi:</strong> ${t.tenderDate} ${t.tenderTime || ''}</div>
+          <div><strong>Sorumlu Birim:</strong> ${t.unit}</div>
+          <div><strong>İlişkili Talep Barkodu:</strong> ${t.relatedBarcode ? `#${t.relatedBarcode}` : 'Yok'}</div>
+          <div><strong>İhale Usulü / Madde:</strong> ${t.regulation || '-'}</div>
+          <div><strong>Tahmini Maliyet (Bütçe):</strong> ${this.formatMoney(t.estimatedAmount || 0, t.currency || 'TRY')}</div>
+          <div><strong>Kazanan Yüklenici:</strong> ${t.winnerSupplier || 'Henüz Sonuçlanmadı'}</div>
+          <div><strong>Gerçekleşen Bedel:</strong> ${t.actualAmount ? this.formatMoney(t.actualAmount, t.currency || 'TRY') : '-'}</div>
+          <div><strong>Sorumlu Uzman:</strong> ${t.assignedTo || '-'}</div>
+          <div style="grid-column: span 2; margin-top:0.5rem; background:rgba(255,255,255,0.03); padding:0.75rem; border-radius:8px;">
+            <strong>İhale Notları & Açıklama:</strong>
+            <p style="margin:0.25rem 0 0 0; font-size:0.85rem; color:var(--text-muted);">${t.notes || 'Açıklama girilmemiş.'}</p>
+          </div>
+        </div>
+      `;
+    }
     this.openModal('modal-view-details');
   },
 

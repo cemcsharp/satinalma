@@ -129,6 +129,9 @@
         <li class="nav-item" data-view="invoices">
           <button><span class="nav-icon">🧾</span><span>Faturalar</span></button>
         </li>
+        <li class="nav-item" data-view="tenders">
+          <button><span class="nav-icon">🏛️</span><span>İhale Planlayıcısı</span></button>
+        </li>
 
         <li class="nav-section-title">📈 Analizler</li>
         <li class="nav-item" data-view="unit-analysis">
@@ -1048,6 +1051,114 @@
               </tr>
             </thead>
             <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6.5. TENDERS & AUCTIONS PLANNER VIEW (İHALE PLANLAYICISI KART VE LİSTESİ) -->
+      <section id="view-tenders" class="view-section" style="display: none;">
+        <!-- Header & Action Bar -->
+        <div class="card-header" style="margin-bottom: 1.25rem;">
+          <div>
+            <h3>🏛️ İhale Planlayıcısı & Süreç Yönetimi</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">İhale tarihleri, aşamaları, birim talepleri ve kazanan yüklenici takibi</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn-primary" id="btn-open-add-tender">
+              <span>➕</span> Yeni İhale Planla
+            </button>
+            <button class="btn-export-excel" id="btn-export-tenders-excel">
+              <span>📥</span> Excel İndir
+            </button>
+            <button class="btn-export-pdf" id="btn-export-tenders-pdf">
+              <span>🖨️</span> PDF / Yazdır
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Top KPI Cards Grid -->
+        <div class="grid-4" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon blue">📅</div>
+            <div class="kpi-data">
+              <h3 id="tender-kpi-upcoming">0</h3>
+              <p>Yaklaşan İhaleler (30 Gün)</p>
+              <div class="kpi-sub">Planlanan oturumlar</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon yellow">⏳</div>
+            <div class="kpi-data">
+              <h3 id="tender-kpi-ongoing">0</h3>
+              <p>Devam Eden İhale Süreçleri</p>
+              <div class="kpi-sub">İlanda & Teklif aşamasında</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon green">✅</div>
+            <div class="kpi-data">
+              <h3 id="tender-kpi-completed">0</h3>
+              <p>Tamamlanan İhaleler</p>
+              <div class="kpi-sub">Sözleşmeye bağlanan</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon purple">💰</div>
+            <div class="kpi-data">
+              <h3 id="tender-kpi-total-volume">0 ₺</h3>
+              <p>Toplam İhale Hacmi</p>
+              <div class="kpi-sub">Tahmini maliyet toplamı</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Toolbar -->
+        <div class="filter-bar" style="margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div class="search-input-box" style="min-width: 240px; flex: 1;">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-tender-search" placeholder="İhale adı, no, birim veya barkod ara...">
+          </div>
+
+          <select class="filter-select" id="filter-tender-status">
+            <option value="ALL">Tüm İhale Aşamaları</option>
+            <option value="Planlandı">📅 Planlandı</option>
+            <option value="Şartname Hazırlığı">⏳ Şartname Hazırlığı</option>
+            <option value="İlanda">🔔 İlanda</option>
+            <option value="Teklif Aşamasında">⚖️ Teklif Aşamasında</option>
+            <option value="İhale Yapıldı / Değerlendirmede">🏛️ İhale Yapıldı / Değerlendirmede</option>
+            <option value="Tamamlandı">✅ Tamamlandı / Sözleşmeye Bağlandı</option>
+            <option value="İptal Edildi">❌ İptal Edildi</option>
+          </select>
+
+          <select class="filter-select" id="filter-tender-unit">
+            <option value="ALL">Tüm Birimler</option>
+          </select>
+        </div>
+
+        <!-- Tenders Table -->
+        <div class="table-container">
+          <table class="custom-table" id="table-tenders">
+            <thead>
+              <tr>
+                <th>İhale No / Kodu</th>
+                <th>İhale Konusu / Başlığı</th>
+                <th>İhale Tarihi & Saati</th>
+                <th>Sorumlu Birim</th>
+                <th>İlişkili Talep</th>
+                <th>İhale Usulü</th>
+                <th>Tahmini Maliyet</th>
+                <th>Kazanan Yüklenici</th>
+                <th>Sorumlu Uzman</th>
+                <th>Aşama / Durum</th>
+                <th style="text-align: center;">İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-tenders-list">
+              <tr><td colspan="11" style="text-align:center; padding: 2rem;">İhale verileri yükleniyor...</td></tr>
+            </tbody>
           </table>
         </div>
       </section>
@@ -2528,6 +2639,115 @@
         <div class="form-actions" style="margin-top: 1.25rem;">
           <button type="button" class="btn-secondary close-modal">İptal</button>
           <button type="submit" class="btn-primary">💾 Teminat Kaydını Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Tender Form Modal (Yeni İhale Planla / Düzenle) -->
+  <div class="modal-overlay" id="modal-tender-form">
+    <div class="modal-content" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 id="tender-modal-title">🏛️ Yeni İhale Planlama Kaydı</h3>
+        <button class="btn-close-modal close-modal">✕</button>
+      </div>
+
+      <form id="form-tender-manage">
+        <input type="hidden" id="tm-id">
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>İhale Kodu / No <span class="required">*</span></label>
+            <input type="text" id="tm-tender-no" placeholder="ör: İH-2026-004" required>
+          </div>
+
+          <div class="form-group">
+            <label>İhale Aşama Durumu <span class="required">*</span></label>
+            <select id="tm-status" required>
+              <option value="Planlandı">📅 Planlandı</option>
+              <option value="Şartname Hazırlığı">⏳ Şartname Hazırlığı</option>
+              <option value="İlanda">🔔 İlanda</option>
+              <option value="Teklif Aşamasında">⚖️ Teklif Aşamasında</option>
+              <option value="İhale Yapıldı / Değerlendirmede">🏛️ İhale Yapıldı / Değerlendirmede</option>
+              <option value="Tamamlandı">✅ Tamamlandı / Sözleşmeye Bağlandı</option>
+              <option value="İptal Edildi">❌ İptal Edildi</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width">
+            <label>İhale Konusu / Başlığı <span class="required">*</span></label>
+            <input type="text" id="tm-title" placeholder="ör: Kampüs Güvenlik Hizmeti İhalesi veya Laboratuvar Alımı" required>
+          </div>
+
+          <div class="form-group">
+            <label>İhale Oturum Tarihi <span class="required">*</span></label>
+            <input type="date" id="tm-tender-date" required>
+          </div>
+
+          <div class="form-group">
+            <label>İhale Oturum Saati</label>
+            <input type="time" id="tm-tender-time" value="14:00">
+          </div>
+
+          <div class="form-group">
+            <label>İhaleyi Açan Birim <span class="required">*</span></label>
+            <select id="tm-unit" required></select>
+          </div>
+
+          <div class="form-group">
+            <label>İlişkili Talep Barkodu (Opsiyonel)</label>
+            <input type="text" id="tm-related-barcode" placeholder="ör: 261832 veya 249015">
+          </div>
+
+          <div class="form-group">
+            <label>İhale Usulü / Madde</label>
+            <select id="tm-regulation">
+              <option value="">İhale Usulü Seçin</option>
+              <option value="Madde 18-C (Açık İhale)">Madde 18-C (Açık İhale)</option>
+              <option value="Madde 19-B (Pazarlık Usulü)">Madde 19-B (Pazarlık Usulü)</option>
+              <option value="Madde 19-A (Belli İstekliler)">Madde 19-A (Belli İstekliler)</option>
+              <option value="Madde 22 (Doğrudan Temin)">Madde 22 (Doğrudan Temin)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Sorumlu Satınalma Uzmanı</label>
+            <select id="tm-assigned-to"></select>
+          </div>
+
+          <div class="form-group">
+            <label>Tahmini Maliyet (Bütçe)</label>
+            <input type="number" step="0.01" id="tm-estimated-amount" placeholder="0.00">
+          </div>
+
+          <div class="form-group">
+            <label>Para Birimi</label>
+            <select id="tm-currency">
+              <option value="TRY">₺ - Türk Lirası (TRY)</option>
+              <option value="USD">$ - Amerikan Doları (USD)</option>
+              <option value="EUR">€ - Euro (EUR)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Kazanan Tedarikçi / Yüklenici (İhale Bittiyse)</label>
+            <input type="text" id="tm-winner-supplier" placeholder="ör: Pronet Güvenlik Hizmetleri A.Ş.">
+          </div>
+
+          <div class="form-group">
+            <label>Gerçekleşen İhale Bedeli</label>
+            <input type="number" step="0.01" id="tm-actual-amount" placeholder="0.00">
+          </div>
+
+          <div class="form-group full-width">
+            <label>İhale Notları & Açıklama</label>
+            <textarea id="tm-notes" rows="2" placeholder="Komisyon üyeleri, ihale şartları veya oturum notları..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.25rem;">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary">💾 İhale Planını Kaydet</button>
         </div>
       </form>
     </div>

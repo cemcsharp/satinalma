@@ -128,7 +128,7 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/data' && method === 'GET') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       
-      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates] = await Promise.all([
+      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders] = await Promise.all([
         getTableData('users'),
         getTableData('requests'),
         getTableData('contracts'),
@@ -137,7 +137,8 @@ const server = http.createServer(async (req, res) => {
         getTableData('logs'),
         pool.query('SELECT id, name FROM units ORDER BY name ASC'),
         pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
-        pool.query('SELECT * FROM rates')
+        pool.query('SELECT * FROM rates'),
+        getTableData('tenders').catch(() => [])
       ]);
 
       const ratesObj = {};
@@ -150,7 +151,8 @@ const server = http.createServer(async (req, res) => {
         users, requests, contracts, invoices, guarantees, logs,
         units: units.rows,
         regulations: regulations.rows,
-        rates: Object.keys(ratesObj).length > 0 ? ratesObj : { USD: 36.50, EUR: 39.80 }
+        rates: Object.keys(ratesObj).length > 0 ? ratesObj : { USD: 36.50, EUR: 39.80 },
+        tenders: tenders || []
       };
 
       res.writeHead(200);
@@ -175,7 +177,7 @@ const server = http.createServer(async (req, res) => {
     const parts = urlPath.split('/').filter(Boolean);
     if (parts[0] === 'api' && parts.length >= 2 && urlPath !== '/api/data') {
       const table = parts[1];
-      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations'];
+      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations', 'tenders'];
       
       if (allowedTables.includes(table)) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -521,6 +523,24 @@ async function initDatabaseSchema() {
         id SERIAL PRIMARY KEY,
         currency VARCHAR(20) UNIQUE NOT NULL,
         rate NUMERIC
+      );
+
+      CREATE TABLE IF NOT EXISTS tenders (
+        id SERIAL PRIMARY KEY,
+        "tenderNo" VARCHAR(100),
+        title VARCHAR(255),
+        "tenderDate" VARCHAR(100),
+        "tenderTime" VARCHAR(50),
+        status VARCHAR(100),
+        unit VARCHAR(255),
+        "relatedBarcode" VARCHAR(100),
+        regulation VARCHAR(100),
+        "estimatedAmount" NUMERIC(12,2),
+        currency VARCHAR(10),
+        "assignedTo" VARCHAR(100),
+        "winnerSupplier" VARCHAR(255),
+        "actualAmount" NUMERIC(12,2),
+        notes TEXT
       );
     `);
 
