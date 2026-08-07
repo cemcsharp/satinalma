@@ -188,7 +188,7 @@ const App = {
 
   populateDropdowns() {
     // Populate unit dropdowns
-    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'er-unit', 'cm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit'];
+    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'er-unit', 'cm-unit', 'gm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit'];
     unitSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -3023,7 +3023,10 @@ const App = {
   openGuaranteeModal(id = null) {
     const unitSelect = document.getElementById('gm-unit');
     if (unitSelect && this.state.units) {
-      unitSelect.innerHTML = this.state.units.map(u => `<option value="${u}">${u}</option>`).join('');
+      unitSelect.innerHTML = '<option value="">Birim Seçin</option>' + this.state.units.map(u => {
+        const uName = typeof u === 'object' ? u.name : u;
+        return `<option value="${uName}">${uName}</option>`;
+      }).join('');
     }
 
     if (id) {
