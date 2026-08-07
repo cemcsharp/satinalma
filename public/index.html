@@ -522,15 +522,32 @@
               </button>
             </div>
           </div>
-          <div class="filter-bar" style="background: transparent; border: none; padding: 0;">
-            <select class="filter-select" id="delegate-from-person">
-              <option value="Açık">Tüm Açık Talepler</option>
-              <option value="Atanmadı">Atanmamış Talepler</option>
+          <div class="filter-bar" style="background: transparent; border: none; padding: 0; flex-wrap: wrap; gap: 0.75rem;">
+            <div class="search-input-box" style="min-width: 200px;">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="filter-delegation-search" placeholder="Barkod veya konu ara...">
+            </div>
+
+            <select class="filter-select" id="delegate-from-person" title="Devredilecek Personel / Havuz">
+              <option value="ALL">Tüm Açık Talepler</option>
+              <option value="Henüz Atanmadı">⏳ Henüz Atanmamış (Havuzdaki Talepler)</option>
             </select>
 
-            <span style="color: var(--text-muted); font-size: 0.9rem;">➡️ şuna ata:</span>
+            <select class="filter-select" id="filter-delegation-unit" title="Birim Filtresi">
+              <option value="ALL">Tüm Birimler</option>
+            </select>
 
-            <select class="filter-select" id="delegate-to-person"></select>
+            <select class="filter-select" id="filter-delegation-priority" title="Öncelik Filtresi">
+              <option value="ALL">Tüm Öncelikler</option>
+              <option value="Kritik">🔴 Kritik</option>
+              <option value="Yüksek">🟠 Yüksek</option>
+              <option value="Orta">🟡 Orta</option>
+              <option value="Düşük">🟢 Düşük</option>
+            </select>
+
+            <span style="color: var(--text-muted); font-size: 0.9rem; font-weight: 700; align-self: center;">➡️ Hedef Personel:</span>
+
+            <select class="filter-select" id="delegate-to-person" style="border-color: var(--accent-primary); font-weight: 700;"></select>
 
             <button class="btn-primary" id="btn-execute-delegation">
               <span>👉</span> Seçilen Talepleri Devret

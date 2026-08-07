@@ -177,7 +177,7 @@ const App = {
 
   populateDropdowns() {
     // Populate unit dropdowns
-    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'cm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit'];
+    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'cm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit'];
     unitSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -196,6 +196,15 @@ const App = {
       this.state.users.forEach(u => {
         const statusLabel = u.isActive !== false ? '' : ' (Pasif)';
         filterPersonEl.innerHTML += `<option value="${u.name}">${u.name}${statusLabel}</option>`;
+      });
+    }
+
+    const delegateFromEl = document.getElementById('delegate-from-person');
+    if (delegateFromEl) {
+      delegateFromEl.innerHTML = '<option value="ALL">Tüm Açık Talepler</option>' +
+        '<option value="Henüz Atanmadı">⏳ Henüz Atanmamış (Havuzdaki Talepler)</option>';
+      this.state.users.filter(u => u.isActive !== false).forEach(u => {
+        delegateFromEl.innerHTML += `<option value="${u.name}">👤 ${u.name} (${u.title})</option>`;
       });
     }
 
@@ -651,8 +660,19 @@ const App = {
     document.getElementById('btn-mark-all-notifications-read')?.addEventListener('click', () => this.markAllNotificationsRead());
     document.getElementById('filter-notif-category')?.addEventListener('change', () => this.renderNotificationsView());
 
-    // Delegation Execution
+    // Delegation Execution & Filters
     document.getElementById('btn-execute-delegation')?.addEventListener('click', () => this.handleDelegation());
+    ['filter-delegation-search', 'delegate-from-person', 'filter-delegation-unit', 'filter-delegation-priority'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', () => this.renderDelegationTable(this.getFilteredRequests()));
+        el.addEventListener('change', () => this.renderDelegationTable(this.getFilteredRequests()));
+      }
+    });
+    document.getElementById('chk-select-all-delegation')?.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      document.querySelectorAll('.chk-delegate-item').forEach(chk => chk.checked = isChecked);
+    });
 
     // Print & Export Event Listeners
     document.getElementById('btn-print-yearly-report')?.addEventListener('click', () => window.print());
@@ -1977,30 +1997,47 @@ const App = {
   },
 
   renderDelegationTable(requests) {
-    const fromPerson = document.getElementById('delegate-from-person')?.value || 'Açık';
+    const searchText = document.getElementById('filter-delegation-search')?.value.toLowerCase().trim() || '';
+    const fromPerson = document.getElementById('delegate-from-person')?.value || 'ALL';
+    const unitVal = document.getElementById('filter-delegation-unit')?.value || 'ALL';
+    const priorityVal = document.getElementById('filter-delegation-priority')?.value || 'ALL';
+
     let filtered = requests.filter(r => r.status === 'Açık');
 
-    if (fromPerson !== 'Açık') {
-      filtered = filtered.filter(r => r.assignedTo === fromPerson);
+    if (fromPerson !== 'ALL') {
+      filtered = filtered.filter(r => (r.assignedTo || 'Henüz Atanmadı') === fromPerson);
+    }
+    if (unitVal !== 'ALL') {
+      filtered = filtered.filter(r => r.unit === unitVal);
+    }
+    if (priorityVal !== 'ALL') {
+      filtered = filtered.filter(r => r.priority === priorityVal);
+    }
+    if (searchText) {
+      filtered = filtered.filter(r => {
+        const bc = (r.requestBarcode || '').toString().toLowerCase();
+        const subj = (r.subject || '').toLowerCase();
+        return bc.includes(searchText) || subj.includes(searchText);
+      });
     }
 
     const tbody = document.querySelector('#table-delegation-requests tbody');
     if (!tbody) return;
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Aktif devredilecek talep bulunmuyor.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Filtreleme kriterlerine uygun devredilecek talep bulunmuyor.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = filtered.slice(0, 15).map(r => `
+    tbody.innerHTML = filtered.slice(0, 30).map(r => `
       <tr>
         <td><input type="checkbox" class="chk-delegate-item" value="${r.id}"></td>
-        <td><span style="font-family:var(--font-mono); font-weight:700;">${r.requestBarcode || '-'}</span></td>
+        <td><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
         <td style="font-weight:600;">${r.subject}</td>
         <td>${r.unit}</td>
-        <td><span class="badge priority-orta">${r.assignedTo}</span></td>
+        <td><span class="badge priority-orta">${r.assignedTo || 'Henüz Atanmadı'}</span></td>
         <td>${r.arrivalDate || r.requestDate}</td>
-        <td><span class="badge priority-${r.priority?.toLowerCase()}">${r.priority}</span></td>
+        <td><span class="badge priority-${r.priority?.toLowerCase() || 'orta'}">${r.priority || 'Orta'}</span></td>
       </tr>
     `).join('');
   },
