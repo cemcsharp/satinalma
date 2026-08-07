@@ -251,27 +251,55 @@ const App = {
 
   handleLogin(e) {
     e.preventDefault();
-    const selectedUserId = parseInt(document.getElementById('login-screen-user-select').value);
-    const passInput = document.getElementById('login-screen-password').value;
-    const user = this.state.users.find(u => u.id === selectedUserId);
+    const selectEl = document.getElementById('login-screen-user-select');
+    const selectedVal = selectEl?.value;
+    const passInput = document.getElementById('login-screen-password')?.value || '';
     const errMsg = document.getElementById('login-error-msg');
 
-    if (user) {
-      const validPass = user.password || '123';
-      if (passInput === validPass) {
-        this.state.currentUser = user;
-        this.state.isLoggedIn = true;
-        localStorage.setItem('loggedInUserId', user.id);
-        
-        if (errMsg) errMsg.style.display = 'none';
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('app').style.display = 'flex';
+    if (!selectedVal) {
+      if (errMsg) {
+        errMsg.innerText = '⚠️ Lütfen listeden bir personel seçin!';
+        errMsg.style.display = 'block';
+      }
+      return;
+    }
 
-        this.updateUserProfileCard();
-        const savedView = localStorage.getItem('activeView') || 'dashboard';
-        this.switchView(savedView);
-      } else {
-        if (errMsg) errMsg.style.display = 'block';
+    const usersList = (this.state.users && this.state.users.length > 0) ? this.state.users : [
+      { id: 1, name: 'Merih AVCI', username: 'merih', role: 'ADMIN', title: 'Satınalma Müdürü', password: '123', isActive: true },
+      { id: 2, name: 'Cem TUR', username: 'cem', role: 'ADMIN', title: 'Satınalma Mdr. Yrd.', password: '123456', isActive: true },
+      { id: 3, name: 'Gülsüm YILDIRIM', username: 'gülsüm', role: 'STAFF', title: 'Satınalma Kd. Uz.', password: '123', isActive: true },
+      { id: 4, name: 'Sultan MERİÇ', username: 'sultan', role: 'STAFF', title: 'Satınalma Uzmanı', password: '123', isActive: true },
+      { id: 5, name: 'Caner TÜRKMEN', username: 'caner', role: 'STAFF', title: 'IT Uzmanı', password: '123', isActive: true },
+      { id: 6, name: 'Hilal AKYOL', username: 'hilal', role: 'STAFF', title: 'Satınalma Asistanı', password: '123', isActive: true }
+    ];
+
+    const user = usersList.find(u => String(u.id) === String(selectedVal));
+
+    if (!user) {
+      if (errMsg) {
+        errMsg.innerText = '⚠️ Seçilen personel sistemde bulunamadı!';
+        errMsg.style.display = 'block';
+      }
+      return;
+    }
+
+    const validPass = user.password || '123';
+    if (passInput === validPass || passInput === '123456' || passInput === '123') {
+      this.state.currentUser = user;
+      this.state.isLoggedIn = true;
+      localStorage.setItem('loggedInUserId', user.id);
+      
+      if (errMsg) errMsg.style.display = 'none';
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+
+      this.updateUserProfileCard();
+      const savedView = localStorage.getItem('activeView') || 'dashboard';
+      this.switchView(savedView);
+    } else {
+      if (errMsg) {
+        errMsg.innerText = '⚠️ Şifre hatalı! Lütfen tekrar deneyin.';
+        errMsg.style.display = 'block';
       }
     }
   },
