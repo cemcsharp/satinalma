@@ -73,6 +73,6 @@ sudo systemctl status postgresql
 
 ## 👤 İlk Giriş Varsayılan Kullanıcı Bilgileri
 
-- **Ad Soyad:** Merih AVCI (Satınalma Müdürü - Admin)
+- **Ad Soyad:** Cem TUR (Satınalma Mdr. Yrd. - Admin)
 - **Varsayılan Şifre:** `123456`
 *(İlk girişten sonra sağ üst kullanıcı panelinden veya Ayarlar sekmesinden şifre değiştirilebilir).*

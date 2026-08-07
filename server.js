@@ -644,7 +644,7 @@ async function initDatabaseSchema() {
       } else {
         await pool.query(
           'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
-          ['Merih AVCI', 'Satınalma Müdürü', 'ADMIN', true, '123456']
+          ['Cem TUR', 'Satınalma Mdr. Yrd.', 'ADMIN', true, '123456']
         );
       }
     }

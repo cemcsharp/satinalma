@@ -127,8 +127,8 @@ const App = {
     const currentVal = loginSelect.value;
     
     const usersList = (this.state.users && this.state.users.length > 0) ? this.state.users : [
-      { id: 1, name: 'Merih AVCI', title: 'Satınalma Müdürü', isActive: true },
-      { id: 2, name: 'Cem TUR', title: 'Satınalma Mdr. Yrd.', isActive: true },
+      { id: 1, name: 'Cem TUR', title: 'Satınalma Mdr. Yrd.', isActive: true },
+      { id: 2, name: 'Merih AVCI', title: 'Satınalma Müdürü', isActive: true },
       { id: 3, name: 'Gülsüm YILDIRIM', title: 'Satınalma Kd. Uz.', isActive: true },
       { id: 4, name: 'Sultan MERİÇ', title: 'Satınalma Uzmanı', isActive: true },
       { id: 5, name: 'Caner TÜRKMEN', title: 'IT Uzmanı', isActive: true },
@@ -267,8 +267,8 @@ const App = {
     }
 
     const usersList = (this.state.users && this.state.users.length > 0) ? this.state.users : [
-      { id: 1, name: 'Merih AVCI', username: 'merih', role: 'ADMIN', title: 'Satınalma Müdürü', password: '123', isActive: true },
-      { id: 2, name: 'Cem TUR', username: 'cem', role: 'ADMIN', title: 'Satınalma Mdr. Yrd.', password: '123456', isActive: true },
+      { id: 1, name: 'Cem TUR', username: 'cem', role: 'ADMIN', title: 'Satınalma Mdr. Yrd.', password: '123', isActive: true },
+      { id: 2, name: 'Merih AVCI', username: 'merih', role: 'ADMIN', title: 'Satınalma Müdürü', password: '123456', isActive: true },
       { id: 3, name: 'Gülsüm YILDIRIM', username: 'gülsüm', role: 'STAFF', title: 'Satınalma Kd. Uz.', password: '123', isActive: true },
       { id: 4, name: 'Sultan MERİÇ', username: 'sultan', role: 'STAFF', title: 'Satınalma Uzmanı', password: '123', isActive: true },
       { id: 5, name: 'Caner TÜRKMEN', username: 'caner', role: 'STAFF', title: 'IT Uzmanı', password: '123', isActive: true },
