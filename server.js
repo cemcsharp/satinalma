@@ -172,7 +172,7 @@ const server = http.createServer(async (req, res) => {
     const parts = urlPath.split('/').filter(Boolean);
     if (parts[0] === 'api' && parts.length >= 2 && urlPath !== '/api/data') {
       const table = parts[1];
-      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs'];
+      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations'];
       
       if (allowedTables.includes(table)) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
