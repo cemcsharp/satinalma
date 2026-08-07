@@ -205,7 +205,11 @@ const App = {
     assignSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
-      el.innerHTML = '<option value="">Aktif Personel Seçin</option>';
+      if (id === 'nr-assigned-to') {
+        el.innerHTML = '<option value="Henüz Atanmadı">⏳ Henüz Atanmadı (Havuzda Bekleyen)</option>';
+      } else {
+        el.innerHTML = '<option value="">Aktif Personel Seçin</option>';
+      }
       activeUsers.forEach(u => {
         el.innerHTML += `<option value="${u.name}">${u.name} (${u.title})</option>`;
       });
@@ -5087,7 +5091,7 @@ const App = {
     const subject = document.getElementById('nr-subject').value;
     const desc = document.getElementById('nr-description').value;
     const unit = document.getElementById('nr-unit').value;
-    const assigned = document.getElementById('nr-assigned-to').value;
+    const assigned = document.getElementById('nr-assigned-to').value || 'Henüz Atanmadı';
     const priority = document.getElementById('nr-priority').value;
     const reg = document.getElementById('nr-regulation').value;
     const estAmt = parseFloat(document.getElementById('nr-estimated-amount')?.value) || 0;
@@ -5109,7 +5113,7 @@ const App = {
       budgetAmount: estAmt,
       actualAmount: 0,
       currency: 'TRY',
-      academicYear: this.getAcademicYearFromDate(arrDate)
+      academicYear: this.getAcademicYear(arrDate)
     };
 
     const savedReq = await this.apiSync('requests', 'POST', newReq);
@@ -5117,7 +5121,7 @@ const App = {
     this.state.requests.unshift(newReq);
     this.populateYearSelect();
 
-    this.showToast("Yeni talep başarıyla oluşturuldu ve atandı!", "success");
+    this.showToast("Yeni talep başarıyla oluşturuldu!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     document.getElementById('form-new-request').reset();
     this.render();
