@@ -26,6 +26,7 @@ const App = {
   async init() {
     console.log("Initializing Satınalma Takip App...");
     this.initTheme();
+    this.populateLoginDropdown();
     this.bindEvents();
     await this.fetchInitialData();
   },
@@ -123,8 +124,16 @@ const App = {
     if (!loginSelect) return;
     const currentVal = loginSelect.value;
     
-    // Sort active users first
-    const sortedUsers = [...(this.state.users || [])].sort((a,b) => (b.isActive?1:0) - (a.isActive?1:0));
+    const usersList = (this.state.users && this.state.users.length > 0) ? this.state.users : [
+      { id: 1, name: 'Merih AVCI', title: 'Satınalma Müdürü', isActive: true },
+      { id: 2, name: 'Cem TUR', title: 'Satınalma Mdr. Yrd.', isActive: true },
+      { id: 3, name: 'Gülsüm YILDIRIM', title: 'Satınalma Kd. Uz.', isActive: true },
+      { id: 4, name: 'Sultan MERİÇ', title: 'Satınalma Uzmanı', isActive: true },
+      { id: 5, name: 'Caner TÜRKMEN', title: 'IT Uzmanı', isActive: true },
+      { id: 6, name: 'Hilal AKYOL', title: 'Satınalma Asistanı', isActive: true }
+    ];
+
+    const sortedUsers = [...usersList].sort((a,b) => (b.isActive?1:0) - (a.isActive?1:0));
     let html = '<option value="">-- Lütfen Personel Seçin --</option>';
     sortedUsers.forEach(u => {
       const statusLabel = u.isActive !== false ? '' : ' (Pasif/Ayrıldı)';
