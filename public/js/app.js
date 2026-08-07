@@ -5284,6 +5284,8 @@ const App = {
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     document.getElementById('form-new-request').reset();
     this.render();
+  },
+
   openNewRequestModal() {
     const form = document.getElementById('form-new-request');
     if (form) form.reset();
