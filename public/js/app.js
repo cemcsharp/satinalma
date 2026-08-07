@@ -2907,6 +2907,40 @@ const App = {
           </div>
         </div>
       `;
+    } else if (type === 'tender') {
+      if (printTitle) printTitle.innerText = 'İHALE PLANLAMA VE SÜREÇ TAKİP FORMU';
+      printBody.innerHTML = `
+        <div style="border: 2px solid #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">İHALE NO / KODU</div>
+              <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.tenderNo}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">AŞAMA DURUMU</div>
+              <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a;">${data.status}</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; font-size: 0.95rem; margin-bottom: 1.5rem;">
+            <div style="grid-column: span 2;"><strong>İhale Konusu / Başlığı:</strong> <span style="font-size: 1.1rem; font-weight: 700;">${data.title}</span></div>
+            <div><strong>İhale Oturum Tarihi:</strong> ${data.tenderDate} ${data.tenderTime || ''}</div>
+            <div><strong>Sorumlu Birim:</strong> ${data.unit}</div>
+            <div><strong>İlişkili Talep Barkodu:</strong> ${data.relatedBarcode ? '#' + data.relatedBarcode : '-'}</div>
+            <div><strong>İhale Usulü / Madde:</strong> ${data.regulation || '-'}</div>
+            <div><strong>Sorumlu Uzman:</strong> ${data.assignedTo || '-'}</div>
+            <div><strong>Para Birimi:</strong> ${data.currency || 'TRY'}</div>
+            <div><strong>Tahmini Maliyet (Bütçe):</strong> <span style="font-size: 1.15rem; font-weight: 800; color: #1e3a8a;">${(data.estimatedAmount || 0).toLocaleString('tr-TR')} ${data.currency || '₺'}</span></div>
+            <div><strong>Kazanan Yüklenici:</strong> ${data.winnerSupplier || 'Henüz Sonuçlanmadı'}</div>
+            <div style="grid-column: span 2;"><strong>Gerçekleşen Bedel:</strong> <span style="font-size: 1.2rem; font-weight: 800; color: #16a34a;">${data.actualAmount ? data.actualAmount.toLocaleString('tr-TR') + ' ' + (data.currency || '₺') : '-'}</span></div>
+          </div>
+
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">İHALE NOTLARI VE AÇIKLAMA:</div>
+            <div style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Not bulunmamaktadır.'}</div>
+          </div>
+        </div>
+      `;
     }
 
     document.body.classList.add('printing-detail');
@@ -3451,6 +3485,8 @@ const App = {
     const t = this.state.tenders.find(item => String(item.id) === String(id));
     if (!t) return;
 
+    this.state.currentActiveDetail = { type: 'tender', data: t };
+
     document.getElementById('view-details-title').innerText = `🏛️ İhale #${t.tenderNo} — Detaylar`;
     const body = document.getElementById('view-details-body');
     if (body) {
@@ -3473,6 +3509,14 @@ const App = {
           </div>
         </div>
       `;
+    }
+
+    const editBtn = document.getElementById('btn-edit-from-view');
+    if (editBtn) {
+      editBtn.onclick = () => {
+        this.closeModal('modal-view-details');
+        this.openTenderModal(t.id);
+      };
     }
     this.openModal('modal-view-details');
   },
