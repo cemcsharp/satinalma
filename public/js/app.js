@@ -617,7 +617,7 @@ const App = {
     });
 
     // Modal Open & Action Buttons
-    document.getElementById('btn-open-new-request')?.addEventListener('click', () => this.openModal('modal-new-request'));
+    document.getElementById('btn-open-new-request')?.addEventListener('click', () => this.openNewRequestModal());
     document.getElementById('btn-open-add-user')?.addEventListener('click', () => this.openUserModal());
     document.getElementById('btn-open-add-contract')?.addEventListener('click', () => this.openContractModal());
     document.getElementById('btn-open-add-guarantee')?.addEventListener('click', () => this.openGuaranteeModal());
@@ -5244,6 +5244,21 @@ const App = {
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     document.getElementById('form-new-request').reset();
     this.render();
+  openNewRequestModal() {
+    const form = document.getElementById('form-new-request');
+    if (form) form.reset();
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('nr-arrival-date');
+    if (dateInput) dateInput.value = todayStr;
+
+    const assignedSelect = document.getElementById('nr-assigned-to');
+    if (assignedSelect) assignedSelect.value = 'Henüz Atanmadı';
+
+    const prioritySelect = document.getElementById('nr-priority');
+    if (prioritySelect) prioritySelect.value = 'Orta';
+
+    this.openModal('modal-new-request');
   },
 
   openEditModal(reqId) {
