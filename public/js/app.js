@@ -57,6 +57,22 @@ const App = {
     }
   },
 
+  toggleSidebar() {
+    const sidebar = document.getElementById('main-sidebar');
+    if (!sidebar) return;
+    const isCollapsed = sidebar.classList.toggle('collapsed');
+    document.body.classList.toggle('sidebar-collapsed', isCollapsed);
+    localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
+    const toggleBtn = document.getElementById('btn-sidebar-toggle');
+    if (toggleBtn) {
+      toggleBtn.innerText = isCollapsed ? '▶' : '◀';
+    }
+    // Trigger window resize event so charts and tables refit smoothly
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 260);
+  },
+
   async fetchInitialData() {
     try {
       const res = await fetch('/api/data');
@@ -165,7 +181,8 @@ const App = {
       const isFilter = id.startsWith('filter') || id.startsWith('select');
       el.innerHTML = isFilter ? '<option value="ALL">Tüm Birimler</option>' : '<option value="">Birim Seçin</option>';
       this.state.units.forEach(u => {
-        el.innerHTML += `<option value="${u}">${u}</option>`;
+        const uName = typeof u === 'object' ? u.name : u;
+        el.innerHTML += `<option value="${uName}">${uName}</option>`;
       });
     });
 
@@ -198,7 +215,8 @@ const App = {
       if (!el) return;
       el.innerHTML = '<option value="">Yönetmelik Maddesi (Opsiyonel)</option>';
       this.state.regulations.forEach(r => {
-        const val = r.toString().replace('Madde ', '');
+        const rName = typeof r === 'object' ? r.name : r;
+        const val = rName.toString().replace('Madde ', '');
         el.innerHTML += `<option value="${val}">Madde ${val}</option>`;
       });
     });
@@ -362,6 +380,34 @@ const App = {
     // Logout Button
     document.getElementById('btn-logout')?.addEventListener('click', () => this.handleLogout());
 
+    // Sidebar Toggle & Saved State Restoration
+    document.getElementById('btn-sidebar-toggle')?.addEventListener('click', () => {
+      this.toggleSidebar();
+    });
+
+    if (localStorage.getItem('sidebarCollapsed') === 'true') {
+      const sidebar = document.getElementById('main-sidebar');
+      if (sidebar) {
+        sidebar.classList.add('collapsed');
+        document.body.classList.add('sidebar-collapsed');
+        const toggleBtn = document.getElementById('btn-sidebar-toggle');
+        if (toggleBtn) toggleBtn.innerText = '▶';
+      }
+    }
+
+    // Section Titles Collapsible Accordion
+    document.querySelectorAll('.nav-section-title').forEach(title => {
+      title.style.cursor = 'pointer';
+      title.setAttribute('title', 'Kategoriyi Katla / Aç');
+      title.addEventListener('click', () => {
+        let next = title.nextElementSibling;
+        while (next && next.classList.contains('nav-item')) {
+          next.style.display = (next.style.display === 'none') ? '' : 'none';
+          next = next.nextElementSibling;
+        }
+      });
+    });
+
     // Nav items
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
@@ -384,7 +430,7 @@ const App = {
     });
 
     // Filters for Requests
-    ['filter-search', 'filter-start-date', 'filter-end-date', 'filter-status', 'filter-unit', 'filter-person', 'filter-priority'].forEach(id => {
+    ['filter-search', 'filter-status', 'filter-unit', 'filter-person', 'filter-priority', 'filter-sort'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener('input', () => {
@@ -453,7 +499,7 @@ const App = {
     });
 
     // Filters for My Requests (Taleplerim)
-    ['filter-my-search', 'filter-my-status', 'filter-my-unit', 'filter-my-priority'].forEach(id => {
+    ['filter-my-search', 'filter-my-status', 'filter-my-unit', 'filter-my-priority', 'filter-my-sort'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener('input', () => this.renderMyRequestsTable());
@@ -554,12 +600,31 @@ const App = {
       this.renderRequestsTable();
     });
 
-    // Modal Open Buttons
+    // Modal Open & Action Buttons
     document.getElementById('btn-open-new-request')?.addEventListener('click', () => this.openModal('modal-new-request'));
     document.getElementById('btn-open-add-user')?.addEventListener('click', () => this.openUserModal());
     document.getElementById('btn-open-add-contract')?.addEventListener('click', () => this.openContractModal());
     document.getElementById('btn-open-add-guarantee')?.addEventListener('click', () => this.openGuaranteeModal());
     document.getElementById('btn-open-add-invoice')?.addEventListener('click', () => this.openInvoiceModal());
+
+    // Settings Action Buttons (Birim & Yönetmelik Maddesi & Backup & Excel Import)
+    document.getElementById('btn-add-unit')?.addEventListener('click', () => this.handleAddUnit());
+    document.getElementById('btn-add-regulation')?.addEventListener('click', () => this.handleAddRegulation());
+    document.getElementById('btn-trigger-backup-now')?.addEventListener('click', () => this.triggerBackupNow());
+    document.getElementById('btn-download-excel-template')?.addEventListener('click', () => this.downloadExcelTemplate());
+    document.getElementById('btn-update-system')?.addEventListener('click', () => this.handleUpdateSystem());
+    document.getElementById('btn-reimport-excel')?.addEventListener('click', () => {
+      document.getElementById('input-excel-file')?.click();
+    });
+    document.getElementById('input-excel-file')?.addEventListener('change', (e) => this.handleExcelFileSelect(e));
+    
+    // Press Enter inside input to add unit/regulation
+    document.getElementById('input-new-unit-name')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); this.handleAddUnit(); }
+    });
+    document.getElementById('input-new-regulation-name')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); this.handleAddRegulation(); }
+    });
 
     document.querySelectorAll('.close-modal').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -641,7 +706,7 @@ const App = {
       const usd = parseFloat(document.getElementById('setting-rate-usd').value) || 36.50;
       const eur = parseFloat(document.getElementById('setting-rate-eur').value) || 39.80;
       this.state.rates = { USD: usd, EUR: eur, lastUpdated: new Date().toLocaleString('tr-TR') };
-      await this.saveDatabase();
+      await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates: this.state.rates }) }).catch(e => console.error(e));
       this.logAction('Döviz Kuru Güncellendi', `USD: ${usd} ₺, EUR: ${eur} ₺`);
       this.showToast("Döviz kurları başarıyla güncellendi!", "success");
       this.render();
@@ -835,7 +900,7 @@ const App = {
           if (eurInput) eurInput.value = data.EUR;
           if (dateLabel) dateLabel.innerText = `TCMB Güncelleme: ${data.lastUpdated}`;
 
-          await this.saveDatabase();
+          await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates: this.state.rates }) }).catch(e => console.error(e));
           this.logAction('TCMB Kurları Çekildi', `Merkez Bankası Satış Kurları -> USD: ${data.USD} ₺, EUR: ${data.EUR} ₺ (${data.lastUpdated})`);
           this.showToast(`TCMB Kurları Başarıyla Çekildi! (USD: ${data.USD} ₺, EUR: ${data.EUR} ₺)`, "success", "🏛️");
           this.render();
@@ -852,18 +917,23 @@ const App = {
     }
   },
 
-  logAction(actionType, details) {
+  async logAction(actionType, details) {
     if (!this.state.logs) this.state.logs = [];
     const newLog = {
-      id: this.state.logs.length + 1,
       timestamp: new Date().toLocaleString('tr-TR'),
       user: this.state.currentUser ? this.state.currentUser.name : 'Sistem',
       action: actionType,
       details: details
     };
-    this.state.logs.unshift(newLog);
-    if (this.state.logs.length > 500) this.state.logs.pop();
-    this.saveDatabase();
+    
+    try {
+      const savedLog = await this.apiSync('logs', 'POST', newLog);
+      if(savedLog) newLog.id = savedLog.id;
+      this.state.logs.unshift(newLog);
+      if (this.state.logs.length > 500) this.state.logs.pop();
+    } catch(e) {
+      console.error('Log Error:', e);
+    }
   },
 
   switchView(viewName) {
@@ -1549,6 +1619,39 @@ const App = {
     }
   },
 
+  sortRequestsList(list, sortKey) {
+    const priorityWeight = { 'Kritik': 4, 'Yüksek': 3, 'Orta': 2, 'Düşük': 1 };
+    return list.sort((a, b) => {
+      if (sortKey === 'DATE_ASC') {
+        const dtA = new Date(a.arrivalDate || a.requestDate || 0);
+        const dtB = new Date(b.arrivalDate || b.requestDate || 0);
+        return dtA - dtB;
+      }
+      if (sortKey === 'AMOUNT_DESC') {
+        const valA = parseFloat(a.estimatedAmount) || parseFloat(a.actualAmount) || parseFloat(a.budgetAmount) || 0;
+        const valB = parseFloat(b.estimatedAmount) || parseFloat(b.actualAmount) || parseFloat(b.budgetAmount) || 0;
+        return valB - valA;
+      }
+      if (sortKey === 'AMOUNT_ASC') {
+        const valA = parseFloat(a.estimatedAmount) || parseFloat(a.actualAmount) || parseFloat(a.budgetAmount) || 0;
+        const valB = parseFloat(b.estimatedAmount) || parseFloat(b.actualAmount) || parseFloat(b.budgetAmount) || 0;
+        return valA - valB;
+      }
+      if (sortKey === 'PRIORITY_DESC') {
+        const pA = priorityWeight[a.priority] || 0;
+        const pB = priorityWeight[b.priority] || 0;
+        return pB - pA;
+      }
+      if (sortKey === 'SLA_DESC') {
+        return (b._diffDays || 0) - (a._diffDays || 0);
+      }
+      // DATE_DESC (default)
+      const dtA = new Date(a.arrivalDate || a.requestDate || 0);
+      const dtB = new Date(b.arrivalDate || b.requestDate || 0);
+      return dtB - dtA;
+    });
+  },
+
   // 2. REQUESTS TABLE RENDERER
   renderRequestsTable() {
     const allFilteredRequests = this.getFilteredRequests();
@@ -1585,29 +1688,13 @@ const App = {
     let requests = [...allFilteredRequests];
 
     const searchText = document.getElementById('filter-search')?.value.toLowerCase() || '';
-    const startDateVal = document.getElementById('filter-start-date')?.value || '';
-    const endDateVal = document.getElementById('filter-end-date')?.value || '';
     const statusVal = document.getElementById('filter-status')?.value || 'ALL';
     const unitVal = document.getElementById('filter-unit')?.value || 'ALL';
     const personVal = document.getElementById('filter-person')?.value || 'ALL';
     const priorityVal = document.getElementById('filter-priority')?.value || 'ALL';
+    const sortVal = document.getElementById('filter-sort')?.value || 'DATE_DESC';
 
     requests = requests.filter(r => {
-      if (startDateVal) {
-        const sDt = new Date(startDateVal);
-        sDt.setHours(0,0,0,0);
-        const reqDt = new Date(r.arrivalDate || r.requestDate);
-        reqDt.setHours(0,0,0,0);
-        if (reqDt < sDt) return false;
-      }
-
-      if (endDateVal) {
-        const eDt = new Date(endDateVal);
-        eDt.setHours(23,59,59,999);
-        const reqDt = new Date(r.arrivalDate || r.requestDate);
-        reqDt.setHours(0,0,0,0);
-        if (reqDt > eDt) return false;
-      }
 
       if (statusVal === 'OVERDUE_14') {
         if (r.status !== 'Açık' || r._diffDays < 14) return false;
@@ -1628,6 +1715,9 @@ const App = {
       }
       return true;
     });
+
+    // Apply Sorting
+    requests = this.sortRequestsList(requests, sortVal);
 
     const totalItems = requests.length;
     const totalPages = Math.ceil(totalItems / this.state.pageSize) || 1;
@@ -1849,15 +1939,18 @@ const App = {
       return;
     }
 
-    this.state.requests.forEach(r => {
-      if (checked.includes(r.id)) {
-        r.assignedTo = targetPerson;
+    this.showConfirm("Seçili Talepleri Devret", `Seçilen ${checked.length} adet talebi ${targetPerson} adlı personele devretmek istediğinize emin misiniz?`, async () => {
+      for (const id of checked) {
+        const r = this.state.requests.find(req => String(req.id) === String(id));
+        if (r) {
+          this.logAction('Talep Devredildi', `Barkod: ${r.requestBarcode || '-'} -> Yeni Sorumlu: ${targetPerson}`);
+          r.assignedTo = targetPerson;
+          await this.apiSync('requests', 'PUT', r);
+        }
       }
+      this.showToast(`${checked.length} adet talep başarıyla ${targetPerson} adlı personele devredildi!`, "success", "⚖️");
+      this.render();
     });
-
-    await this.saveDatabase();
-    this.showToast(`${checked.length} adet talep başarıyla ${targetPerson} adlı personele devredildi!`, "success", "⚖️");
-    this.render();
   },
 
   // 4. MY REQUESTS (PERSONNEL VIEW)
@@ -1901,6 +1994,7 @@ const App = {
     const statusVal = document.getElementById('filter-my-status')?.value || 'ALL';
     const unitVal = document.getElementById('filter-my-unit')?.value || 'ALL';
     const priorityVal = document.getElementById('filter-my-priority')?.value || 'ALL';
+    const sortVal = document.getElementById('filter-my-sort')?.value || 'DATE_DESC';
 
     requests = requests.filter(r => {
       if (statusVal === 'OVERDUE_14') {
@@ -1923,6 +2017,9 @@ const App = {
       }
       return true;
     });
+
+    // Apply Sorting
+    requests = this.sortRequestsList(requests, sortVal);
 
     const tbody = document.querySelector('#table-my-requests tbody');
     if (!tbody) return;
@@ -2149,10 +2246,10 @@ const App = {
         c.guaranteeExpiry = guaranteeExpiry;
         c.status = status;
         c.notes = notes;
+        await this.apiSync('contracts', 'PUT', c);
       }
     } else {
       const newContract = {
-        id: this.state.contracts.length + 1,
         contractNo,
         supplier,
         title,
@@ -2169,12 +2266,13 @@ const App = {
         notes,
         academicYear: this.getAcademicYearFromDate(startDate || endDate)
       };
+      const savedC = await this.apiSync('contracts', 'POST', newContract);
+      if (savedC) newContract.id = savedC.id;
       this.state.contracts.push(newContract);
     }
 
     this.populateYearSelect();
     this.logAction(id ? 'Sözleşme Güncellendi' : 'Yeni Sözleşme Eklendi', `No: ${contractNo}, Tutar: ${totalAmount} ${currency} (Sabit Kur: ${rateVal} ₺)`);
-    await this.saveDatabase();
     this.showToast("Sözleşme bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.renderContracts();
@@ -2197,9 +2295,9 @@ const App = {
 
     const barcodeText = req.requestBarcode ? `Barkod #${req.requestBarcode}` : 'Talep';
     this.showConfirm("Talebi Sil", `${barcodeText} - "${req.subject}" başlıklı talebi silmek istediğinizden emin misiniz?`, async () => {
+      await this.apiSync('requests', 'DELETE', req.id);
       this.state.requests = this.state.requests.filter(r => String(r.id) !== String(requestId));
       this.logAction('Talep Silindi', `Barkod: ${req.requestBarcode || '-'}, Konu: ${req.subject}`);
-      await this.saveDatabase();
       this.showToast("Talep başarıyla silindi!", "warning");
       this.render();
     }, '🗑️');
@@ -2213,9 +2311,9 @@ const App = {
     }
 
     this.showConfirm("Sözleşmeyi Sil", `Sözleşme #${c.contractNo} ("${c.title}") silinecek. Emin misiniz?`, async () => {
+      await this.apiSync('contracts', 'DELETE', c.id);
       this.state.contracts = this.state.contracts.filter(item => String(item.id) !== String(contractId));
       this.logAction('Sözleşme Silindi', `No: ${c.contractNo}, Konu: ${c.title}`);
-      await this.saveDatabase();
       this.showToast("Sözleşme başarıyla silindi!", "success");
       this.renderContracts();
     }, '🗑️');
@@ -2229,9 +2327,9 @@ const App = {
     }
 
     this.showConfirm("Faturayı Sil", `Fatura #${inv.invoiceNo} (${inv.supplier}) silinecek. Emin misiniz?`, async () => {
+      await this.apiSync('invoices', 'DELETE', inv.id);
       this.state.invoices = this.state.invoices.filter(item => String(item.id) !== String(invoiceId));
       this.logAction('Fatura Silindi', `No: ${inv.invoiceNo}, Tedarikçi: ${inv.supplier}`);
-      await this.saveDatabase();
       this.showToast("Fatura başarıyla silindi!", "warning");
       this.renderInvoices();
     }, '🗑️');
@@ -2763,7 +2861,7 @@ const App = {
     if (!this.state.guarantees) this.state.guarantees = [];
 
     if (id) {
-      const g = this.state.guarantees.find(item => String(item.id) === String(id));
+      const g = this.state.guarantees.find(item => item.id === parseInt(id));
       if (g) {
         g.letterNo = letterNo;
         g.bankName = bankName;
@@ -2778,13 +2876,12 @@ const App = {
         g.expiryDate = expiryDate;
         g.storageLocation = storageLocation;
         g.notes = notes;
+        await this.apiSync('guarantees', 'PUT', g);
         this.showToast(`Teminat Mektubu #${letterNo} başarıyla güncellendi!`, "success", "🛡️");
         this.logAction('Teminat Mektubu Güncellendi', `No: ${letterNo}, Tutar: ${amount} ${currency}`);
       }
     } else {
-      const newId = this.state.guarantees.length > 0 ? Math.max(...this.state.guarantees.map(item => item.id || 0)) + 1 : 1;
       const newG = {
-        id: newId,
         letterNo,
         bankName,
         type,
@@ -2800,12 +2897,13 @@ const App = {
         notes,
         assignedTo: this.state.currentUser ? this.state.currentUser.name : 'Satınalma Uzmanı'
       };
+      const savedG = await this.apiSync('guarantees', 'POST', newG);
+      if (savedG) newG.id = savedG.id;
       this.state.guarantees.unshift(newG);
       this.showToast(`Yeni Teminat Mektubu #${letterNo} başarıyla kaydedildi!`, "success", "🛡️");
       this.logAction('Yeni Teminat Mektubu Eklendi', `No: ${letterNo}, Banka: ${bankName}, Tutar: ${amount} ${currency}`);
     }
 
-    await this.saveDatabase();
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.renderGuarantees();
   },
@@ -2817,7 +2915,7 @@ const App = {
     this.showConfirm("Firmaya İade Onayı", `Teminat Mektubu #${g.letterNo} (${g.supplier} - ${g.amount.toLocaleString('tr-TR')} ${g.currency}) firmaya iade edilmiş olarak işaretlensin mi?`, async () => {
       g.status = 'İade Edildi';
       g.returnDate = new Date().toISOString().split('T')[0];
-      await this.saveDatabase();
+      await this.apiSync('guarantees', 'PUT', g);
       this.showToast(`Teminat Mektubu #${g.letterNo} firmaya iade edildi!`, "success", "↩️");
       this.logAction('Teminat Mektubu İade Edildi', `No: ${g.letterNo}, Firma: ${g.supplier}`);
       this.renderGuarantees();
@@ -2829,8 +2927,8 @@ const App = {
     if (!g) return;
 
     this.showConfirm("Teminat Mektubu Silme", `Teminat Mektubu #${g.letterNo} kaydını tamamen silmek istediğinize emin misiniz?`, async () => {
+      await this.apiSync('guarantees', 'DELETE', g.id);
       this.state.guarantees = this.state.guarantees.filter(item => String(item.id) !== String(id));
-      await this.saveDatabase();
       this.showToast(`Teminat mektubu kaydı silindi!`, "info", "🗑️");
       this.logAction('Teminat Mektubu Silindi', `No: ${g.letterNo}`);
       this.renderGuarantees();
@@ -3067,10 +3165,10 @@ const App = {
         inv.relatedBarcode = relatedBarcode;
         inv.paymentDate = paymentDate;
         inv.notes = notes;
+        await this.apiSync('invoices', 'PUT', inv);
       }
     } else {
       const newInvoice = {
-        id: this.state.invoices.length + 1,
         invoiceNo,
         supplier,
         invoiceDate,
@@ -3084,11 +3182,12 @@ const App = {
         notes,
         academicYear: this.getAcademicYearFromDate(invoiceDate || dueDate)
       };
+      const savedI = await this.apiSync('invoices', 'POST', newInvoice);
+      if (savedI) newInvoice.id = savedI.id;
       this.state.invoices.push(newInvoice);
     }
 
     this.populateYearSelect();
-    await this.saveDatabase();
     this.showToast("Fatura bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.renderInvoices();
@@ -3101,7 +3200,7 @@ const App = {
     this.showConfirm("Fatura Ödeme Onayı", `Fatura #${inv.invoiceNo} (${inv.amount.toLocaleString('tr-TR')} ₺) ödenmiş olarak işaretlensin mi?`, async () => {
       inv.paymentStatus = 'Ödendi';
       inv.paymentDate = new Date().toISOString().split('T')[0];
-      await this.saveDatabase();
+      await this.apiSync('invoices', 'PUT', inv);
       this.showToast("Fatura ödenmiş olarak güncellendi!", "success", "✅");
       this.renderInvoices();
     }, '💳');
@@ -3160,14 +3259,13 @@ const App = {
 
     const ids = selectedChks.map(c => parseInt(c.getAttribute('data-id')));
 
-    this.showConfirm("Toplu Durum Güncelleme", `Seçilen ${ids.length} adet talebi 'Tamamlandı' olarak güncellemek istediğinize emin misiniz?`, async () => {
-      ids.forEach(id => {
+    this.showConfirm("Toplu Talep Tamamlama", `Seçilen ${ids.length} adet talebi TAMAMLANDI olarak işaretlemek istediğinize emin misiniz?`, async () => {
+      for (const id of ids) {
         const r = this.state.requests.find(req => req.id === id);
-        if (r) r.status = 'Tamamlandı';
-      });
+        if (r) { r.status = 'Tamamlandı'; await this.apiSync('requests', 'PUT', r); }
+      }
 
       this.logAction('Toplu Talep Tamamlandı', `${ids.length} adet talep toplu olarak tamamlandı yapıldı.`);
-      await this.saveDatabase();
       this.showToast(`${ids.length} adet talep başarıyla tamamlandı!`, "success", "✅");
       const chkAll = document.getElementById('chk-select-all-requests');
       if (chkAll) chkAll.checked = false;
@@ -3189,13 +3287,12 @@ const App = {
     const ids = selectedChks.map(c => parseInt(c.getAttribute('data-id')));
 
     this.showConfirm("Toplu Talep Devretme", `Seçilen ${ids.length} adet talebi '${targetPerson}' isimli personele devretmek istediğinize emin misiniz?`, async () => {
-      ids.forEach(id => {
+      for (const id of ids) {
         const r = this.state.requests.find(req => req.id === id);
-        if (r) r.assignedTo = targetPerson;
-      });
+        if (r) { r.assignedTo = targetPerson; await this.apiSync('requests', 'PUT', r); }
+      }
 
       this.logAction('Toplu Talep Devredildi', `${ids.length} adet talep ${targetPerson} isimli personele devredildi.`);
-      await this.saveDatabase();
       this.showToast(`${ids.length} adet talep ${targetPerson} personeline başarıyla devredildi!`, "success", "👉");
       const chkAll = document.getElementById('chk-select-all-requests');
       if (chkAll) chkAll.checked = false;
@@ -4338,6 +4435,305 @@ const App = {
         `;
       }).join('');
     }
+    this.renderUnitsSettings();
+    this.renderRegulationsSettings();
+    this.renderBackupsTableSettings();
+  },
+
+  async renderBackupsTableSettings() {
+    const tbody = document.getElementById('tbody-backups-list');
+    if (!tbody) return;
+    try {
+      const res = await fetch('/api/backups');
+      if (res.ok) {
+        const backups = await res.json();
+        if (!Array.isArray(backups) || backups.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">Henüz alınmış veritabanı yedeği bulunmuyor.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = backups.map(b => `
+          <tr>
+            <td style="font-weight:600; font-family:var(--font-mono); font-size:0.82rem;">${b.filename}</td>
+            <td>${b.createdAt}</td>
+            <td>${b.size}</td>
+            <td style="text-align:center;">
+              <a href="/api/backups/download/${b.filename}" class="btn-icon" title="Yedek Dosyasını İndir" download>📥</a>
+            </td>
+          </tr>
+        `).join('');
+      }
+    } catch (err) {
+      console.error(err);
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--status-rejected);">Yedek listesi alınamadı.</td></tr>`;
+    }
+  },
+
+  async triggerBackupNow() {
+    try {
+      this.showToast("Veritabanı yedeği oluşturuluyor...", "info", "💾");
+      const res = await fetch('/api/backups/create', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        this.showToast(`Yedek oluşturuldu: ${data.filename} (${data.size})`, "success", "✅");
+        this.renderBackupsTableSettings();
+      } else {
+        this.showToast("Yedekleme başarısız oldu.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast("Yedekleme sırasında hata oluştu.", "error");
+    }
+  },
+
+  handleExcelFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (typeof XLSX === 'undefined') {
+      this.showToast("Excel okuma kütüphanesi yüklenemedi. Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonRows = XLSX.utils.sheet_to_json(worksheet);
+
+        if (!jsonRows || jsonRows.length === 0) {
+          this.showToast("Seçilen Excel dosyasında okunabilir veri bulunamadı.", "warning");
+          return;
+        }
+
+        // Map Excel columns to Request fields
+        const requestsToImport = jsonRows.map(r => {
+          return {
+            requestBarcode: r['Barkod No'] || r['Barkod'] || r['Talep Barkod'] || r['Barkod No.'] || Math.floor(100000000 + Math.random() * 900000000),
+            subject: r['Talep Konusu'] || r['Konu'] || r['Açıklama'] || 'Excel İçe Aktarma',
+            unit: r['Birim'] || r['Birim Adı'] || 'Genel Sekreterlik',
+            arrivalDate: r['Geliş Tarihi'] || r['Tarih'] || new Date().toISOString().split('T')[0],
+            assignedTo: r['Atanan Personel'] || r['Personel'] || r['Sorumlu'] || 'Merih AVCI',
+            priority: r['Öncelik'] || 'Orta',
+            status: r['Durum'] || 'Açık',
+            estimatedAmount: parseFloat(r['Tahmini Bütçe (TL)'] || r['Tahmini Bütçe'] || r['Bütçe'] || 0),
+            actualAmount: parseFloat(r['Gerçekleşen Tutar (TL)'] || r['Gerçekleşen Tutar'] || r['Tutar'] || 0),
+            currency: r['Para Birimi'] || 'TRY',
+            supplier: r['Tedarikçi'] || r['Firma'] || '',
+            orderBarcode: r['Sipariş No'] || r['Sipariş Barkod'] || '',
+            orderDate: r['Sipariş Tarihi'] || '',
+            regulation: r['Yönetmelik Maddesi'] || r['Madde'] || '',
+            description: r['Detay / Açıklama'] || r['Notlar'] || ''
+          };
+        });
+
+        this.showToast(`Excel dosyasından ${requestsToImport.length} adet talep okundu, veritabanına yükleniyor...`, "info", "📊");
+
+        const res = await fetch('/api/import-excel-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestsToImport)
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          this.showToast(`🎉 ${result.addedCount} adet talep veritabanına başarıyla yüklendi!`, "success", "✅");
+          await this.fetchInitialData();
+          this.render();
+        } else {
+          this.showToast("Excel verileri yüklenirken sunucu hatası oluştu.", "error");
+        }
+      } catch (err) {
+        console.error("Excel okuma hatası:", err);
+        this.showToast("Excel dosyası okunamadı. Lütfen geçerli bir .xlsx veya .xls dosyası seçin.", "error");
+      } finally {
+        e.target.value = ''; // Reset input for re-selection
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  },
+
+  downloadExcelTemplate() {
+    if (typeof XLSX === 'undefined') {
+      this.showToast("Excel kütüphanesi yüklenemedi.", "error");
+      return;
+    }
+
+    const templateData = [
+      {
+        'Barkod No': 1000150,
+        'Talep Konusu': 'Laboratuvar Dizüstü Bilgisayar Alımı',
+        'Birim': 'Mühendislik Fakültesi',
+        'Geliş Tarihi': '2026-02-01',
+        'Atanan Personel': 'Merih AVCI',
+        'Öncelik': 'Yüksek',
+        'Durum': 'Açık',
+        'Tahmini Bütçe (TL)': 45000,
+        'Gerçekleşen Tutar (TL)': 0,
+        'Para Birimi': 'TRY',
+        'Tedarikçi': '',
+        'Sipariş No': '',
+        'Sipariş Tarihi': '',
+        'Yönetmelik Maddesi': '19-A',
+        'Detay / Açıklama': 'Örnek talep kaydı açıklaması'
+      },
+      {
+        'Barkod No': 1000151,
+        'Talep Konusu': 'Derslik Projeksiyon Cihazı Bakımı',
+        'Birim': 'Bilgi İşlem Müdürlüğü',
+        'Geliş Tarihi': '2026-02-05',
+        'Atanan Personel': 'Cem TÜRKMEN',
+        'Öncelik': 'Orta',
+        'Durum': 'Tamamlandı',
+        'Tahmini Bütçe (TL)': 18000,
+        'Gerçekleşen Tutar (TL)': 16500,
+        'Para Birimi': 'TRY',
+        'Tedarikçi': 'Tekno Sistem A.Ş.',
+        'Sipariş No': 2000089,
+        'Sipariş Tarihi': '2026-02-07',
+        'Yönetmelik Maddesi': '18-C',
+        'Detay / Açıklama': 'Bakım ve değişim tamamlandı'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Talepler");
+    XLSX.writeFile(workbook, "Satinalma_Talep_Yukleme_Sablonu.xlsx");
+    this.showToast("Örnek Excel şablonu bilgisayarınıza indirildi.", "success", "📄");
+  },
+
+  async handleUpdateSystem() {
+    if (!confirm("Sunucudaki uygulama son koda (Git) güncellenecek ve servis yeniden başlatılacak. Devam etmek istiyor musunuz?")) return;
+    try {
+      this.showToast("Sunucu güncelleniyor, lütfen bekleyin...", "info", "🚀");
+      const res = await fetch('/api/update-system', { method: 'POST' });
+      if (res.ok) {
+        this.showToast("🎉 Sunucu başarıyla son sürüme güncellendi!", "success", "✅");
+      } else {
+        this.showToast("Güncelleme işlemi tamamlandı.", "info");
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast("Güncelleme sırasında hata oluştu.", "error");
+    }
+  },
+
+  renderUnitsSettings() {
+    const tbody = document.getElementById('tbody-units-settings');
+    if (!tbody) return;
+    if (!this.state.units || this.state.units.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:var(--text-muted); padding:1rem;">Tanımlı birim bulunamadı.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = this.state.units.map(u => {
+      const id = typeof u === 'object' ? u.id : u;
+      const name = typeof u === 'object' ? u.name : u;
+      return `
+        <tr>
+          <td style="font-weight:600;">${name}</td>
+          <td style="text-align:center;">
+            <button class="btn-icon" onclick="App.handleDeleteUnit(${id}, '${name.replace(/'/g, "\\'")}')" title="Birimi Sil">🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  renderRegulationsSettings() {
+    const tbody = document.getElementById('tbody-regulations-settings');
+    if (!tbody) return;
+    if (!this.state.regulations || this.state.regulations.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:var(--text-muted); padding:1rem;">Tanımlı yönetmelik maddesi bulunamadı.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = this.state.regulations.map(r => {
+      const id = typeof r === 'object' ? r.id : r;
+      const name = typeof r === 'object' ? r.name : r;
+      return `
+        <tr>
+          <td style="font-weight:600;">Madde ${name}</td>
+          <td style="text-align:center;">
+            <button class="btn-icon" onclick="App.handleDeleteRegulation(${id}, '${name.replace(/'/g, "\\'")}')" title="Maddeyi Sil">🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  async handleAddUnit() {
+    const input = document.getElementById('input-new-unit-name');
+    const name = input?.value.trim();
+    if (!name) {
+      this.showToast("Lütfen eklenecek birim adını girin.", "warning");
+      return;
+    }
+    try {
+      const res = await this.apiSync('units', 'POST', { name });
+      if (res) {
+        this.state.units.push(res);
+        input.value = '';
+        this.renderUnitsSettings();
+        this.populateDropdowns();
+        this.showToast(`"${name}" birimi başarıyla eklendi.`, "success", "🏢");
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast("Birim eklenirken hata oluştu.", "error");
+    }
+  },
+
+  async handleDeleteUnit(id, name) {
+    if (!confirm(`"${name}" birimini silmek istediğinizden emin misiniz?`)) return;
+    try {
+      await this.apiSync('units', 'DELETE', null, id);
+      this.state.units = this.state.units.filter(u => (typeof u === 'object' ? u.id : u) !== id);
+      this.renderUnitsSettings();
+      this.populateDropdowns();
+      this.showToast(`"${name}" birimi silindi.`, "info", "🗑️");
+    } catch (err) {
+      console.error(err);
+      this.showToast("Birim silinirken hata oluştu.", "error");
+    }
+  },
+
+  async handleAddRegulation() {
+    const input = document.getElementById('input-new-regulation-name');
+    let name = input?.value.trim();
+    if (!name) {
+      this.showToast("Lütfen eklenecek yönetmelik maddesini girin.", "warning");
+      return;
+    }
+    if (name.startsWith('Madde ')) name = name.replace('Madde ', '');
+    try {
+      const res = await this.apiSync('regulations', 'POST', { name });
+      if (res) {
+        this.state.regulations.push(res);
+        input.value = '';
+        this.renderRegulationsSettings();
+        this.populateDropdowns();
+        this.showToast(`"Madde ${name}" başarıyla eklendi.`, "success", "📜");
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast("Yönetmelik maddesi eklenirken hata oluştu.", "error");
+    }
+  },
+
+  async handleDeleteRegulation(id, name) {
+    if (!confirm(`"Madde ${name}" düzenlemesini silmek istediğinizden emin misiniz?`)) return;
+    try {
+      await this.apiSync('regulations', 'DELETE', null, id);
+      this.state.regulations = this.state.regulations.filter(r => (typeof r === 'object' ? r.id : r) !== id);
+      this.renderRegulationsSettings();
+      this.populateDropdowns();
+      this.showToast(`"Madde ${name}" silindi.`, "info", "🗑️");
+    } catch (err) {
+      console.error(err);
+      this.showToast("Yönetmelik maddesi silinirken hata oluştu.", "error");
+    }
   },
 
   openUserModal(userId = null) {
@@ -4415,11 +4811,11 @@ const App = {
         u.phone = phone;
         u.email = email;
         u.isActive = isActive;
+        await this.apiSync('users', 'PUT', u);
       }
     } else {
       const username = name.split(' ')[0].toLowerCase();
       const newUser = {
-        id: this.state.users.length + 1,
         username: username,
         name: name,
         title: title,
@@ -4429,10 +4825,11 @@ const App = {
         email: email,
         isActive: isActive
       };
+      const savedU = await this.apiSync('users', 'POST', newUser);
+      if (savedU) newUser.id = savedU.id;
       this.state.users.push(newUser);
     }
 
-    await this.saveDatabase();
     this.showToast("Personel bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.populateLoginDropdown();
@@ -4444,8 +4841,8 @@ const App = {
     const u = this.state.users.find(usr => String(usr.id) === String(userId));
     if (u) {
       u.isActive = u.isActive === false ? true : false;
+      await this.apiSync('users', 'PUT', u);
       const statusText = u.isActive ? 'Aktif' : 'Pasif (Ayrıldı)';
-      await this.saveDatabase();
       this.showToast(`${u.name} kullanıcısının durumu '${statusText}' olarak değiştirildi!`, "info");
       this.populateLoginDropdown();
       this.populateDropdowns();
@@ -4458,13 +4855,41 @@ const App = {
     if (!u) return;
 
     this.showConfirm("Personel Sil", `${u.name} isimli personeli silmek istediğinizden emin misiniz?`, async () => {
+      await this.apiSync('users', 'DELETE', u.id);
       this.state.users = this.state.users.filter(usr => String(usr.id) !== String(userId));
-      await this.saveDatabase();
       this.showToast("Personel başarıyla silindi!", "warning");
       this.populateLoginDropdown();
       this.populateDropdowns();
       this.render();
     }, '🗑️');
+  },
+
+  async apiSync(table, method, data = null) {
+    let url = `/api/${table}`;
+    if ((method === 'PUT' || method === 'DELETE') && data !== null) {
+      const id = typeof data === 'object' ? data.id : data;
+      url += `/${id}`;
+    }
+    
+    const options = {
+      method: method,
+      headers: { 'Content-Type': 'application/json' }
+    };
+    
+    if (data && method !== 'DELETE') {
+      options.body = JSON.stringify(data);
+    }
+
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        throw new Error(`API Hatası: ${response.statusText}`);
+      }
+      return await response.json();
+    } catch (e) {
+      console.error('apiSync başarısız:', e);
+      return null;
+    }
   },
 
   async saveDatabase() {
@@ -4611,9 +5036,10 @@ const App = {
       academicYear: this.getAcademicYearFromDate(arrDate)
     };
 
+    const savedReq = await this.apiSync('requests', 'POST', newReq);
+    if (savedReq) newReq.id = savedReq.id;
     this.state.requests.unshift(newReq);
     this.populateYearSelect();
-    await this.saveDatabase();
 
     this.showToast("Yeni talep başarıyla oluşturuldu ve atandı!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
@@ -4640,7 +5066,7 @@ const App = {
     req.regulation = document.getElementById('er-regulation').value;
     req.description = document.getElementById('er-description').value;
 
-    await this.saveDatabase();
+    await this.apiSync('requests', 'PUT', req);
 
     this.showToast("Talep bilgileri başarıyla güncellendi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));

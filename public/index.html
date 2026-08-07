@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="/css/style.css">
   <!-- Chart.js for data visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS for Excel file import & parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- Toast Notification Area -->
@@ -78,12 +80,17 @@
   <div id="app" style="display: none;">
     <!-- Sidebar Navigation -->
     <aside class="sidebar" id="main-sidebar">
-      <div class="brand">
-        <div class="brand-logo">🛒</div>
-        <div class="brand-text">
-          <h1>Satınalma Takip</h1>
-          <p>Piri Reis Üniversitesi</p>
+      <div class="brand" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <div class="brand-logo">🛒</div>
+          <div class="brand-text">
+            <h1>Satınalma Takip</h1>
+            <p>Piri Reis Üniversitesi</p>
+          </div>
         </div>
+        <button id="btn-sidebar-toggle" title="Menüyü Daralt / Genişlet" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 0.3rem 0.5rem; border-radius: 4px; transition: var(--transition-fast);">
+          ◀
+        </button>
       </div>
       <!-- Mobile Hamburger Button -->
       <button id="btn-mobile-menu" onclick="document.getElementById('main-sidebar').classList.toggle('mobile-open'); document.getElementById('sidebar-overlay').classList.toggle('show');" style="display:none; margin-left:auto; background:transparent; border:1px solid var(--border-color); border-radius:6px; color:var(--text-main); padding:0.4rem 0.6rem; font-size:1.2rem; cursor:pointer;">☰</button>
@@ -96,13 +103,7 @@
         <li class="nav-item" data-view="my-requests">
           <button><span class="nav-icon">👤</span><span>Taleplerim</span></button>
         </li>
-        <li class="nav-item" data-view="notifications">
-          <button style="display:flex; align-items:center; width:100%;">
-            <span class="nav-icon">🔔</span>
-            <span>Bildirimler</span>
-            <span id="nav-notif-badge" style="display:none; margin-left:auto; background:var(--status-rejected); color:#fff; border-radius:10px; padding:0.05rem 0.45rem; font-size:0.7rem; font-weight:800;">0</span>
-          </button>
-        </li>
+
 
         <li class="nav-section-title">📋 Operasyon</li>
         <li class="nav-item" data-view="requests">
@@ -403,12 +404,7 @@
             <input type="text" id="filter-search" placeholder="Barkod, konu, açıklama, tedarikçi ile ara...">
           </div>
 
-          <div style="display: flex; gap: 0.35rem; align-items: center; background: var(--bg-card); padding: 0.25rem 0.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <span style="font-size: 0.78rem; color: var(--text-muted);">📅 Başlangıç:</span>
-            <input type="date" id="filter-start-date" style="background: transparent; border: none; color: var(--text-main); font-size: 0.8rem;">
-            <span style="font-size: 0.78rem; color: var(--text-muted);">Bitiş:</span>
-            <input type="date" id="filter-end-date" style="background: transparent; border: none; color: var(--text-main); font-size: 0.8rem;">
-          </div>
+
 
           <select class="filter-select" id="filter-status">
             <option value="ALL">Tüm Durumlar</option>
@@ -433,12 +429,23 @@
             <option value="Orta">🟡 Orta</option>
           </select>
 
-          <button class="btn-secondary" id="btn-export-excel">
-            <span>📥</span> Excel İndir
-          </button>
-          <button class="btn-export-pdf" id="btn-export-requests-pdf">
-            <span>🖨️</span> PDF / Yazdır
-          </button>
+          <select class="filter-select" id="filter-sort" title="Sıralama Ölçütü" style="border-color: var(--accent-primary); font-weight: 600;">
+            <option value="DATE_DESC">🔽 Yeniden Eskiye (Varsayılan)</option>
+            <option value="DATE_ASC">🔼 Eskiden Yeniye</option>
+            <option value="AMOUNT_DESC">💰 En Yüksek Bütçeli / Tutarlı</option>
+            <option value="AMOUNT_ASC">💵 En Düşük Bütçeli / Tutarlı</option>
+            <option value="PRIORITY_DESC">🚨 Önceliğe Göre (Kritik ➔ Düşük)</option>
+            <option value="SLA_DESC">⏳ Gecikme Süresine Göre (SLA)</option>
+          </select>
+
+          <div class="export-btn-group">
+            <button class="btn-export-excel" id="btn-export-excel">
+              <span>📥</span> Excel
+            </button>
+            <button class="btn-export-pdf" id="btn-export-requests-pdf">
+              <span>🖨️</span> PDF / Yazdır
+            </button>
+          </div>
         </div>
 
         <!-- Bulk Actions Bar -->
@@ -632,9 +639,20 @@
             <option value="Düşük">🟢 Düşük</option>
           </select>
 
-          <button class="btn-export-pdf" id="btn-export-my-requests-pdf">
-            <span>🖨️</span> PDF / Yazdır
-          </button>
+          <select class="filter-select" id="filter-my-sort" title="Sıralama Ölçütü" style="border-color: var(--accent-primary); font-weight: 600;">
+            <option value="DATE_DESC">🔽 Yeniden Eskiye (Varsayılan)</option>
+            <option value="DATE_ASC">🔼 Eskiden Yeniye</option>
+            <option value="AMOUNT_DESC">💰 En Yüksek Bütçeli / Tutarlı</option>
+            <option value="AMOUNT_ASC">💵 En Düşük Bütçeli / Tutarlı</option>
+            <option value="PRIORITY_DESC">🚨 Önceliğe Göre (Kritik ➔ Düşük)</option>
+            <option value="SLA_DESC">⏳ Gecikme Süresine Göre (SLA)</option>
+          </select>
+
+          <div class="export-btn-group">
+            <button class="btn-export-pdf" id="btn-export-my-requests-pdf">
+              <span>🖨️</span> PDF / Yazdır
+            </button>
+          </div>
         </div>
 
         <div class="table-container">
@@ -1732,7 +1750,7 @@
               </button>
             </div>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Sistem veritabanı (<code>data/db.json</code>) otomatik korumalı saklanır ve tarih etiketli yedekleri <code>data/backups/</code> dizininde tutulur.
+              Sistem veritabanı (<code>PostgreSQL / satinalma_db</code>) ilişkisel olarak korumalı saklanır ve REST API üzerinden güvenli şekilde yönetilir.
             </p>
             <div style="margin-bottom: 1.25rem;">
               <h4 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-main);">📂 Son Alınan Veritabanı Yedekleri</h4>
@@ -1743,17 +1761,86 @@
                       <th>Yedek Dosya Adı</th>
                       <th>Oluşturulma Tarihi</th>
                       <th>Boyut</th>
+                      <th style="text-align: center;">İndir</th>
                     </tr>
                   </thead>
                   <tbody id="tbody-backups-list">
-                    <tr><td colspan="3" style="text-align:center;">Yedekler yükleniyor...</td></tr>
+                    <tr><td colspan="4" style="text-align:center;">Yedekler yükleniyor...</td></tr>
                   </tbody>
                 </table>
               </div>
             </div>
-            <button class="btn-secondary" id="btn-reimport-excel">
-              <span>🔄</span> Excel'den Verileri Yeniden Yükle
-            </button>
+            <!-- Hidden Excel File Input -->
+            <input type="file" id="input-excel-file" accept=".xlsx, .xls" style="display: none;">
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+              <button class="btn-primary" id="btn-reimport-excel">
+                <span>📥</span> Bilgisayardan Excel Yükle
+              </button>
+              <button class="btn-secondary" id="btn-download-excel-template">
+                <span>📄</span> Örnek Excel Şablonu İndir
+              </button>
+              <button class="btn-secondary" id="btn-update-system" style="margin-left: auto; border-color: var(--accent-primary);" title="Sunucudaki kodu son sürüme günceller">
+                <span>🚀</span> Canlı Sunucuyu Güncelle
+              </button>
+            </div>
+          </div>
+
+          <!-- Birim Yönetimi Card -->
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>🏢 Birim & Fakülte Yönetimi</h3>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Sistemdeki aktif akademik ve idari birimleri tanımlayın, yeni birim ekleyin veya silin.
+            </p>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+              <input type="text" id="input-new-unit-name" placeholder="Yeni Birim / Fakülte Adı..." style="flex: 1; padding: 0.45rem 0.75rem; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);">
+              <button class="btn-primary" id="btn-add-unit" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; white-space: nowrap;">
+                <span>➕</span> Birim Ekle
+              </button>
+            </div>
+            <div class="table-container" style="max-height: 240px; overflow-y: auto;">
+              <table class="custom-table" id="table-units-settings">
+                <thead>
+                  <tr>
+                    <th>Birim Adı</th>
+                    <th style="width: 80px; text-align: center;">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-units-settings">
+                  <tr><td colspan="2" style="text-align:center;">Birimler yükleniyor...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Yönetmelik Maddeleri Yönetimi Card -->
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>📜 İhale Yönetmelik Maddeleri</h3>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Satınalma taleplerinde kullanılan ihale usulü ve yönetmelik maddelerini tanımlayın.
+            </p>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+              <input type="text" id="input-new-regulation-name" placeholder="Örn: 19-A, 18-C, 21-f..." style="flex: 1; padding: 0.45rem 0.75rem; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);">
+              <button class="btn-primary" id="btn-add-regulation" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; white-space: nowrap;">
+                <span>➕</span> Madde Ekle
+              </button>
+            </div>
+            <div class="table-container" style="max-height: 240px; overflow-y: auto;">
+              <table class="custom-table" id="table-regulations-settings">
+                <thead>
+                  <tr>
+                    <th>Madde / Usül Adı</th>
+                    <th style="width: 80px; text-align: center;">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-regulations-settings">
+                  <tr><td colspan="2" style="text-align:center;">Maddeler yükleniyor...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>

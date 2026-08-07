@@ -297,11 +297,56 @@ aside.sidebar {
   bottom: 0;
   left: 0;
   z-index: 100;
-  transition: background-color 0.3s ease;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
 }
 
 main.main-content {
   margin-left: 220px;
+  width: calc(100% - 220px);
+  max-width: calc(100% - 220px);
+  box-sizing: border-box;
+  overflow-x: hidden;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Collapsed Sidebar Mode */
+aside.sidebar.collapsed {
+  width: 70px !important;
+}
+
+aside.sidebar.collapsed .brand-text,
+aside.sidebar.collapsed .nav-section-title,
+aside.sidebar.collapsed .nav-item button span:not(.nav-icon),
+aside.sidebar.collapsed .user-details,
+aside.sidebar.collapsed #btn-logout {
+  display: none !important;
+}
+
+aside.sidebar.collapsed .brand {
+  justify-content: center;
+  padding: 0.25rem 0 0.75rem;
+}
+
+aside.sidebar.collapsed .nav-item button {
+  justify-content: center;
+  padding: 0.65rem 0;
+}
+
+aside.sidebar.collapsed .nav-item .nav-icon {
+  font-size: 1.3rem;
+  margin-right: 0;
+}
+
+aside.sidebar.collapsed .user-profile-card {
+  padding: 0.5rem 0;
+  justify-content: center;
+}
+
+aside.sidebar.collapsed + main.main-content,
+body.sidebar-collapsed main.main-content {
+  margin-left: 70px !important;
+  width: calc(100% - 70px) !important;
+  max-width: calc(100% - 70px) !important;
 }
 
 .brand {
@@ -679,41 +724,47 @@ header.top-header {
 
 /* Export & Backup Action Buttons */
 .btn-export-excel {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: #fff;
-  border: none;
-  padding: 0.5rem 0.9rem;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 0.38rem 0.75rem;
   border-radius: var(--radius-sm);
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   transition: var(--transition-fast);
 }
 
 .btn-export-excel:hover {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .btn-export-pdf {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: #fff;
-  border: none;
-  padding: 0.5rem 0.9rem;
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  padding: 0.38rem 0.75rem;
   border-radius: var(--radius-sm);
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   transition: var(--transition-fast);
 }
 
 .btn-export-pdf:hover {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
@@ -721,7 +772,8 @@ header.top-header {
 .export-btn-group {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
+  margin-left: auto;
 }
 
 .search-input-box {

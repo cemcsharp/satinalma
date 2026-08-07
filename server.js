@@ -1,24 +1,37 @@
 // ============================================================
 //  Piri Reis Üniversitesi — Satınalma Takip Sunucusu (Node.js)
-//  Linux / Windows uyumlu — Harici bağımlılık gerektirmez
-//  Kullanım: node server.js
+//  Veritabanı: PostgreSQL (REST API)
 // ============================================================
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const pg = require('pg');
+// Parse NUMERIC / DECIMAL database fields as numbers instead of strings
+pg.types.setTypeParser(1700, (val) => (val === null ? null : parseFloat(val)));
+pg.types.setTypeParser(20, (val) => (val === null ? null : parseInt(val, 10)));
+const { Pool } = pg;
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const DB_DIR = path.join(__dirname, 'data');
-const DB_PATH = path.join(DB_DIR, 'db.json');
-const BACKUPS_DIR = path.join(DB_DIR, 'backups');
 
-// Yedek klasörü yoksa oluştur
-if (!fs.existsSync(BACKUPS_DIR)) {
-  fs.mkdirSync(BACKUPS_DIR, { recursive: true });
-}
+// PostgreSQL Bağlantı Havuzu
+const pool = new Pool({
+  user: 'postgres',
+  host: 'localhost',
+  database: 'satinalma_db',
+  password: '123456',
+  port: 5432,
+});
+
+pool.on('connect', (client) => {
+  client.query("SET client_encoding = 'UTF8'");
+});
+
+pool.on('error', (err) => {
+  console.error('Beklenmeyen veritabanı hatası', err);
+});
 
 // MIME Type Eşlemeleri
 const MIME_TYPES = {
@@ -36,43 +49,6 @@ const MIME_TYPES = {
   '.ttf': 'font/ttf',
 };
 
-// Yedek alma fonksiyonu
-function createBackup(reason) {
-  try {
-    if (!fs.existsSync(DB_PATH)) return null;
-    if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
-
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
-    const backupName = `db_${timestamp}.json`;
-    const backupPath = path.join(BACKUPS_DIR, backupName);
-
-    fs.copyFileSync(DB_PATH, backupPath);
-    console.log(`[${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}] 💾 Yedek alındı: ${backupName} (${reason})`);
-
-    // Son 30 yedeği tut, gerisini sil
-    const files = fs.readdirSync(BACKUPS_DIR)
-      .filter(f => f.startsWith('db_') && f.endsWith('.json'))
-      .sort()
-      .reverse();
-
-    if (files.length > 30) {
-      files.slice(30).forEach(f => {
-        fs.unlinkSync(path.join(BACKUPS_DIR, f));
-      });
-    }
-    return backupName;
-  } catch (err) {
-    console.error('Yedek hatası:', err.message);
-    return null;
-  }
-}
-
-// Sunucu başlangıcında yedek al
-createBackup('startup');
-
-// JSON body okuma
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -82,7 +58,6 @@ function readBody(req) {
   });
 }
 
-// TCMB Döviz Kuru Çekme
 function fetchTCMBRates() {
   return new Promise((resolve, reject) => {
     https.get('https://www.tcmb.gov.tr/kurlar/today.xml', (res) => {
@@ -110,7 +85,19 @@ function fetchTCMBRates() {
   });
 }
 
-// HTTP Sunucu
+async function getTableData(tableName) {
+  const res = await pool.query(`SELECT * FROM ${tableName} ORDER BY id ASC`);
+  return res.rows;
+}
+
+function sanitizeVal(val, k) {
+  if (val === undefined || val === null || (typeof val === 'number' && isNaN(val))) return null;
+  if (typeof val === 'string' && val.trim() === '' && ['estimatedAmount', 'budgetAmount', 'actualAmount', 'totalAmount', 'amount', 'guaranteeAmount', 'sequenceNo', '_diffDays', 'exchangeRate'].includes(k)) {
+    return null;
+  }
+  return val;
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const urlPath = url.pathname;
@@ -120,7 +107,6 @@ const server = http.createServer(async (req, res) => {
   const now = new Date();
   console.log(`[${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}] ${method} ${urlPath}`);
 
-  // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -131,22 +117,44 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (urlPath === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   try {
-    // GET /api/data
+    // 1. Initial Load
     if (urlPath === '/api/data' && method === 'GET') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      if (fs.existsSync(DB_PATH)) {
-        const data = fs.readFileSync(DB_PATH, 'utf8');
-        res.writeHead(200);
-        res.end(data);
-      } else {
-        res.writeHead(404);
-        res.end(JSON.stringify({ error: 'DB file not found' }));
-      }
+      
+      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates] = await Promise.all([
+        getTableData('users'),
+        getTableData('requests'),
+        getTableData('contracts'),
+        getTableData('invoices'),
+        getTableData('guarantees'),
+        getTableData('logs'),
+        pool.query('SELECT id, name FROM units ORDER BY name ASC'),
+        pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
+        pool.query('SELECT * FROM rates')
+      ]);
+
+      const ratesObj = {};
+      rates.rows.forEach(r => ratesObj[r.currency] = r.rate);
+
+      const payload = {
+        users, requests, contracts, invoices, guarantees, logs,
+        units: units.rows,
+        regulations: regulations.rows,
+        rates: Object.keys(ratesObj).length > 0 ? ratesObj : { USD: 36.50, EUR: 39.80 }
+      };
+
+      res.writeHead(200);
+      res.end(JSON.stringify(payload));
       return;
     }
 
-    // GET /api/fetch-tcmb-rates
     if (urlPath === '/api/fetch-tcmb-rates' && method === 'GET') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       try {
@@ -160,57 +168,227 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // POST /api/save-db
-    if (urlPath === '/api/save-db' && method === 'POST') {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const body = await readBody(req);
-      if (body && body.trim()) {
-        fs.writeFileSync(DB_PATH, body, 'utf8');
-        res.writeHead(200);
-        res.end(JSON.stringify({ success: true }));
-      } else {
-        res.writeHead(400);
-        res.end(JSON.stringify({ success: false, error: 'Empty body' }));
+    // 2. Generic REST CRUD API
+    const parts = urlPath.split('/').filter(Boolean);
+    if (parts[0] === 'api' && parts.length >= 2 && urlPath !== '/api/data') {
+      const table = parts[1];
+      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs'];
+      
+      if (allowedTables.includes(table)) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        
+        // POST /api/:table
+        if (method === 'POST') {
+          const body = await readBody(req);
+          if (!body) { res.writeHead(400); res.end(JSON.stringify({ error: 'Empty body' })); return; }
+          const data = JSON.parse(body);
+          
+          // Remove frontend-generated ID so Postgres generates it using SERIAL
+          delete data.id;
+
+          const keys = Object.keys(data);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(data[k], k));
+
+          const query = `INSERT INTO ${table} (${cols}) VALUES (${placeholders}) RETURNING *`;
+          const result = await pool.query(query, values);
+          
+          res.writeHead(201);
+          res.end(JSON.stringify(result.rows[0]));
+          return;
+        }
+        
+        // PUT /api/:table/:id
+        if (method === 'PUT' && parts[2]) {
+          const id = parseInt(parts[2], 10);
+          const body = await readBody(req);
+          if (!body) { res.writeHead(400); res.end(JSON.stringify({ error: 'Empty body' })); return; }
+          const data = JSON.parse(body);
+          delete data.id; // never update id
+          
+          const keys = Object.keys(data);
+          const updates = keys.map((k, i) => `"${k}" = $${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(data[k], k));
+          values.push(id);
+
+          const query = `UPDATE ${table} SET ${updates} WHERE id = $${values.length} RETURNING *`;
+          const result = await pool.query(query, values);
+          
+          if (result.rowCount === 0) {
+            res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' }));
+          } else {
+            res.writeHead(200); res.end(JSON.stringify(result.rows[0]));
+          }
+          return;
+        }
+
+        // DELETE /api/:table/:id
+        if (method === 'DELETE' && parts[2]) {
+          const id = parseInt(parts[2], 10);
+          const result = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
+          if (result.rowCount === 0) {
+            res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' }));
+          } else {
+            res.writeHead(200); res.end(JSON.stringify({ success: true }));
+          }
+          return;
+        }
       }
+      
+      // Rates Table Endpoint
+      if (table === 'settings' && method === 'POST') {
+        const body = await readBody(req);
+        if (body) {
+           const data = JSON.parse(body);
+           const client = await pool.connect();
+           try {
+             await client.query('BEGIN');
+             await client.query('TRUNCATE rates');
+             if (data.rates && data.rates.USD) await client.query('INSERT INTO rates ("currency", "rate") VALUES ($1, $2)', ['USD', data.rates.USD]);
+             if (data.rates && data.rates.EUR) await client.query('INSERT INTO rates ("currency", "rate") VALUES ($1, $2)', ['EUR', data.rates.EUR]);
+             await client.query('COMMIT');
+             res.writeHead(200);
+             res.end(JSON.stringify({ success: true }));
+           } catch (e) {
+             await client.query('ROLLBACK');
+             throw e;
+           } finally {
+             client.release();
+           }
+        }
+        return;
+      }
+    }
+
+    // Self-Update Endpoint (Executes update.sh or git pull)
+    if (urlPath === '/api/update-system' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const { exec } = require('child_process');
+      exec('git pull && pm2 reload satinalma', (err, stdout, stderr) => {
+        if (err) {
+          // If git is not used or error occurs, log it cleanly
+          console.error('Güncelleme hatası:', err.message);
+          res.writeHead(500);
+          res.end(JSON.stringify({ success: false, error: err.message }));
+        } else {
+          console.log('Sistem güncellendi:', stdout);
+          res.writeHead(200);
+          res.end(JSON.stringify({ success: true, output: stdout }));
+        }
+      });
       return;
     }
 
-    // GET /api/backups
+    // Backup & Import Endpoints
+    const BACKUP_DIR = path.join(__dirname, 'backups');
+    if (!fs.existsSync(BACKUP_DIR)) {
+      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    }
+
     if (urlPath === '/api/backups' && method === 'GET') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const list = [];
-      if (fs.existsSync(BACKUPS_DIR)) {
-        const files = fs.readdirSync(BACKUPS_DIR)
-          .filter(f => f.startsWith('db_') && f.endsWith('.json'))
-          .sort()
-          .reverse();
-
-        files.forEach(f => {
-          const stat = fs.statSync(path.join(BACKUPS_DIR, f));
-          const d = stat.birthtime || stat.ctime;
-          const pad2 = (n) => String(n).padStart(2, '0');
-          list.push({
-            filename: f,
-            sizeKB: Math.round(stat.size / 1024 * 10) / 10,
-            created: `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
-          });
-        });
-      }
+      const files = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json') || f.endsWith('.sql'));
+      const backupList = files.map(f => {
+        const stat = fs.statSync(path.join(BACKUP_DIR, f));
+        const sizeKB = (stat.size / 1024).toFixed(1) + ' KB';
+        const d = new Date(stat.mtime);
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateStr = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        return { filename: f, createdAt: dateStr, size: sizeKB, mtime: stat.mtime };
+      });
+      backupList.sort((a, b) => b.mtime - a.mtime);
       res.writeHead(200);
-      res.end(JSON.stringify(list));
+      res.end(JSON.stringify(backupList));
       return;
     }
 
-    // POST /api/backup-now
-    if (urlPath === '/api/backup-now' && method === 'POST') {
+    if (urlPath === '/api/backups/create' && method === 'POST') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const bName = createBackup('manual');
-      if (bName) {
+      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates] = await Promise.all([
+        getTableData('users'),
+        getTableData('requests'),
+        getTableData('contracts'),
+        getTableData('invoices'),
+        getTableData('guarantees'),
+        getTableData('logs'),
+        pool.query('SELECT id, name FROM units ORDER BY id ASC'),
+        pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
+        pool.query('SELECT * FROM rates')
+      ]);
+
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+      const filename = `backup_satinalma_${dateStr}.json`;
+      const backupPath = path.join(BACKUP_DIR, filename);
+
+      const backupData = {
+        timestamp: now.toISOString(),
+        users, requests, contracts, invoices, guarantees, logs,
+        units: units.rows,
+        regulations: regulations.rows,
+        rates: rates.rows
+      };
+
+      fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2), 'utf8');
+      const stat = fs.statSync(backupPath);
+      const sizeKB = (stat.size / 1024).toFixed(1) + ' KB';
+
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, filename, size: sizeKB }));
+      return;
+    }
+
+    if (urlPath.startsWith('/api/backups/download/') && method === 'GET') {
+      const filename = path.basename(urlPath.replace('/api/backups/download/', ''));
+      const filePath = path.join(BACKUP_DIR, filename);
+      if (fs.existsSync(filePath)) {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.writeHead(200);
-        res.end(JSON.stringify({ success: true, filename: bName }));
+        res.end(fs.readFileSync(filePath));
       } else {
+        res.writeHead(404);
+        res.end('File not found');
+      }
+      return;
+    }
+
+    if (urlPath === '/api/import-excel-requests' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const body = await readBody(req);
+      const items = JSON.parse(body || '[]');
+      if (!Array.isArray(items) || items.length === 0) {
+        res.writeHead(400); res.end(JSON.stringify({ error: 'No items provided' }));
+        return;
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        let addedCount = 0;
+        for (const item of items) {
+          delete item.id; // allow PostgreSQL SERIAL auto-increment
+          const keys = Object.keys(item);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(item[k], k));
+
+          const query = `INSERT INTO requests (${cols}) VALUES (${placeholders})`;
+          await client.query(query, values);
+          addedCount++;
+        }
+        await client.query('COMMIT');
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true, addedCount }));
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Import excel error:', err);
         res.writeHead(500);
-        res.end(JSON.stringify({ success: false, error: 'Yedek alınamadı.' }));
+        res.end(JSON.stringify({ error: err.message }));
+      } finally {
+        client.release();
       }
       return;
     }
@@ -246,7 +424,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('==========================================================');
-  console.log(' 🚀 SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (Node.js)');
+  console.log(' 🚀 SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (REST API Modu)');
   console.log(` 🌐 Erişim: http://localhost:${PORT}/`);
   console.log('==========================================================');
 });
