@@ -1098,6 +1098,7 @@ const App = {
       contracts: { title: 'Sözleşme Takip', sub: 'Sözleşme süreleri, teminat mektupları ve yaklaşan bitiş uyarıları' },
       guarantees: { title: 'Teminat Mektupları', sub: 'İhale ve iş bazlı banka teminat mektupları, kasa saklama ve vade takibi' },
       invoices: { title: 'Fatura & Muhasebe', sub: 'Vadesi gelen faturalar ve haftalık nakit akış ödeme listesi' },
+      tenders: { title: 'İhale Planlayıcısı & Süreç Yönetimi', sub: 'İhale tarihleri, aşamaları, birim talepleri ve kazanan yüklenici takibi' },
       'unit-analysis': { title: 'Birim Analizi', sub: 'Üniversite birimlerinin talep ve harcama detayları' },
       'supplier-analysis': { title: 'Tedarikçi Analizi', sub: 'En yüksek harcama yapılan tedarikçilerin sıralaması' },
       'yearly-report': { title: 'Yıllık Rapor', sub: 'Yıllık satınalma faaliyet raporu, YoY metrikleri ve SLA hız analizleri' },
