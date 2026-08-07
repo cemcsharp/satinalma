@@ -392,13 +392,13 @@ body.sidebar-collapsed main.main-content {
 }
 
 .nav-section-title {
-  font-size: 0.58rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--accent-primary);
   text-transform: uppercase;
-  margin: 0.55rem 0 0.15rem 0.4rem;
-  opacity: 0.85;
+  margin: 0.85rem 0 0.25rem 0.4rem;
+  opacity: 0.9;
 }
 
 .nav-section-title:first-child {
