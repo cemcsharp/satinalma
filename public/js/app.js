@@ -963,7 +963,61 @@ const App = {
     }
   },
 
+  resetPageFilters() {
+    // 1. Requests Management Filters
+    if (document.getElementById('filter-search')) document.getElementById('filter-search').value = '';
+    if (document.getElementById('filter-status')) document.getElementById('filter-status').value = 'ALL';
+    if (document.getElementById('filter-unit')) document.getElementById('filter-unit').value = 'ALL';
+    if (document.getElementById('filter-person')) document.getElementById('filter-person').value = 'ALL';
+    if (document.getElementById('filter-priority')) document.getElementById('filter-priority').value = 'ALL';
+    if (document.getElementById('filter-sort')) document.getElementById('filter-sort').value = 'DATE_DESC';
+    this.state.currentPage = 1;
+
+    // 2. Workload & Delegation Filters
+    if (document.getElementById('filter-delegation-search')) document.getElementById('filter-delegation-search').value = '';
+    if (document.getElementById('delegate-from-person')) document.getElementById('delegate-from-person').value = 'ALL';
+    if (document.getElementById('filter-delegation-unit')) document.getElementById('filter-delegation-unit').value = 'ALL';
+    if (document.getElementById('filter-delegation-priority')) document.getElementById('filter-delegation-priority').value = 'ALL';
+
+    // 3. My Requests Filters
+    if (document.getElementById('filter-my-search')) document.getElementById('filter-my-search').value = '';
+    if (document.getElementById('filter-my-status')) document.getElementById('filter-my-status').value = 'ALL';
+    if (document.getElementById('filter-my-unit')) document.getElementById('filter-my-unit').value = 'ALL';
+    if (document.getElementById('filter-my-priority')) document.getElementById('filter-my-priority').value = 'ALL';
+    if (document.getElementById('filter-my-sort')) document.getElementById('filter-my-sort').value = 'DATE_DESC';
+
+    // 4. Contracts Filters
+    if (document.getElementById('filter-contract-search')) document.getElementById('filter-contract-search').value = '';
+    if (document.getElementById('filter-contract-status')) document.getElementById('filter-contract-status').value = 'ALL';
+    if (document.getElementById('filter-contract-unit')) document.getElementById('filter-contract-unit').value = 'ALL';
+
+    // 5. Guarantees Filters
+    if (document.getElementById('filter-guarantee-search')) document.getElementById('filter-guarantee-search').value = '';
+    if (document.getElementById('filter-guarantee-status')) document.getElementById('filter-guarantee-status').value = 'ALL';
+    if (document.getElementById('filter-guarantee-type')) document.getElementById('filter-guarantee-type').value = 'ALL';
+
+    // 6. Invoices Filters
+    if (document.getElementById('filter-invoice-search')) document.getElementById('filter-invoice-search').value = '';
+    if (document.getElementById('filter-invoice-status')) document.getElementById('filter-invoice-status').value = 'ALL';
+    if (document.getElementById('filter-invoice-unit')) document.getElementById('filter-invoice-unit').value = 'ALL';
+
+    // 7. Unit Analysis Filters
+    if (document.getElementById('filter-unit-search')) document.getElementById('filter-unit-search').value = '';
+    if (document.getElementById('select-unit-analysis')) document.getElementById('select-unit-analysis').value = 'ALL';
+
+    // 8. Supplier Analysis Filters
+    if (document.getElementById('filter-supplier-search')) document.getElementById('filter-supplier-search').value = '';
+    if (document.getElementById('filter-supplier-unit')) document.getElementById('filter-supplier-unit').value = 'ALL';
+
+    // 9. Activity Logs Filters
+    if (document.getElementById('filter-logs-search')) document.getElementById('filter-logs-search').value = '';
+    if (document.getElementById('filter-logs-user')) document.getElementById('filter-logs-user').value = 'ALL';
+  },
+
   switchView(viewName) {
+    if (this.state.currentView && this.state.currentView !== viewName) {
+      this.resetPageFilters();
+    }
     this.state.currentView = viewName;
     localStorage.setItem('activeView', viewName);
     
