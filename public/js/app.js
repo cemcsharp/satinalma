@@ -78,7 +78,10 @@ const App = {
       const res = await fetch('/api/data');
       if (res.ok) {
         const data = await res.json();
-        this.state.requests = data.requests || [];
+        this.state.requests = (data.requests || []).map(r => ({
+          ...r,
+          academicYear: r.academicYear || this.getAcademicYear(r.arrivalDate || r.requestDate)
+        }));
         this.state.users = data.users || [];
         this.state.units = data.units || [];
         this.state.regulations = data.regulations || [];
@@ -1003,9 +1006,28 @@ const App = {
     this.render();
   },
 
+  getAcademicYear(dateStr) {
+    if (!dateStr) return '2025-2026';
+    let y = 2026, m = 2;
+    const str = dateStr.toString().trim();
+    if (str.includes('-')) {
+      const parts = str.split('-');
+      y = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10) - 1;
+    } else if (str.includes('.')) {
+      const parts = str.split('.');
+      if (parts[2] && parts[2].length === 4) y = parseInt(parts[2], 10);
+      m = parseInt(parts[1], 10) - 1;
+    }
+    if (isNaN(y) || isNaN(m)) return '2025-2026';
+    if (m >= 8) return `${y}-${y + 1}`;
+    return `${y - 1}-${y}`;
+  },
+
   getFilteredRequests() {
     return this.state.requests.filter(r => {
-      if (this.state.selectedYear !== 'ALL' && r.academicYear !== this.state.selectedYear) {
+      const acadYear = r.academicYear || this.getAcademicYear(r.arrivalDate || r.requestDate);
+      if (this.state.selectedYear !== 'ALL' && acadYear !== this.state.selectedYear) {
         return false;
       }
       return true;
