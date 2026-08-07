@@ -1,8 +1,8 @@
-# 🏛️ Bilgi İşlem (IT) Hızlı Sunucu Kurulum Rehberi
+# 🏛️ Bilgi İşlem (IT) Hızlı Sunucu Kurulum & İşletim Rehberi
 
-**Piri Reis Üniversitesi — Satınalma Takip Uygulaması**
+**Piri Reis Üniversitesi — Satınalma Takip Sistemi**
 
-Bu rehber Bilgi İşlem (Sistem Yöneticisi) arkadaşlarımızın **Ubuntu / Debian** sunucularda tek komutla kurulum yapabilmesi için hazırlanmıştır.
+Bu rehber Bilgi İşlem (Sistem Yöneticisi) ekibimizin **Ubuntu / Debian** Linux sunucularda tek komutla eksiksiz ve hatasız kurulum yapabilmesi için hazırlanmıştır.
 
 ---
 
@@ -14,30 +14,49 @@ Sunucuya SSH ile bağlandıktan sonra proje klasöründe şu komutu çalıştır
 sudo bash install.sh
 ```
 
-### ⚡ Bu Komut Neler Yapar?
-1. **Node.js, PostgreSQL ve Nginx** servislerini sisteme otomatik yükler.
-2. `satinalma_db` veritabanını ve yetkilerini otomatik yapılandırır.
-3. Uygulamayı arka planda **PM2** süreç yöneticisi ile 7/24 çalışacak şekilde başlatır.
-4. **Nginx Reverse Proxy** (Port 80 ➔ 3000) yönlendirmesini otomatik aktif eder.
+### ⚡ Bu Otomatik Kurulum Betiği (`install.sh`) Neler Yapar?
+
+1. **Sistem Paket Güncellemesi:** `apt update && apt upgrade` çalıştırarak sunucuyu günceller.
+2. **Node.js 20 LTS:** En güncel uzun süreli desteklenen Node.js sürümünü sunucuya yükler.
+3. **PostgreSQL Veritabanı Yapılandırması:** 
+   - `satinalma_db` veritabanını varsayılan **UTF-8 Türkçe (tr_TR.UTF-8)** karakter kodlamasıyla oluşturur.
+   - `postgres` kullanıcısı şifresini ve izinlerini tanımlar.
+4. **Bağımlılıklar:** `npm install --production` ile gerekli Node paketlerini kurar.
+5. **7/24 PM2 Çalışma Garantisi:** Uygulamayı arka planda **PM2** süreç yöneticisi ile başlatır ve sunucu reboot (yeniden başlama) olsa dahi otomatik açılacak şekilde `systemd` servisine bağlar.
+6. **Nginx Reverse Proxy & Güvenlik:** 
+   - Nginx sunucusunu kurar ve Port 80 gelen istekleri Port 3000 Node.js uygulamasına yönlendirir.
+   - Büyük dosya/Excel aktarımları için `client_max_body_size 50M` ve zaman aşımı ayarlarını yapılandırır.
 
 ---
 
-## 🔧 IT Sistem Yöneticisi Özeti
+## 🔧 IT Sistem Yöneticisi Teknik Özeti
 
-- **Uygulama Portu:** Node.js varsayılan olarak `3000` portunda çalışır.
-- **Nginx Yönlendirmesi:** `http://sunucu-ip/` adresi doğrudan Port 3000'e yönlendirilir.
+- **Uygulama Portu:** Node.js varsayılan olarak internal `3000` portunda dinler.
+- **Nginx Yönlendirmesi:** `http://<SUNUCU_IP>/` adresi doğrudan Port 3000'e yönlendirilir.
 - **Veritabanı:** PostgreSQL `satinalma_db` (Kullanıcı: `postgres`, Şifre: `123456`, Port: `5432`).
-- **Domain Tanımlama:** Nginx dosyasından (`/etc/nginx/sites-available/satinalma`) `server_name` kısmına üniversite domain adı (ör: `satinalma.pirireis.edu.tr`) yazılabilir.
+- **Domain Tanımlama:** Nginx ayar dosyasından (`/etc/nginx/sites-available/satinalma`) `server_name _` kısmını üniversite domain adı (ör: `satinalma.pirireis.edu.tr`) ile değiştirebilirsiniz.
+
+---
+
+## 🔄 GÜNCELLEME ALMA (UPDATE)
+
+Yazılımda yeni bir güncelleme veya özellik yayınlandığında sunucuda sadece şu komutu çalıştırmanız yeterlidir:
+
+```bash
+bash update.sh
+```
+
+Bu komut GitHub'dan son kodları çeker, gerekiyorsa bağımlılıkları günceller ve uygulamayı kesintisiz (zero-downtime) yeniden başlatır.
 
 ---
 
 ## 🛠️ Hızlı Yönetim Komutları
 
 ```bash
-# Uygulama Durumu
+# Uygulama Çalışma Durumu
 pm2 status
 
-# Canlı Log Takibi
+# Canlı Konsol Log Takibi
 pm2 logs satinalma
 
 # Yeniden Başlatma
@@ -45,4 +64,15 @@ pm2 restart satinalma
 
 # Nginx Yeniden Başlatma
 sudo systemctl restart nginx
+
+# PostgreSQL Servis Durumu
+sudo systemctl status postgresql
 ```
+
+---
+
+## 👤 İlk Giriş Varsayılan Kullanıcı Bilgileri
+
+- **Ad Soyad:** Merih AVCI (Satınalma Müdürü - Admin)
+- **Varsayılan Şifre:** `123456`
+*(İlk girişten sonra sağ üst kullanıcı panelinden veya Ayarlar sekmesinden şifre değiştirilebilir).*

@@ -1,19 +1,32 @@
 #!/bin/bash
+# ============================================================
+#  Piri Reis Üniversitesi — Satınalma Takip Sistemi
+#  Güncelleme Betiği (GitHub → Sunucu)
+# ============================================================
 
-# ==============================================================================
-# Piri Reis Üniversitesi Satınalma Takip Sistemi - Otomatik Güncelleme Betiği
-# ==============================================================================
+set -e
 
 echo "=========================================================="
-echo " 🔄 Güncelleme başlatılıyor..."
+echo " 🔄 Satınalma Takip Sistemi Güncelleniyor..."
 echo "=========================================================="
 
-# Git deposundan son güncellemeleri çek
+# 1. GitHub'dan son değişiklikleri çek
+echo ""
+echo "📥 [1/3] GitHub'dan güncellemeler çekiliyor..."
 git pull origin main || git pull
 
-# PM2 servisini kesintisiz yeniden başlat
-pm2 reload satinalma || pm2 restart satinalma || pm2 restart server
+# 2. Yeni npm bağımlılığı eklenmiş olabilir
+echo ""
+echo "📦 [2/3] Bağımlılıklar kontrol ediliyor..."
+npm install --production
 
+# 3. PM2 servisini kesintisiz yeniden başlat
+echo ""
+echo "⚡ [3/3] Uygulama yeniden başlatılıyor..."
+pm2 reload satinalma || pm2 restart satinalma
+
+echo ""
 echo "=========================================================="
 echo " ✅ Uygulama başarıyla son sürüme güncellendi!"
+echo " 🌐 Erişim: http://$(hostname -I | awk '{print $1}')/"
 echo "=========================================================="
