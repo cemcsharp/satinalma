@@ -157,6 +157,84 @@ const App = {
     }
   },
 
+  getAcademicYear(dateStr) {
+    return this.getAcademicYearFromDate(dateStr);
+  },
+
+  parseMoney(val) {
+    if (val === null || val === undefined || val === '') return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    let s = String(val).trim();
+    if (!s) return 0;
+    // Remove currency symbols, extra spaces
+    s = s.replace(/[₺$€\s]/g, '');
+    if (s.includes('.') && s.includes(',')) {
+      const lastDot = s.lastIndexOf('.');
+      const lastComma = s.lastIndexOf(',');
+      if (lastComma > lastDot) {
+        // Turkish/European standard: 3.340,50 -> 3340.50
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        // US standard: 3,340.50 -> 3340.50
+        s = s.replace(/,/g, '');
+      }
+    } else if (s.includes(',')) {
+      s = s.replace(',', '.');
+    }
+    s = s.replace(/[^0-9.-]/g, '');
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : num;
+  },
+
+  formatMoney(amount, currency = 'TRY', decimals = 2) {
+    const num = typeof amount === 'number' ? (isNaN(amount) ? 0 : amount) : this.parseMoney(amount);
+    const curr = currency || 'TRY';
+    const symbolMap = { 'TRY': '₺', 'USD': '$', 'EUR': '€' };
+    const sym = symbolMap[curr] || curr;
+    return `${num.toLocaleString('tr-TR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}\u00A0${sym}`;
+  },
+
+  onAmountInput(inputEl, currencySelectOrCode = 'TRY', isActual = false) {
+    if (!inputEl) return;
+    const previewId = inputEl.id + '-preview';
+    let previewEl = document.getElementById(previewId);
+    if (!previewEl) {
+      previewEl = inputEl.parentElement?.querySelector('.amount-live-preview');
+    }
+    if (!previewEl) return;
+
+    const rawVal = inputEl.value?.trim();
+    if (!rawVal) {
+      previewEl.innerText = '';
+      previewEl.classList.remove('has-value');
+      return;
+    }
+
+    let currCode = 'TRY';
+    if (currencySelectOrCode) {
+      const selectEl = document.getElementById(currencySelectOrCode);
+      if (selectEl) {
+        currCode = selectEl.value || 'TRY';
+      } else {
+        currCode = currencySelectOrCode;
+      }
+    }
+
+    const num = this.parseMoney(rawVal);
+    const formatted = this.formatMoney(num, currCode, 2);
+    previewEl.innerHTML = `💵 <strong>${formatted}</strong>`;
+    previewEl.classList.add('has-value');
+  },
+
+  onCurrencyChange(currencySelectId, inputIds = []) {
+    inputIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.value) {
+        this.onAmountInput(el, currencySelectId);
+      }
+    });
+  },
+
   populateYearSelect() {
     // Akademik yılı Ağustos 1 başlangıç - Temmuz 31 bitiş olarak hesapla
     // Bugünün tarihine ve verilerdeki tüm yıllara göre selector'ü otomatik doldur
@@ -1616,12 +1694,12 @@ const App = {
     document.getElementById('kpi-completed-demands').innerText = completedCount;
     document.getElementById('kpi-completed-rate').innerText = `%${completedRate} Tamamlanma`;
     document.getElementById('kpi-open-demands').innerText = openCount;
-    document.getElementById('kpi-total-spend').innerText = `${totalSpend.toLocaleString('tr-TR')} ₺`;
+    document.getElementById('kpi-total-spend').innerText = this.formatMoney(totalSpend, 'TRY', 2);
 
     const elSavingsTotal = document.getElementById('kpi-savings-total');
     const elSavingsRate = document.getElementById('kpi-savings-rate');
 
-    if (elSavingsTotal) elSavingsTotal.innerText = `${totalSavings.toLocaleString('tr-TR')} ₺`;
+    if (elSavingsTotal) elSavingsTotal.innerText = this.formatMoney(totalSavings, 'TRY', 2);
     if (elSavingsRate) elSavingsRate.innerText = `%${savingsRate} Bütçe Kazancı`;
 
     this.renderDashboardCharts(requests);
@@ -1829,12 +1907,31 @@ const App = {
     }
   },
 
+  parseDateValue(str) {
+    if (!str) return 0;
+    if (str instanceof Date) return isNaN(str.getTime()) ? 0 : str.getTime();
+    const s = String(str).trim();
+    if (s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length === 3) {
+        let yr = parseInt(parts[2], 10);
+        if (yr > 2099 && String(yr).startsWith('2021')) yr = 2026;
+        const mo = parseInt(parts[1], 10) - 1;
+        const dy = parseInt(parts[0], 10);
+        const dt = new Date(yr, mo, dy);
+        return isNaN(dt.getTime()) ? 0 : dt.getTime();
+      }
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  },
+
   sortRequestsList(list, sortKey) {
     const priorityWeight = { 'Kritik': 4, 'Yüksek': 3, 'Orta': 2, 'Düşük': 1 };
     return list.sort((a, b) => {
       if (sortKey === 'DATE_ASC') {
-        const dtA = new Date(a.arrivalDate || a.requestDate || 0);
-        const dtB = new Date(b.arrivalDate || b.requestDate || 0);
+        const dtA = this.parseDateValue(a.arrivalDate || a.requestDate);
+        const dtB = this.parseDateValue(b.arrivalDate || b.requestDate);
         return dtA - dtB;
       }
       if (sortKey === 'AMOUNT_DESC') {
@@ -1856,8 +1953,8 @@ const App = {
         return (b._diffDays || 0) - (a._diffDays || 0);
       }
       // DATE_DESC (default)
-      const dtA = new Date(a.arrivalDate || a.requestDate || 0);
-      const dtB = new Date(b.arrivalDate || b.requestDate || 0);
+      const dtA = this.parseDateValue(a.arrivalDate || a.requestDate);
+      const dtB = this.parseDateValue(b.arrivalDate || b.requestDate);
       return dtB - dtA;
     });
   },
@@ -1956,17 +2053,17 @@ const App = {
         <td><input type="checkbox" class="chk-select-request" data-id="${r.id}" onchange="App._onRowCheckboxChange()"></td>
         <td>${r.sequenceNo || startIdx + i + 1}</td>
         <td class="sticky-col-left"><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
-        <td style="font-weight:600; max-width: 250px;">
+        <td style="font-weight:600; min-width: 220px; max-width: 320px;">
           <div>${r.subject}</div>
           <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">${r.description ? r.description.substring(0, 45) + '...' : ''}</div>
         </td>
-        <td style="font-size:0.8rem;">${r.unit}</td>
-        <td><span style="font-weight:600;">${r.assignedTo}</span></td>
-        <td style="font-size:0.8rem; color:var(--text-muted);">${r.arrivalDate || r.requestDate}</td>
-        <td><span class="badge priority-${r.priority?.toLowerCase() || 'orta'}">${r.priority || 'Orta'}</span></td>
-        <td>${this.getStatusBadge(r)}</td>
-        <td style="font-weight:700; font-family:var(--font-mono);">${r.actualAmount > 0 ? r.actualAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-        <td class="sticky-col-right">
+        <td style="font-size:0.8rem; min-width: 140px;">${r.unit}</td>
+        <td style="white-space:nowrap;"><span style="font-weight:600;">${r.assignedTo}</span></td>
+        <td style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">${r.arrivalDate || r.requestDate}</td>
+        <td style="white-space:nowrap;"><span class="badge priority-${r.priority?.toLowerCase() || 'orta'}">${r.priority || 'Orta'}</span></td>
+        <td style="white-space:nowrap;">${this.getStatusBadge(r)}</td>
+        <td style="font-weight:700; font-family:var(--font-mono); white-space:nowrap; text-align:right;">${r.actualAmount > 0 ? this.formatMoney(r.actualAmount, r.currency || 'TRY', 2) : '-'}</td>
+        <td class="sticky-col-right" style="white-space:nowrap;">
           <div class="action-btns">
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-icon" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>
@@ -2088,10 +2185,10 @@ const App = {
             <td style="font-size:0.82rem; color:var(--text-muted);">${p.user.title}</td>
             <td><span class="badge" style="background:var(--bg-card);">${p.total} İş</span></td>
             <td><span class="badge status-open">${p.savingsCount} Pazarlıklı İş</span></td>
-            <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.initialTotal > 0 ? p.initialTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-            <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.actualTotal > 0 ? p.actualTotal.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+            <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.initialTotal > 0 ? this.formatMoney(p.initialTotal, 'TRY', 2) : '-'}</td>
+            <td style="font-family:var(--font-mono); font-size:0.88rem;">${p.actualTotal > 0 ? this.formatMoney(p.actualTotal, 'TRY', 2) : '-'}</td>
             <td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.95rem;">
-              ${p.savings > 0 ? '+' + p.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
+              ${p.savings > 0 ? '+' + this.formatMoney(p.savings, 'TRY', 2) : '0,00 ₺'}
             </td>
             <td>
               <span class="badge" style="background:${p.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${p.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
@@ -2258,16 +2355,16 @@ const App = {
 
     tbody.innerHTML = requests.map(r => `
       <tr>
-        <td><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
-        <td style="font-weight:600; max-width: 240px;">${r.subject}</td>
-        <td>${r.unit}</td>
-        <td>${r.arrivalDate || r.requestDate}</td>
-        <td>${this.getStatusBadge(r)}</td>
-        <td style="font-family:var(--font-mono);">${r.orderBarcode || '-'}</td>
-        <td>${r.orderDate || '-'}</td>
-        <td>${r.supplier || '-'}</td>
-        <td style="font-weight:700;">${r.actualAmount > 0 ? r.actualAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
-        <td>
+        <td style="white-space:nowrap;"><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
+        <td style="font-weight:600; min-width: 220px; max-width: 340px;">${r.subject}</td>
+        <td style="font-size:0.82rem; min-width: 140px;">${r.unit}</td>
+        <td style="font-size:0.82rem; white-space:nowrap;">${r.arrivalDate || r.requestDate}</td>
+        <td style="white-space:nowrap;">${this.getStatusBadge(r)}</td>
+        <td style="font-family:var(--font-mono); white-space:nowrap;">${r.orderBarcode || '-'}</td>
+        <td style="font-size:0.82rem; white-space:nowrap;">${r.orderDate || '-'}</td>
+        <td style="font-size:0.82rem; min-width: 120px;">${r.supplier || '-'}</td>
+        <td style="font-weight:700; font-family:var(--font-mono); white-space:nowrap; text-align:right;">${r.actualAmount > 0 ? this.formatMoney(r.actualAmount, r.currency || 'TRY', 2) : '-'}</td>
+        <td style="white-space:nowrap;">
           <div class="action-btns">
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" onclick="App.openEditModal('${r.id}')">Sipariş Gir / Güncelle</button>
@@ -2363,9 +2460,9 @@ const App = {
     }).length;
 
     document.getElementById('contract-kpi-total').innerText = activeContracts.length;
-    document.getElementById('contract-kpi-amount').innerText = `${totalAmount.toLocaleString('tr-TR')} ₺`;
+    document.getElementById('contract-kpi-amount').innerText = this.formatMoney(totalAmount, 'TRY', 2);
     document.getElementById('contract-kpi-expiring').innerText = expiringCount;
-    document.getElementById('contract-kpi-guarantee').innerText = `${totalGuarantee.toLocaleString('tr-TR')} ₺`;
+    document.getElementById('contract-kpi-guarantee').innerText = this.formatMoney(totalGuarantee, 'TRY', 2);
 
     const tbody = document.querySelector('#table-contracts tbody');
     if (!tbody) return;
@@ -2393,10 +2490,10 @@ const App = {
           <td style="font-weight:600; max-width:260px;">${c.title}</td>
           <td style="font-weight:600;">${c.supplier}</td>
           <td style="font-size:0.8rem;">${c.unit}</td>
-          <td style="font-weight:700; font-family:var(--font-mono);">${(c.totalAmount || 0).toLocaleString('tr-TR')} ${c.currency || 'TRY'}</td>
+          <td style="font-weight:700; font-family:var(--font-mono);">${this.formatMoney(c.totalAmount || 0, c.currency || 'TRY', 2)}</td>
           <td style="font-size:0.8rem; color:var(--text-muted);">${c.startDate} / ${c.endDate}</td>
           <td>${timeBadge}</td>
-          <td style="font-weight:600; font-family:var(--font-mono);">${c.guaranteeAmount ? (c.guaranteeAmount).toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+          <td style="font-weight:600; font-family:var(--font-mono);">${c.guaranteeAmount ? this.formatMoney(c.guaranteeAmount, 'TRY', 2) : '-'}</td>
           <td><span class="badge status-${c.status === 'Aktif' ? 'completed' : 'rejected'}">${c.status}</span></td>
           <td>
             <div class="action-btns">
@@ -2422,9 +2519,19 @@ const App = {
       document.getElementById('cm-assigned-to').value = c.assignedTo;
       document.getElementById('cm-start-date').value = c.startDate;
       document.getElementById('cm-end-date').value = c.endDate;
-      document.getElementById('cm-amount').value = c.totalAmount;
       document.getElementById('cm-currency').value = c.currency || 'TRY';
-      document.getElementById('cm-guarantee-amount').value = c.guaranteeAmount || '';
+      
+      const amtInput = document.getElementById('cm-amount');
+      if (amtInput) {
+        amtInput.value = c.totalAmount ? c.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        this.onAmountInput(amtInput, 'cm-currency', true);
+      }
+      const gAmtInput = document.getElementById('cm-guarantee-amount');
+      if (gAmtInput) {
+        gAmtInput.value = c.guaranteeAmount ? c.guaranteeAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        this.onAmountInput(gAmtInput, 'cm-currency');
+      }
+
       document.getElementById('cm-guarantee-expiry').value = c.guaranteeExpiry || '';
       document.getElementById('cm-status').value = c.status || 'Aktif';
       document.getElementById('cm-notes').value = c.notes || '';
@@ -2432,6 +2539,8 @@ const App = {
     } else {
       document.getElementById('cm-id').value = '';
       document.getElementById('form-contract-manage').reset();
+      this.onAmountInput(document.getElementById('cm-amount'), 'cm-currency', true);
+      this.onAmountInput(document.getElementById('cm-guarantee-amount'), 'cm-currency');
       document.getElementById('contract-modal-title').innerText = '➕ Yeni Sözleşme Oluştur';
     }
     this.openModal('modal-contract-form');
@@ -2447,9 +2556,9 @@ const App = {
     const assignedTo = document.getElementById('cm-assigned-to').value;
     const startDate = document.getElementById('cm-start-date').value;
     const endDate = document.getElementById('cm-end-date').value;
-    const totalAmount = parseFloat(document.getElementById('cm-amount').value) || 0;
+    const totalAmount = this.parseMoney(document.getElementById('cm-amount')?.value);
     const currency = document.getElementById('cm-currency').value;
-    const guaranteeAmount = parseFloat(document.getElementById('cm-guarantee-amount').value) || 0;
+    const guaranteeAmount = this.parseMoney(document.getElementById('cm-guarantee-amount')?.value);
     const guaranteeExpiry = document.getElementById('cm-guarantee-expiry').value;
     const status = document.getElementById('cm-status').value;
     const notes = document.getElementById('cm-notes').value.trim();
@@ -2511,14 +2620,6 @@ const App = {
     if (curr === 'TRY') return amount;
     const rate = itemExchangeRate || (this.state.rates && this.state.rates[curr]) || 1;
     return amount * rate;
-  },
-
-  formatMoney(amount, currency = 'TRY') {
-    const num = parseFloat(amount) || 0;
-    const curr = currency || 'TRY';
-    const symbolMap = { 'TRY': '₺', 'USD': '$', 'EUR': '€' };
-    const sym = symbolMap[curr] || curr;
-    return `${num.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${sym}`;
   },
 
   async deleteRequest(requestId) {
@@ -2991,7 +3092,7 @@ const App = {
     const elExp = document.getElementById('guarantee-kpi-expiring-count');
     const elRet = document.getElementById('guarantee-kpi-returned-count');
 
-    if (elVol) elVol.innerText = `${totalVolume.toLocaleString('tr-TR')} ₺`;
+    if (elVol) elVol.innerText = this.formatMoney(totalVolume, 'TRY', 2);
     if (elAct) elAct.innerText = activeCount;
     if (elExp) elExp.innerText = expiringCount;
     if (elRet) elRet.innerText = returnedCount;
@@ -3061,7 +3162,7 @@ const App = {
           <td><span class="badge priority-orta" style="font-size:0.75rem;">${g.type}</span></td>
           <td style="font-weight: 600; max-width:240px;" title="${g.title}">${g.title}</td>
           <td style="font-weight: 600;">${g.supplier}</td>
-          <td style="font-weight: 800; color: var(--status-completed); font-family: var(--font-mono);">${(g.amount || 0).toLocaleString('tr-TR')} ${g.currency || 'TRY'}</td>
+          <td style="font-weight: 800; color: var(--status-completed); font-family: var(--font-mono);">${this.formatMoney(g.amount || 0, g.currency || 'TRY', 2)}</td>
           <td style="font-weight: 600; color: ${badgeClass === 'priority-kritik' ? 'var(--status-rejected)' : 'var(--text-main)'};">${g.expiryDate || '-'}</td>
           <td style="font-size:0.8rem; color:var(--text-muted);">🔒 ${g.storageLocation || 'Kasada'}</td>
           <td><span class="badge ${badgeClass}">${statusStr}</span></td>
@@ -3098,8 +3199,14 @@ const App = {
       document.getElementById('gm-title').value = g.title;
       document.getElementById('gm-supplier').value = g.supplier;
       if (unitSelect) unitSelect.value = g.unit || '';
-      document.getElementById('gm-amount').value = g.amount;
       document.getElementById('gm-currency').value = g.currency || 'TRY';
+      
+      const gAmtInput = document.getElementById('gm-amount');
+      if (gAmtInput) {
+        gAmtInput.value = g.amount ? g.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        this.onAmountInput(gAmtInput, 'gm-currency', true);
+      }
+
       document.getElementById('gm-issue-date').value = g.issueDate || '';
       document.getElementById('gm-expiry-date').value = g.expiryDate || '';
       document.getElementById('gm-storage-location').value = g.storageLocation || '';
@@ -3108,6 +3215,7 @@ const App = {
     } else {
       document.getElementById('gm-id').value = '';
       document.getElementById('form-guarantee-manage').reset();
+      this.onAmountInput(document.getElementById('gm-amount'), 'gm-currency', true);
       document.getElementById('guarantee-modal-title').innerText = '🛡️ Yeni Teminat Mektubu Kaydı';
     }
     this.openModal('modal-guarantee-form');
@@ -3123,7 +3231,7 @@ const App = {
     const title = document.getElementById('gm-title').value.trim();
     const supplier = document.getElementById('gm-supplier').value.trim();
     const unit = document.getElementById('gm-unit')?.value || 'Destek Hizmetler Müdürlüğü';
-    const amount = parseFloat(document.getElementById('gm-amount').value) || 0;
+    const amount = this.parseMoney(document.getElementById('gm-amount')?.value);
     const currency = document.getElementById('gm-currency').value;
     const issueDate = document.getElementById('gm-issue-date').value;
     const expiryDate = document.getElementById('gm-expiry-date').value;
@@ -3411,15 +3519,27 @@ const App = {
       document.getElementById('tm-related-barcode').value = t.relatedBarcode || '';
       document.getElementById('tm-regulation').value = t.regulation || '';
       if (assignedSelect) assignedSelect.value = t.assignedTo || '';
-      document.getElementById('tm-estimated-amount').value = t.estimatedAmount || '';
       document.getElementById('tm-currency').value = t.currency || 'TRY';
+      
+      const tmEstInput = document.getElementById('tm-estimated-amount');
+      if (tmEstInput) {
+        tmEstInput.value = t.estimatedAmount ? t.estimatedAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        this.onAmountInput(tmEstInput, 'tm-currency');
+      }
+      const tmActInput = document.getElementById('tm-actual-amount');
+      if (tmActInput) {
+        tmActInput.value = t.actualAmount ? t.actualAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        this.onAmountInput(tmActInput, 'tm-currency', true);
+      }
+
       document.getElementById('tm-winner-supplier').value = t.winnerSupplier || '';
-      document.getElementById('tm-actual-amount').value = t.actualAmount || '';
       document.getElementById('tm-notes').value = t.notes || '';
       document.getElementById('tender-modal-title').innerText = `✏️ İhale #${t.tenderNo} Düzenle`;
     } else {
       document.getElementById('tm-id').value = '';
       document.getElementById('form-tender-manage').reset();
+      this.onAmountInput(document.getElementById('tm-estimated-amount'), 'tm-currency');
+      this.onAmountInput(document.getElementById('tm-actual-amount'), 'tm-currency', true);
       document.getElementById('tender-modal-title').innerText = '🏛️ Yeni İhale Planlama Kaydı';
     }
     this.openModal('modal-tender-form');
@@ -3437,10 +3557,10 @@ const App = {
     const relatedBarcode = document.getElementById('tm-related-barcode').value.trim();
     const regulation = document.getElementById('tm-regulation').value;
     const assignedTo = document.getElementById('tm-assigned-to').value;
-    const estimatedAmount = parseFloat(document.getElementById('tm-estimated-amount').value) || 0;
+    const estimatedAmount = this.parseMoney(document.getElementById('tm-estimated-amount')?.value);
     const currency = document.getElementById('tm-currency').value;
     const winnerSupplier = document.getElementById('tm-winner-supplier').value.trim();
-    const actualAmount = parseFloat(document.getElementById('tm-actual-amount').value) || 0;
+    const actualAmount = this.parseMoney(document.getElementById('tm-actual-amount')?.value);
     const notes = document.getElementById('tm-notes').value.trim();
 
     const tenderObj = {
@@ -3595,10 +3715,10 @@ const App = {
     });
     const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
 
-    document.getElementById('invoice-kpi-total').innerText = `${totalAmountAll.toLocaleString('tr-TR')} ₺`;
-    document.getElementById('invoice-kpi-this-week').innerText = `${thisWeekTotal.toLocaleString('tr-TR')} ₺`;
-    document.getElementById('invoice-kpi-overdue').innerText = `${overdueTotal.toLocaleString('tr-TR')} ₺`;
-    document.getElementById('invoice-kpi-paid').innerText = `${paidAmount.toLocaleString('tr-TR')} ₺`;
+    document.getElementById('invoice-kpi-total').innerText = this.formatMoney(totalAmountAll, 'TRY', 2);
+    document.getElementById('invoice-kpi-this-week').innerText = this.formatMoney(thisWeekTotal, 'TRY', 2);
+    document.getElementById('invoice-kpi-overdue').innerText = this.formatMoney(overdueTotal, 'TRY', 2);
+    document.getElementById('invoice-kpi-paid').innerText = this.formatMoney(paidAmount, 'TRY', 2);
 
     const tbody = document.querySelector('#table-invoices tbody');
     if (!tbody) return;
@@ -3638,7 +3758,7 @@ const App = {
           <td style="font-size:0.8rem; color:var(--text-muted);">${inv.invoiceDate}</td>
           <td style="font-weight:700; font-size:0.85rem;">${inv.dueDate}</td>
           <td>${dueBadge}</td>
-          <td style="font-weight:700; font-family:var(--font-mono); color:var(--status-completed);">${(inv.amount || 0).toLocaleString('tr-TR')} ${inv.currency || 'TRY'}</td>
+          <td style="font-weight:700; font-family:var(--font-mono); color:var(--status-completed);">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</td>
           <td>${statusBadge}</td>
           <td><span style="font-family:var(--font-mono); font-size:0.8rem; color:var(--accent-purple);">${inv.relatedBarcode || '-'}</span></td>
           <td>
@@ -3663,8 +3783,14 @@ const App = {
       document.getElementById('im-supplier').value = inv.supplier;
       document.getElementById('im-date').value = inv.invoiceDate;
       document.getElementById('im-due-date').value = inv.dueDate;
-      document.getElementById('im-amount').value = inv.amount;
       document.getElementById('im-currency').value = inv.currency || 'TRY';
+
+      const imAmtInput = document.getElementById('im-amount');
+      if (imAmtInput) {
+        imAmtInput.value = inv.amount ? inv.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        this.onAmountInput(imAmtInput, 'im-currency', true);
+      }
+
       document.getElementById('im-status').value = inv.paymentStatus || 'Ödeme Bekliyor';
       document.getElementById('im-delivery-date').value = inv.accountingDeliveryDate || '';
       document.getElementById('im-related-barcode').value = inv.relatedBarcode || '';
@@ -3674,6 +3800,7 @@ const App = {
     } else {
       document.getElementById('im-id').value = '';
       document.getElementById('form-invoice-manage').reset();
+      this.onAmountInput(document.getElementById('im-amount'), 'im-currency', true);
       document.getElementById('invoice-modal-title').innerText = '🧾 Yeni Fatura / Muhasebe Teslim Kaydı';
     }
     this.openModal('modal-invoice-form');
@@ -3686,7 +3813,7 @@ const App = {
     const supplier = document.getElementById('im-supplier').value.trim();
     const invoiceDate = document.getElementById('im-date').value;
     const dueDate = document.getElementById('im-due-date').value;
-    const amount = parseFloat(document.getElementById('im-amount').value) || 0;
+    const amount = this.parseMoney(document.getElementById('im-amount')?.value);
     const currency = document.getElementById('im-currency').value;
     const paymentStatus = document.getElementById('im-status').value;
     const accountingDeliveryDate = document.getElementById('im-delivery-date').value;
@@ -3740,7 +3867,7 @@ const App = {
     const inv = this.state.invoices.find(item => String(item.id) === String(invoiceId));
     if (!inv) return;
 
-    this.showConfirm("Fatura Ödeme Onayı", `Fatura #${inv.invoiceNo} (${inv.amount.toLocaleString('tr-TR')} ₺) ödenmiş olarak işaretlensin mi?`, async () => {
+    this.showConfirm("Fatura Ödeme Onayı", `Fatura #${inv.invoiceNo} (${this.formatMoney(inv.amount, inv.currency || 'TRY', 2)}) ödenmiş olarak işaretlensin mi?`, async () => {
       inv.paymentStatus = 'Ödendi';
       inv.paymentDate = new Date().toISOString().split('T')[0];
       await this.apiSync('invoices', 'PUT', inv);
@@ -4648,26 +4775,29 @@ const App = {
             const safeName = p.user.name.replace(/'/g, "\\'");
 
             const monthTds = p.monthlySavings.map(s => {
-              if (s > 0) return `<td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); background:rgba(34,197,94,0.05);">+${s.toLocaleString('tr-TR')} ₺</td>`;
-              return `<td style="color:var(--text-muted); font-size:0.78rem;">-</td>`;
+              if (s > 0) {
+                const isInt = (s % 1 === 0);
+                return `<td style="font-family:var(--font-mono); font-weight:700; color:var(--status-completed); background:rgba(34,197,94,0.05); text-align:right; white-space:nowrap;">+${this.formatMoney(s, 'TRY', isInt ? 0 : 2)}</td>`;
+              }
+              return `<td style="color:var(--text-muted); font-size:0.78rem; text-align:center;">-</td>`;
             }).join('');
 
             return `
               <tr style="cursor: pointer;" onclick="App.openPersonnelSavingsDetailView('${safeName}')" title="Kullanıcıya tıklayarak detaylı grafik, birim dağılımı ve iş listesini görün">
-                <td>
+                <td style="white-space:nowrap;">
                   <strong style="color:var(--text-main); font-size:0.88rem;">${p.user.name}</strong>
                   <div style="font-size:0.72rem; color:var(--text-muted);">${p.user.title}</div>
                 </td>
                 ${monthTds}
-                <td style="font-family:var(--font-mono); font-weight:800; color:var(--status-completed); font-size:0.92rem; background:rgba(34,197,94,0.12);">
-                  ${p.savings > 0 ? '+' + p.savings.toLocaleString('tr-TR') + ' ₺' : '0 ₺'}
+                <td style="font-family:var(--font-mono); font-weight:800; color:var(--status-completed); font-size:0.92rem; background:rgba(34,197,94,0.12); text-align:right; white-space:nowrap;">
+                  ${p.savings > 0 ? '+' + this.formatMoney(p.savings, 'TRY', 2) : '0,00\u00A0₺'}
                 </td>
-                <td>
+                <td style="text-align:center; white-space:nowrap;">
                   <span class="badge" style="background:${p.savings > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card)'}; color:${p.savings > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
                     %${ratePct}
                   </span>
                 </td>
-                <td>
+                <td style="text-align:center; white-space:nowrap;">
                   <button class="btn-primary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="event.stopPropagation(); App.openPersonnelSavingsDetailView('${safeName}')">
                     🔍 Detay
                   </button>
@@ -4681,18 +4811,18 @@ const App = {
       if (tfoot) {
         const grandRatePct = grandInstInitial > 0 ? ((grandSavings / grandInstInitial) * 100).toFixed(1) : '0.0';
         const footMonthTds = institutionalMonthly.map(s => {
-          return `<td style="font-family:var(--font-mono); color:var(--status-completed);">${s > 0 ? '+' + s.toLocaleString('tr-TR') + ' ₺' : '-'}</td>`;
+          return `<td style="font-family:var(--font-mono); color:var(--status-completed); text-align:right; white-space:nowrap;">${s > 0 ? '+' + this.formatMoney(s, 'TRY', (s % 1 === 0 ? 0 : 2)) : '-'}</td>`;
         }).join('');
 
         tfoot.innerHTML = `
           <tr>
-            <td style="color:var(--accent-primary);">🏛️ KURUM GENEL TOPLAMI</td>
+            <td style="color:var(--accent-primary); white-space:nowrap;">🏛️ KURUM GENEL TOPLAMI</td>
             ${footMonthTds}
-            <td style="font-family:var(--font-mono); font-size:0.92rem; color:var(--status-completed); background:rgba(34,197,94,0.2);">
-              +${grandSavings.toLocaleString('tr-TR')} ₺
+            <td style="font-family:var(--font-mono); font-size:0.92rem; color:var(--status-completed); background:rgba(34,197,94,0.2); text-align:right; white-space:nowrap;">
+              +${this.formatMoney(grandSavings, 'TRY', 2)}
             </td>
-            <td style="color:var(--status-completed);">%${grandRatePct}</td>
-            <td>-</td>
+            <td style="color:var(--status-completed); text-align:center; white-space:nowrap;">%${grandRatePct}</td>
+            <td style="text-align:center;">-</td>
           </tr>
         `;
       }
@@ -4988,9 +5118,17 @@ const App = {
     const usdInput = document.getElementById('setting-rate-usd');
     const eurInput = document.getElementById('setting-rate-eur');
     const dateLabel = document.getElementById('rate-last-updated');
+    const topbarUsd = document.getElementById('topbar-rate-usd');
+    const topbarEur = document.getElementById('topbar-rate-eur');
 
     if (usdInput && this.state.rates && this.state.rates.USD) usdInput.value = this.state.rates.USD;
     if (eurInput && this.state.rates && this.state.rates.EUR) eurInput.value = this.state.rates.EUR;
+    if (topbarUsd && this.state.rates && this.state.rates.USD) {
+      topbarUsd.innerText = Number(this.state.rates.USD).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    }
+    if (topbarEur && this.state.rates && this.state.rates.EUR) {
+      topbarEur.innerText = Number(this.state.rates.EUR).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    }
     if (dateLabel) {
       dateLabel.innerText = this.state.rates && this.state.rates.lastUpdated
         ? `Son Güncelleme: ${this.state.rates.lastUpdated}`
@@ -5341,38 +5479,6 @@ const App = {
     this.openModal('modal-user-form');
   },
 
-  openEditModal(requestId) {
-    const req = this.state.requests.find(r => String(r.id) === String(requestId));
-    if (!req) {
-      this.showToast(`Düzenlenecek talep kaydı (#${requestId}) bulunamadı.`, "error");
-      return;
-    }
-
-    document.getElementById('er-id').value = req.id;
-    document.getElementById('er-status').value = req.status;
-    document.getElementById('er-assigned-to').value = req.assignedTo;
-    document.getElementById('er-order-barcode').value = req.orderBarcode || '';
-    document.getElementById('er-order-date').value = req.orderDate || '';
-    document.getElementById('er-supplier').value = req.supplier || '';
-    if (document.getElementById('er-estimated-amount')) {
-      document.getElementById('er-estimated-amount').value = req.estimatedAmount || req.budgetAmount || 0;
-    }
-    document.getElementById('er-actual-amount').value = req.actualAmount || 0;
-    document.getElementById('er-currency').value = req.currency || 'TRY';
-    
-    const regSelect = document.getElementById('er-regulation');
-    if (regSelect) {
-      let regVal = req.regulation || '';
-      if (regVal.startsWith('Madde ')) regVal = regVal.replace('Madde ', '');
-      regSelect.value = regVal;
-    }
-    
-    document.getElementById('er-description').value = req.description || '';
-
-    document.getElementById('edit-modal-title').innerText = `✏️ Talep #${req.requestBarcode || req.id} Düzenle`;
-    this.openModal('modal-edit-request');
-  },
-
   async handleSaveUser(e) {
     e.preventDefault();
     const id = document.getElementById('um-id').value;
@@ -5600,7 +5706,8 @@ const App = {
     const assigned = document.getElementById('nr-assigned-to').value || 'Henüz Atanmadı';
     const priority = document.getElementById('nr-priority').value;
     const reg = document.getElementById('nr-regulation').value;
-    const estAmt = parseFloat(document.getElementById('nr-estimated-amount')?.value) || 0;
+    const estAmt = this.parseMoney(document.getElementById('nr-estimated-amount')?.value);
+    const currency = document.getElementById('nr-currency')?.value || 'TRY';
 
     const newReq = {
       id: this.state.requests.length + 1,
@@ -5618,7 +5725,7 @@ const App = {
       estimatedAmount: estAmt,
       budgetAmount: estAmt,
       actualAmount: 0,
-      currency: 'TRY',
+      currency: currency,
       academicYear: this.getAcademicYear(arrDate)
     };
 
@@ -5647,24 +5754,113 @@ const App = {
     const prioritySelect = document.getElementById('nr-priority');
     if (prioritySelect) prioritySelect.value = 'Orta';
 
+    const currSelect = document.getElementById('nr-currency');
+    if (currSelect) currSelect.value = 'TRY';
+
+    const estInput = document.getElementById('nr-estimated-amount');
+    if (estInput) {
+      estInput.value = '';
+      this.onAmountInput(estInput, 'nr-currency');
+    }
+
     this.openModal('modal-new-request');
   },
 
   openEditModal(reqId) {
     const req = this.state.requests.find(r => String(r.id) === String(reqId));
-    if (!req) return;
+    if (!req) {
+      this.showToast(`Düzenlenecek talep kaydı (#${reqId}) bulunamadı.`, "error");
+      return;
+    }
 
     document.getElementById('er-id').value = req.id;
+    if (document.getElementById('er-request-barcode')) {
+      document.getElementById('er-request-barcode').value = req.requestBarcode || '';
+    }
+
+    // Tarih formatını (DD.MM.YYYY veya YYYY-MM-DD) date input formatına (YYYY-MM-DD) uyarla
+    let arrDateVal = req.arrivalDate || req.requestDate || '';
+    if (arrDateVal) {
+      const dParts = String(arrDateVal).trim().split(/[./-]/);
+      if (dParts.length === 3) {
+        if (dParts[0].length <= 2 && dParts[2].length >= 4) {
+          const day = dParts[0].padStart(2, '0');
+          const month = dParts[1].padStart(2, '0');
+          let year = dParts[2].trim();
+          if (year === '20216') year = '2026';
+          else if (year.length > 4) year = year.slice(0, 4);
+          arrDateVal = `${year}-${month}-${day}`;
+        } else if (dParts[0].length >= 4) {
+          let year = dParts[0].trim();
+          if (year === '20216') year = '2026';
+          else if (year.length > 4) year = year.slice(0, 4);
+          const month = dParts[1].padStart(2, '0');
+          const day = dParts[2].padStart(2, '0');
+          arrDateVal = `${year}-${month}-${day}`;
+        }
+      }
+    }
+    if (document.getElementById('er-arrival-date')) {
+      document.getElementById('er-arrival-date').value = arrDateVal;
+    }
+
+    if (document.getElementById('er-subject')) {
+      document.getElementById('er-subject').value = req.subject || '';
+    }
+
     document.getElementById('er-status').value = req.status || 'Açık';
+
+    if (document.getElementById('er-priority')) {
+      document.getElementById('er-priority').value = req.priority || 'Orta';
+    }
+
     if (document.getElementById('er-unit')) document.getElementById('er-unit').value = req.unit || '';
     if (document.getElementById('er-assigned-to')) document.getElementById('er-assigned-to').value = req.assignedTo || '';
     document.getElementById('er-order-barcode').value = req.orderBarcode || '';
-    document.getElementById('er-order-date').value = req.orderDate || '';
+    
+    let orderDateVal = req.orderDate || '';
+    if (orderDateVal) {
+      const dParts = String(orderDateVal).trim().split(/[./-]/);
+      if (dParts.length === 3) {
+        if (dParts[0].length <= 2 && dParts[2].length >= 4) {
+          const day = dParts[0].padStart(2, '0');
+          const month = dParts[1].padStart(2, '0');
+          let year = dParts[2].trim();
+          if (year.length > 4) year = year.slice(0, 4);
+          orderDateVal = `${year}-${month}-${day}`;
+        } else if (dParts[0].length >= 4) {
+          let year = dParts[0].trim();
+          if (year.length > 4) year = year.slice(0, 4);
+          const month = dParts[1].padStart(2, '0');
+          const day = dParts[2].padStart(2, '0');
+          orderDateVal = `${year}-${month}-${day}`;
+        }
+      }
+    }
+    document.getElementById('er-order-date').value = orderDateVal;
     document.getElementById('er-supplier').value = req.supplier || '';
-    if (document.getElementById('er-estimated-amount')) document.getElementById('er-estimated-amount').value = req.estimatedAmount || '';
-    document.getElementById('er-actual-amount').value = req.actualAmount || '';
     document.getElementById('er-currency').value = req.currency || 'TRY';
-    if (document.getElementById('er-regulation')) document.getElementById('er-regulation').value = req.regulation || '';
+
+    const estInput = document.getElementById('er-estimated-amount');
+    if (estInput) {
+      const val = req.estimatedAmount || req.budgetAmount;
+      estInput.value = val ? val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      this.onAmountInput(estInput, 'er-currency');
+    }
+
+    const actInput = document.getElementById('er-actual-amount');
+    if (actInput) {
+      actInput.value = req.actualAmount ? req.actualAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      this.onAmountInput(actInput, 'er-currency', true);
+    }
+    
+    const regSelect = document.getElementById('er-regulation');
+    if (regSelect) {
+      let regVal = req.regulation || '';
+      if (regVal.startsWith('Madde ')) regVal = regVal.replace('Madde ', '');
+      regSelect.value = regVal;
+    }
+
     document.getElementById('er-description').value = req.description || '';
 
     const titleEl = document.getElementById('edit-modal-title');
@@ -5679,24 +5875,41 @@ const App = {
     const req = this.state.requests.find(r => r.id === id);
     if (!req) return;
 
+    if (document.getElementById('er-request-barcode')) {
+      req.requestBarcode = document.getElementById('er-request-barcode').value.trim();
+    }
+    if (document.getElementById('er-arrival-date')) {
+      const arrDate = document.getElementById('er-arrival-date').value;
+      req.arrivalDate = arrDate;
+      req.requestDate = arrDate;
+      req.academicYear = this.getAcademicYear(arrDate);
+    }
+    if (document.getElementById('er-subject')) {
+      req.subject = document.getElementById('er-subject').value.trim();
+    }
+    if (document.getElementById('er-priority')) {
+      req.priority = document.getElementById('er-priority').value;
+    }
+
     req.status = document.getElementById('er-status').value;
     if (document.getElementById('er-unit')) req.unit = document.getElementById('er-unit').value;
     req.assignedTo = document.getElementById('er-assigned-to').value;
-    req.orderBarcode = document.getElementById('er-order-barcode').value;
+    req.orderBarcode = document.getElementById('er-order-barcode').value.trim();
     req.orderDate = document.getElementById('er-order-date').value;
-    req.supplier = document.getElementById('er-supplier').value;
-    const estAmt = parseFloat(document.getElementById('er-estimated-amount')?.value) || 0;
+    req.supplier = document.getElementById('er-supplier').value.trim();
+    const estAmt = this.parseMoney(document.getElementById('er-estimated-amount')?.value);
     req.estimatedAmount = estAmt;
     if (!req.budgetAmount) req.budgetAmount = estAmt;
-    req.actualAmount = parseFloat(document.getElementById('er-actual-amount').value) || 0;
+    req.actualAmount = this.parseMoney(document.getElementById('er-actual-amount')?.value);
     req.currency = document.getElementById('er-currency').value;
-    req.regulation = document.getElementById('er-regulation').value;
-    req.description = document.getElementById('er-description').value;
+    if (document.getElementById('er-regulation')) req.regulation = document.getElementById('er-regulation').value;
+    req.description = document.getElementById('er-description').value.trim();
 
     await this.apiSync('requests', 'PUT', req);
 
     this.showToast("Talep bilgileri başarıyla güncellendi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+    this.populateYearSelect();
     this.render();
   },
 

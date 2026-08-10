@@ -190,6 +190,13 @@
             <div class="global-search-results" id="global-search-results"></div>
           </div>
 
+          <!-- Live FX Ticker (TCMB) -->
+          <div class="topbar-rates-pill" id="topbar-rates-pill" onclick="App.switchView('settings')" title="TCMB Canlı Döviz Kurları (Ayarları Açmak İçin Tıklayın)">
+            <span class="rate-item"><span>💵</span> USD: <strong id="topbar-rate-usd">36,50</strong> ₺</span>
+            <span class="rate-divider">|</span>
+            <span class="rate-item"><span>💶</span> EUR: <strong id="topbar-rate-eur">39,80</strong> ₺</span>
+          </div>
+
           <!-- Notification Bell -->
           <div class="notif-bell-box">
             <button class="btn-notif-bell" id="btn-notification-bell" title="Bildirim ve Uyarı Merkezi">
@@ -1603,25 +1610,25 @@
             </div>
 
             <div class="table-container" style="margin-top: 0.75rem; max-height: 520px; overflow-x: auto; overflow-y: auto;">
-              <table class="custom-table" id="table-yearly-personnel-savings" style="font-size: 0.82rem;">
+              <table class="custom-table" id="table-yearly-personnel-savings" style="font-size: 0.82rem; width: 100%;">
                 <thead>
                   <tr>
-                    <th style="min-width: 140px;">Satınalma Uzmanı</th>
-                    <th>Eylül</th>
-                    <th>Ekim</th>
-                    <th>Kasım</th>
-                    <th>Aralık</th>
-                    <th>Ocak</th>
-                    <th>Şubat</th>
-                    <th>Mart</th>
-                    <th>Nisan</th>
-                    <th>Mayıs</th>
-                    <th>Haziran</th>
-                    <th>Temmuz</th>
-                    <th>Ağustos</th>
-                    <th style="min-width: 130px;">Yıllık Toplam (₺)</th>
-                    <th>Tasarruf %</th>
-                    <th>İşlemler</th>
+                    <th style="min-width: 150px;">Satınalma Uzmanı</th>
+                    <th style="text-align: right; min-width: 68px;">Eyl</th>
+                    <th style="text-align: right; min-width: 68px;">Eki</th>
+                    <th style="text-align: right; min-width: 68px;">Kas</th>
+                    <th style="text-align: right; min-width: 68px;">Ara</th>
+                    <th style="text-align: right; min-width: 68px;">Oca</th>
+                    <th style="text-align: right; min-width: 68px;">Şub</th>
+                    <th style="text-align: right; min-width: 68px;">Mar</th>
+                    <th style="text-align: right; min-width: 68px;">Nis</th>
+                    <th style="text-align: right; min-width: 68px;">May</th>
+                    <th style="text-align: right; min-width: 68px;">Haz</th>
+                    <th style="text-align: right; min-width: 68px;">Tem</th>
+                    <th style="text-align: right; min-width: 68px;">Ağu</th>
+                    <th style="min-width: 130px; text-align: right;">Yıllık Toplam (₺)</th>
+                    <th style="min-width: 80px; text-align: center;">Tasarruf %</th>
+                    <th style="min-width: 70px; text-align: center;">İşlem</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -2134,11 +2141,21 @@
           </div>
 
           <div class="form-group">
-            <label>Tahmini / Bütçe Tutarı (TRY)</label>
-            <input type="number" step="0.01" id="nr-estimated-amount" placeholder="ör: 100000.00">
+            <label>Tahmini / Bütçe Tutarı</label>
+            <input type="text" inputmode="decimal" id="nr-estimated-amount" placeholder="ör: 100.000,00" oninput="App.onAmountInput(this, 'nr-currency')">
+            <div id="nr-estimated-amount-preview" class="amount-live-preview"></div>
           </div>
 
           <div class="form-group">
+            <label>Para Birimi</label>
+            <select id="nr-currency" onchange="App.onCurrencyChange('nr-currency', ['nr-estimated-amount'])">
+              <option value="TRY" selected>TRY (₺)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width">
             <label>Yönetmelik Maddesi</label>
             <select id="nr-regulation"></select>
           </div>
@@ -2165,11 +2182,36 @@
 
         <div class="form-grid">
           <div class="form-group">
+            <label>Talep Barkodu <span class="required">*</span></label>
+            <input type="text" id="er-request-barcode" placeholder="ör: 249001" required>
+          </div>
+
+          <div class="form-group">
+            <label>Satınalmaya Geliş Tarihi <span class="required">*</span></label>
+            <input type="date" id="er-arrival-date" required>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Talep Konusu <span class="required">*</span></label>
+            <input type="text" id="er-subject" placeholder="ör: Bilgisayar Malzemeleri Alımı Hk" required>
+          </div>
+
+          <div class="form-group">
             <label>Talep Durumu</label>
             <select id="er-status">
               <option value="Açık">🔵 Açık / Devam Eden</option>
               <option value="Tamamlandı">✅ Tamamlandı</option>
               <option value="Reddedildi">❌ Reddedildi</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Öncelik</label>
+            <select id="er-priority">
+              <option value="Orta">🟡 Orta</option>
+              <option value="Kritik">🔴 Kritik</option>
+              <option value="Yüksek">🟠 Yüksek</option>
+              <option value="Düşük">🟢 Düşük</option>
             </select>
           </div>
 
@@ -2199,18 +2241,20 @@
           </div>
 
           <div class="form-group">
-            <label>Tahmini / Bütçe Tutarı (TRY)</label>
-            <input type="number" step="0.01" id="er-estimated-amount" placeholder="ör: 100000.00">
+            <label>Tahmini / Bütçe Tutarı</label>
+            <input type="text" inputmode="decimal" id="er-estimated-amount" placeholder="ör: 100.000,00" oninput="App.onAmountInput(this, 'er-currency')">
+            <div id="er-estimated-amount-preview" class="amount-live-preview"></div>
           </div>
 
           <div class="form-group">
-            <label>Gerçekleşen Tutar (TRY)</label>
-            <input type="number" step="0.01" id="er-actual-amount" placeholder="0.00">
+            <label>Gerçekleşen Tutar</label>
+            <input type="text" inputmode="decimal" id="er-actual-amount" placeholder="0,00" oninput="App.onAmountInput(this, 'er-currency', true)">
+            <div id="er-actual-amount-preview" class="amount-live-preview is-actual"></div>
           </div>
 
           <div class="form-group">
             <label>Para Birimi</label>
-            <select id="er-currency">
+            <select id="er-currency" onchange="App.onCurrencyChange('er-currency', ['er-estimated-amount', 'er-actual-amount'])">
               <option value="TRY">TRY (₺)</option>
               <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
@@ -2285,12 +2329,13 @@
 
           <div class="form-group">
             <label>Sözleşme Bedeli <span class="required">*</span></label>
-            <input type="number" step="0.01" id="cm-amount" required placeholder="0.00">
+            <input type="text" inputmode="decimal" id="cm-amount" required placeholder="0,00" oninput="App.onAmountInput(this, 'cm-currency', true)">
+            <div id="cm-amount-preview" class="amount-live-preview is-actual"></div>
           </div>
 
           <div class="form-group">
             <label>Para Birimi <span class="required">*</span></label>
-            <select id="cm-currency">
+            <select id="cm-currency" onchange="App.onCurrencyChange('cm-currency', ['cm-amount', 'cm-guarantee-amount'])">
               <option value="TRY">TRY (₺)</option>
               <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
@@ -2299,7 +2344,8 @@
 
           <div class="form-group">
             <label>Teminat Mektubu Tutarı</label>
-            <input type="number" step="0.01" id="cm-guarantee-amount" placeholder="0.00">
+            <input type="text" inputmode="decimal" id="cm-guarantee-amount" placeholder="0,00" oninput="App.onAmountInput(this, 'cm-currency')">
+            <div id="cm-guarantee-amount-preview" class="amount-live-preview"></div>
           </div>
 
           <div class="form-group">
@@ -2364,12 +2410,13 @@
 
           <div class="form-group">
             <label>Fatura Tutarı <span class="required">*</span></label>
-            <input type="number" step="0.01" id="im-amount" required placeholder="0.00">
+            <input type="text" inputmode="decimal" id="im-amount" required placeholder="0,00" oninput="App.onAmountInput(this, 'im-currency', true)">
+            <div id="im-amount-preview" class="amount-live-preview is-actual"></div>
           </div>
 
           <div class="form-group">
             <label>Para Birimi <span class="required">*</span></label>
-            <select id="im-currency">
+            <select id="im-currency" onchange="App.onCurrencyChange('im-currency', ['im-amount'])">
               <option value="TRY">TRY (₺)</option>
               <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
@@ -2603,12 +2650,13 @@
 
           <div class="form-group">
             <label>Teminat Tutarı <span class="required">*</span></label>
-            <input type="number" step="0.01" id="gm-amount" placeholder="0.00" required>
+            <input type="text" inputmode="decimal" id="gm-amount" placeholder="0,00" required oninput="App.onAmountInput(this, 'gm-currency', true)">
+            <div id="gm-amount-preview" class="amount-live-preview is-actual"></div>
           </div>
 
           <div class="form-group">
             <label>Para Birimi</label>
-            <select id="gm-currency">
+            <select id="gm-currency" onchange="App.onCurrencyChange('gm-currency', ['gm-amount'])">
               <option value="TRY">₺ - Türk Lirası (TRY)</option>
               <option value="USD">$ - Amerikan Doları (USD)</option>
               <option value="EUR">€ - Euro (EUR)</option>
@@ -2717,12 +2765,13 @@
 
           <div class="form-group">
             <label>Tahmini Maliyet (Bütçe)</label>
-            <input type="number" step="0.01" id="tm-estimated-amount" placeholder="0.00">
+            <input type="text" inputmode="decimal" id="tm-estimated-amount" placeholder="0,00" oninput="App.onAmountInput(this, 'tm-currency')">
+            <div id="tm-estimated-amount-preview" class="amount-live-preview"></div>
           </div>
 
           <div class="form-group">
             <label>Para Birimi</label>
-            <select id="tm-currency">
+            <select id="tm-currency" onchange="App.onCurrencyChange('tm-currency', ['tm-estimated-amount', 'tm-actual-amount'])">
               <option value="TRY">₺ - Türk Lirası (TRY)</option>
               <option value="USD">$ - Amerikan Doları (USD)</option>
               <option value="EUR">€ - Euro (EUR)</option>
@@ -2736,7 +2785,8 @@
 
           <div class="form-group">
             <label>Gerçekleşen İhale Bedeli</label>
-            <input type="number" step="0.01" id="tm-actual-amount" placeholder="0.00">
+            <input type="text" inputmode="decimal" id="tm-actual-amount" placeholder="0,00" oninput="App.onAmountInput(this, 'tm-currency', true)">
+            <div id="tm-actual-amount-preview" class="amount-live-preview is-actual"></div>
           </div>
 
           <div class="form-group full-width">

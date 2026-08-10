@@ -829,6 +829,7 @@ header.top-header {
 /* Data Table */
 .table-container {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   background: var(--bg-card);
@@ -842,20 +843,35 @@ table.custom-table {
 }
 
 table.custom-table th {
-  background: rgba(13, 19, 34, 0.8);
+  background: rgba(13, 19, 34, 0.85);
   color: var(--text-muted);
-  padding: 0.85rem 1rem;
+  padding: 0.75rem 0.85rem;
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
 table.custom-table td {
-  padding: 0.85rem 1rem;
+  padding: 0.75rem 0.85rem;
   border-bottom: 1px solid var(--border-color);
   vertical-align: middle;
+  font-size: 0.84rem;
+}
+
+/* Specific elements that must stay on a single line */
+table.custom-table td.col-nowrap,
+table.custom-table td [style*="font-mono"],
+table.custom-table td[style*="font-mono"],
+.badge,
+.action-btns {
+  white-space: nowrap !important;
+}
+
+table.custom-table td[style*="font-mono"] {
+  font-variant-numeric: tabular-nums;
 }
 
 table.custom-table tbody tr {
@@ -2037,5 +2053,67 @@ th.sticky-col-left, th.sticky-col-right {
   .print-only {
     display: block !important;
   }
+}
+
+/* Live Amount Preview Styling */
+.amount-live-preview {
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent-primary);
+  margin-top: 0.3rem;
+  min-height: 1.1rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.amount-live-preview.has-value {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px dashed rgba(59, 130, 246, 0.3);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+.amount-live-preview.is-actual {
+  color: var(--status-completed);
+}
+.amount-live-preview.is-actual.has-value {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px dashed rgba(34, 197, 94, 0.3);
+}
+
+/* Live FX Ticker Pill */
+.topbar-rates-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full, 9999px);
+  font-size: 0.8rem;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+  user-select: none;
+}
+.topbar-rates-pill:hover {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.06);
+  transform: translateY(-1px);
+}
+.topbar-rates-pill .rate-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: var(--font-mono);
+}
+.topbar-rates-pill .rate-item strong {
+  color: var(--accent-primary);
+}
+.topbar-rates-pill .rate-divider {
+  color: var(--border-color);
+  font-weight: 300;
 }
 
