@@ -479,9 +479,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (urlPath === '/api/backups/create' && method === 'POST') {
+    if ((urlPath === '/api/backups/create' || urlPath === '/api/backup-now') && method === 'POST') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates] = await Promise.all([
+      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, documents] = await Promise.all([
         getTableData('users'),
         getTableData('requests'),
         getTableData('contracts'),
@@ -490,7 +490,8 @@ const server = http.createServer(async (req, res) => {
         getTableData('logs'),
         pool.query('SELECT id, name FROM units ORDER BY id ASC'),
         pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
-        pool.query('SELECT * FROM rates')
+        pool.query('SELECT * FROM rates'),
+        getTableData('documents')
       ]);
 
       const now = new Date();
@@ -504,7 +505,8 @@ const server = http.createServer(async (req, res) => {
         users, requests, contracts, invoices, guarantees, logs,
         units: units.rows,
         regulations: regulations.rows,
-        rates: rates.rows
+        rates: rates.rows,
+        documents: documents || []
       };
 
       fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2), 'utf8');

@@ -7453,14 +7453,17 @@ const App = {
       if (res.ok) {
         const backups = await res.json();
         if (!backups || backups.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Henüz yedek dosyası yok.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">Henüz yedek dosyası bulunmuyor. \'Şimdi Manuel Yedek Al\' butonuna basarak ilk yedeğinizi alabilirsiniz.</td></tr>';
           return;
         }
         tbody.innerHTML = backups.map(b => `
           <tr>
-            <td style="font-weight:600;">💾 ${b.filename}</td>
-            <td>${b.created}</td>
-            <td><span class="badge priority-orta">${b.sizeKB} KB</span></td>
+            <td style="font-weight:600; font-family:var(--font-mono); font-size:0.8rem;">💾 ${b.filename}</td>
+            <td style="font-size:0.82rem;">${b.createdAt || '-'}</td>
+            <td><span class="badge priority-orta">${b.size || '0 KB'}</span></td>
+            <td style="text-align:center;">
+              <a href="/api/backups/download/${encodeURIComponent(b.filename)}" class="btn-icon" title="Bilgisayara İndir (.json)" download style="text-decoration:none; display:inline-block;">📥</a>
+            </td>
           </tr>
         `).join('');
       }
