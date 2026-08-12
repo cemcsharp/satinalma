@@ -1187,97 +1187,6 @@ table.custom-table tbody tr:hover {
   cursor: not-allowed;
 }
 
-/* Print Layout Support for PDF Export & Official Reports */
-@media print {
-  @page {
-    size: A4 landscape;
-    margin: 12mm;
-  }
-
-  body {
-    background: #ffffff !important;
-    color: #1e293b !important;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif !important;
-  }
-
-  #app {
-    display: block !important;
-  }
-
-  body.printing-detail #app,
-  body.printing-detail .modal-overlay {
-    display: none !important;
-  }
-
-  body.printing-detail #printable-official-document {
-    display: block !important;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background: #ffffff !important;
-    color: #0f172a !important;
-    padding: 10px;
-    box-sizing: border-box;
-  }
-
-  aside.sidebar,
-  .top-header .header-controls,
-  .btn-theme-toggle,
-  .year-selector-box,
-  .filter-bar,
-  .btn-primary,
-  .btn-secondary,
-  .btn-export-excel,
-  .btn-export-pdf,
-  .btn-icon,
-  .pagination-bar,
-  .modal-overlay,
-  .action-btns {
-    display: none !important;
-  }
-
-  main.main-content {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    background: transparent !important;
-  }
-
-  .top-header {
-    margin-bottom: 1.5rem !important;
-    padding-bottom: 0.5rem !important;
-    border-bottom: 2px solid #cbd5e1 !important;
-  }
-
-  .top-header h2 {
-    color: #0f172a !important;
-    font-size: 1.6rem !important;
-  }
-
-  .top-header p {
-    color: #64748b !important;
-    font-size: 0.9rem !important;
-  }
-
-  .glass-card {
-    border: 1px solid #cbd5e1 !important;
-    background: #ffffff !important;
-    box-shadow: none !important;
-    color: #0f172a !important;
-    page-break-inside: avoid;
-    margin-bottom: 1.25rem !important;
-  }
-
-  .glass-card h3, .glass-card h4 {
-    color: #0f172a !important;
-  }
-
-  .table-container {
-    max-height: none !important;
-    overflow: visible !important;
-  }
-
   table.custom-table {
     width: 100% !important;
     border-collapse: collapse !important;
@@ -2800,19 +2709,23 @@ th.sticky-col-left, th.sticky-col-right {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm 8mm 8mm 8mm;
+    margin: 15mm 12mm 12mm 12mm;
   }
 
   body.printing-detail #printable-official-document {
     display: block !important;
+    position: static !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding-top: 3mm !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
   }
 
+  body.printing-detail #app,
   body.printing-detail .app-container,
   body.printing-detail .modal-overlay,
   body.printing-detail .view-section,

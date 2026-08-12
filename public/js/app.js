@@ -3617,11 +3617,14 @@ const App = {
       `;
     }
 
+    const originalTitle = document.title;
+    document.title = ' ';
     document.body.classList.add('printing-detail');
     window.print();
     setTimeout(() => {
+      document.title = originalTitle;
       document.body.classList.remove('printing-detail');
-    }, 1000);
+    }, 800);
   },
 
   // 5.5 GUARANTEES MANAGER & RENDERER (TEMİNAT MEKTUPLARI YÖNETİMİ)
