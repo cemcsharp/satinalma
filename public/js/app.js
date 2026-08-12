@@ -4036,15 +4036,12 @@ const App = {
           </td>
           <td>${t.assignedTo || '-'}</td>
           <td><span class="badge ${stClass}">${stIcon} ${t.status || 'Planlandı'}</span></td>
-          <td style="text-align: center; white-space: nowrap;">
-            <button class="doc-attach-btn" onclick="App.openDocumentManager('tender', '${t.id}', 'İhale #${t.tenderNo || t.id} — ${t.title?.replace(/'/g, "\\'")}')" title="İhale Evrakları (Şartname, İlan, Teklifler, Kararlar)">
-              <span>📁</span> Evraklar ${docCount > 0 ? `<span class="doc-count-pill">${docCount}</span>` : ''}
-            </button>
-          </td>
-          <td>
+          <td style="text-align: center;">
             <div class="action-btns" style="justify-content:center;">
               <button class="btn-icon" onclick="App.viewTenderDetails('${t.id}')" title="Detayları İncele">👁️</button>
-              <button class="btn-icon" onclick="App.openDocumentManager('tender', '${t.id}', 'İhale #${t.tenderNo} — ${t.title?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
+              <button class="btn-icon" onclick="App.openDocumentManager('tender', '${t.id}', 'İhale #${t.tenderNo || t.id} — ${t.title?.replace(/'/g, "\\'")}')" title="İhale Evrakları & Dijital Arşiv (${docCount} Belge)" style="position:relative;">
+                📁${docCount > 0 ? `<span style="position:absolute; top:-4px; right:-4px; background:var(--accent-primary); color:#fff; font-size:0.6rem; font-weight:800; border-radius:50%; width:14px; height:14px; display:flex; align-items:center; justify-content:center;">${docCount}</span>` : ''}
+              </button>
               <button class="btn-icon" onclick="App.openTenderModal('${t.id}')" title="Düzenle">✏️</button>
               <button class="btn-icon" onclick="App.deleteTender('${t.id}')" title="Sil">🗑️</button>
             </div>
