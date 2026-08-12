@@ -172,15 +172,20 @@
     </aside>
 
     <!-- Mobile Sidebar Overlay -->
-    <div id="sidebar-overlay" onclick="document.getElementById('main-sidebar').classList.remove('mobile-open'); this.classList.remove('show');" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:190;"></div>
+    <div id="sidebar-overlay" onclick="App.toggleMobileSidebar(true)" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(3px); z-index:950;"></div>
 
     <!-- Main Content Area -->
     <main class="main-content">
       <!-- Top Header -->
       <header class="top-header">
-        <div class="header-title">
-          <h2 id="view-title">Dashboard</h2>
-          <p id="view-subtitle">Genel yönetim özeti ve canlı performans metrikleri</p>
+        <div class="header-left-wrapper" style="display: flex; align-items: center; gap: 0.75rem;">
+          <button type="button" class="btn-mobile-toggle" id="btn-mobile-nav-toggle" onclick="App.toggleMobileSidebar()" title="Menüyü Aç/Kapat">
+            <span>☰</span>
+          </button>
+          <div class="header-title">
+            <h2 id="view-title">Dashboard</h2>
+            <p id="view-subtitle">Genel yönetim özeti ve canlı performans metrikleri</p>
+          </div>
         </div>
 
         <div class="header-controls">

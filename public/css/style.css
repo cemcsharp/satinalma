@@ -1305,21 +1305,264 @@ table.custom-table tbody tr:hover {
   }
 }
 
-/* Responsive */
-@media (max-width: 900px) {
+/* ============================================================
+   📱 ULTRA RESPONSIVE & MOBILE DESIGN SUITE
+   ============================================================ */
+
+/* Mobile Hamburger Toggle Button in Top Header */
+.btn-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+.btn-mobile-toggle:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* Base Responsive Container adjustments */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
+}
+table.custom-table {
+  min-width: 720px;
+}
+
+/* 1. Large Laptops / Tablets Landscape (max-width: 1200px) */
+@media (max-width: 1200px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .grid-3-1 {
+    grid-template-columns: 1fr !important;
+  }
+  .top-search-container .search-input-box {
+    width: 180px !important;
+  }
+}
+
+/* 2. Tablets & Mobile Landscape (max-width: 992px) */
+@media (max-width: 992px) {
+  /* Off-canvas Mobile Sidebar */
   aside.sidebar {
-    width: 80px;
-    padding: 1rem 0.5rem;
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: -280px !important;
+    width: 270px !important;
+    z-index: 1000 !important;
+    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.6) !important;
+    transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
-  .brand-text, .user-details, .nav-item button span:not(.nav-icon) {
-    display: none;
+  aside.sidebar.mobile-open {
+    left: 0 !important;
   }
+  #sidebar-overlay.show {
+    display: block !important;
+    opacity: 1 !important;
+  }
+  
+  #btn-sidebar-toggle {
+    display: none !important;
+  }
+  .btn-mobile-toggle {
+    display: inline-flex !important;
+  }
+
   main.main-content {
-    margin-left: 80px;
-    padding: 1.5rem;
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1.25rem 1rem !important;
   }
-  .grid-2, .grid-3-1 {
-    grid-template-columns: 1fr;
+
+  /* Header Controls Stack */
+  .top-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.85rem !important;
+    padding-bottom: 0.85rem !important;
+  }
+  .top-header .header-controls {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+  .top-search-container {
+    width: 100% !important;
+    order: 3 !important;
+  }
+  .top-search-container .search-input-box {
+    width: 100% !important;
+  }
+  .topbar-rates-pill {
+    order: 1 !important;
+    font-size: 0.72rem !important;
+    padding: 0.35rem 0.55rem !important;
+  }
+  .notif-bell-box {
+    order: 2 !important;
+  }
+  .btn-theme-toggle {
+    order: 2 !important;
+    font-size: 0.75rem !important;
+    padding: 0.35rem 0.6rem !important;
+  }
+  .year-selector-box {
+    order: 2 !important;
+  }
+
+  /* Grids & Cards */
+  .grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+  .grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Filter Bars */
+  .filter-bar {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem !important;
+  }
+  .filter-bar > * {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .filter-select, .search-input-box input {
+    width: 100% !important;
+  }
+
+  /* Card Headers */
+  .card-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+  .card-header > div:last-child {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.4rem !important;
+  }
+  .card-header .btn-primary,
+  .card-header .btn-secondary,
+  .card-header .btn-export-excel,
+  .card-header .btn-export-pdf {
+    flex: 1 !important;
+    min-width: 120px !important;
+    justify-content: center !important;
+    text-align: center !important;
+    font-size: 0.78rem !important;
+    padding: 0.45rem 0.75rem !important;
+  }
+
+  /* Modals */
+  .modal-overlay {
+    padding: 0.5rem !important;
+    align-items: flex-start !important;
+  }
+  .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0.5rem auto !important;
+    padding: 1.25rem 1rem !important;
+    max-height: 94vh !important;
+  }
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+  .form-group.full-width {
+    grid-column: span 1 !important;
+  }
+  .form-actions {
+    flex-direction: column-reverse !important;
+    gap: 0.5rem !important;
+  }
+  .form-actions button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Tabs & Segmented Controls */
+  #invoice-date-tabs,
+  #yearly-report-tabs,
+  .segmented-control {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 4px !important;
+    width: 100% !important;
+  }
+
+  /* Notification dropdown on mobile */
+  .notif-dropdown {
+    right: -60px !important;
+    width: 320px !important;
+    max-width: 90vw !important;
+  }
+}
+
+/* 3. Mobile Phones Portrait (max-width: 540px) */
+@media (max-width: 540px) {
+  main.main-content {
+    padding: 0.85rem 0.5rem !important;
+  }
+  .header-title h2 {
+    font-size: 1.2rem !important;
+  }
+  .header-title p {
+    font-size: 0.75rem !important;
+  }
+
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+  .kpi-card {
+    padding: 0.75rem 0.85rem !important;
+  }
+  .kpi-card h3 {
+    font-size: 1.35rem !important;
+  }
+
+  .dashboard-alert-banner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.65rem !important;
+  }
+  .alert-pill-item {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Login screen on small phones */
+  .login-card, .login-dual-card {
+    padding: 1.25rem 1rem !important;
+  }
+  .login-header h2 {
+    font-size: 1.2rem !important;
   }
 }
 

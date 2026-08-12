@@ -1156,6 +1156,32 @@ const App = {
     }
   },
 
+  toggleSidebar() {
+    const sidebar = document.getElementById('main-sidebar');
+    if (!sidebar) return;
+    const isCollapsed = sidebar.classList.toggle('collapsed');
+    document.body.classList.toggle('sidebar-collapsed', isCollapsed);
+    localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
+    const toggleBtn = document.getElementById('btn-sidebar-toggle');
+    if (toggleBtn) toggleBtn.innerText = isCollapsed ? '▶' : '◀';
+  },
+
+  toggleMobileSidebar(forceClose = false) {
+    const sidebar = document.getElementById('main-sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (!sidebar || !overlay) return;
+
+    if (forceClose) {
+      sidebar.classList.remove('mobile-open');
+      overlay.classList.remove('show');
+      overlay.style.display = 'none';
+    } else {
+      const isOpen = sidebar.classList.toggle('mobile-open');
+      overlay.classList.toggle('show', isOpen);
+      overlay.style.display = isOpen ? 'block' : 'none';
+    }
+  },
+
   resetPageFilters() {
     // 1. Requests Management Filters
     if (document.getElementById('filter-search')) document.getElementById('filter-search').value = '';
@@ -1208,6 +1234,7 @@ const App = {
   },
 
   switchView(viewName) {
+    this.toggleMobileSidebar(true);
     if (this.state.currentView && this.state.currentView !== viewName) {
       this.resetPageFilters();
     }
