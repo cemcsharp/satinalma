@@ -3522,6 +3522,39 @@ const App = {
           </div>
         </div>
       `;
+    } else if (type === 'guarantee') {
+      if (printTitle) printTitle.innerText = 'TEMİNAT MEKTUBU VE KASA TAKİP FORMU';
+      printBody.innerHTML = `
+        <div style="border: 1.5px solid #0f172a; padding: 1rem; border-radius: 6px; background: #fff; page-break-inside: avoid;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 0.6rem; margin-bottom: 0.75rem;">
+            <div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">TEMİNAT MEKTUP NO</div>
+              <div style="font-size: 1.3rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.letterNo}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">MEKTUP DURUMU</div>
+              <div style="font-size: 1rem; font-weight: 700; color: #0f172a;">${data.status}</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem 1rem; font-size: 8.5pt; margin-bottom: 0.75rem;">
+            <div><strong>Düzenleyen Banka:</strong> 🏦 ${data.bankName || data.bank || '-'}</div>
+            <div><strong>Teminat Türü:</strong> ${data.type || '-'}</div>
+            <div style="grid-column: span 2;"><strong>İlişkili İhale / İş:</strong> ${data.title || '-'}</div>
+            <div><strong>Yüklenici Firma:</strong> ${data.supplier || '-'}</div>
+            <div><strong>Sorumlu Birim:</strong> ${data.unit || '-'}</div>
+            <div><strong>Düzenleme Tarihi:</strong> ${data.issueDate || '-'}</div>
+            <div><strong>Son Geçerlilik (Vade):</strong> ${data.expiryDate || '-'}</div>
+            <div><strong>Kasa Saklama Konumu:</strong> 🔒 ${data.storageLocation || 'Mali İşler Kasası'}</div>
+            <div style="grid-column: span 2;"><strong>Teminat Tutarı:</strong> <span style="font-size: 1.05rem; font-weight: 800; color: #16a34a;">${(data.amount || data.guaranteeAmount || 0).toLocaleString('tr-TR')} ${data.currency || 'TRY'}</span></div>
+          </div>
+
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 0.6rem;">
+            <div style="font-size: 7.5pt; font-weight: 700; color: #475569; margin-bottom: 0.2rem;">AÇIKLAMA VE NOTLAR:</div>
+            <div style="font-size: 8.5pt; line-height: 1.4; white-space: pre-wrap; background: #f8fafc; padding: 0.6rem; border-radius: 4px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Açıklama girilmemiş.'}</div>
+          </div>
+        </div>
+      `;
     } else if (type === 'tender') {
       if (printTitle) printTitle.innerText = 'İHALE PLANLAMA VE SÜREÇ FORMU';
       printBody.innerHTML = `
@@ -3833,6 +3866,7 @@ const App = {
     const g = this.state.guarantees.find(item => String(item.id) === String(id));
     if (!g) return;
 
+    this.state.currentActiveDetail = { type: 'guarantee', data: g };
     document.getElementById('view-details-title').innerText = `🛡️ Teminat Mektubu #${g.letterNo}`;
     const body = document.getElementById('view-details-body');
     if (body) {
@@ -3850,15 +3884,15 @@ const App = {
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; font-size: 0.88rem; margin-bottom: 1rem;">
-            <div><strong>Düzenleyen Banka:</strong> 🏦 ${g.bankName}</div>
-            <div><strong>Teminat Türü:</strong> ${g.type}</div>
-            <div style="grid-column: span 2;"><strong>İlişkili İhale / İş:</strong> ${g.title}</div>
-            <div><strong>Yüklenici Firma:</strong> ${g.supplier}</div>
+            <div><strong>Düzenleyen Banka:</strong> 🏦 ${g.bankName || g.bank || '-'}</div>
+            <div><strong>Teminat Türü:</strong> ${g.type || '-'}</div>
+            <div style="grid-column: span 2;"><strong>İlişkili İhale / İş:</strong> ${g.title || '-'}</div>
+            <div><strong>Yüklenici Firma:</strong> ${g.supplier || '-'}</div>
             <div><strong>Sorumlu Birim:</strong> ${g.unit || '-'}</div>
             <div><strong>Düzenleme Tarihi:</strong> ${g.issueDate || '-'}</div>
             <div><strong>Son Geçerlilik (Vade):</strong> ${g.expiryDate || '-'}</div>
             <div><strong>Kasa Saklama Konumu:</strong> 🔒 ${g.storageLocation || 'Mali İşler Kasası'}</div>
-            <div><strong>Teminat Tutarı:</strong> <span style="font-size: 1.15rem; font-weight: 800; color: var(--status-completed); font-family: var(--font-mono);">${(g.amount || 0).toLocaleString('tr-TR')} ${g.currency || 'TRY'}</span></div>
+            <div style="grid-column: span 2;"><strong>Teminat Tutarı:</strong> <span style="font-size: 1.15rem; font-weight: 800; color: var(--status-completed); font-family: var(--font-mono);">${(g.amount || g.guaranteeAmount || 0).toLocaleString('tr-TR')} ${g.currency || 'TRY'}</span></div>
           </div>
 
           <div style="border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
@@ -3867,6 +3901,14 @@ const App = {
           </div>
         </div>
       `;
+    }
+
+    const editBtn = document.getElementById('btn-edit-from-view');
+    if (editBtn) {
+      editBtn.onclick = () => {
+        this.closeModal('modal-view-details');
+        this.openGuaranteeModal(g.id);
+      };
     }
 
     this.openModal('modal-view-details');
