@@ -108,6 +108,9 @@
         <li class="nav-item active" data-view="dashboard">
           <button><span class="nav-icon">📊</span><span>Dashboard</span></button>
         </li>
+        <li class="nav-item" data-view="notifications">
+          <button><span class="nav-icon">🔔</span><span>Bildirim Merkezi</span><span class="nav-counter-badge" id="nav-notif-count" style="display:none; margin-left:auto; background:var(--status-rejected); color:#fff; font-size:0.7rem; font-weight:bold; padding:0.1rem 0.45rem; border-radius:10px;">0</span></button>
+        </li>
         <li class="nav-item" data-view="my-requests">
           <button><span class="nav-icon">👤</span><span>Taleplerim</span></button>
         </li>
@@ -245,6 +248,9 @@
 
       <!-- 1. DASHBOARD VIEW -->
       <section id="view-dashboard" class="view-section">
+        <!-- Smart Proactive Alerts Banner (Yaklaşan Vadeler & Alarmlar) -->
+        <div id="dashboard-alerts-container" style="display: none; margin-bottom: 1.25rem;"></div>
+
         <div class="grid-4" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));">
           <div class="glass-card kpi-card">
             <div class="kpi-icon blue">📋</div>
@@ -371,6 +377,74 @@
               </table>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- 🔔 NOTIFICATIONS & ALARM CENTER VIEW -->
+      <section id="view-notifications" class="view-section" style="display: none;">
+        <div class="grid-4" style="margin-bottom: 1.5rem;">
+          <div class="glass-card kpi-card notif-filter-kpi active" data-notif-filter="ALL" style="cursor: pointer;">
+            <div class="kpi-icon red">🔔</div>
+            <div class="kpi-data">
+              <h3 id="notif-kpi-total">0</h3>
+              <p>Toplam Bildirim</p>
+              <div class="kpi-sub">Tüm Aktif Uyarılar</div>
+            </div>
+          </div>
+          <div class="glass-card kpi-card notif-filter-kpi" data-notif-filter="CRITICAL" style="cursor: pointer;">
+            <div class="kpi-icon red">🚨</div>
+            <div class="kpi-data">
+              <h3 id="notif-kpi-critical" style="color: var(--status-rejected);">0</h3>
+              <p style="color: var(--status-rejected); font-weight:700;">Acil / Vadesi Dolan</p>
+              <div class="kpi-sub" style="color: var(--status-rejected);">Vadesi Geçen & 7 Gün</div>
+            </div>
+          </div>
+          <div class="glass-card kpi-card notif-filter-kpi" data-notif-filter="WARNING" style="cursor: pointer;">
+            <div class="kpi-icon yellow">⏳</div>
+            <div class="kpi-data">
+              <h3 id="notif-kpi-warning" style="color: var(--status-open);">0</h3>
+              <p>Yaklaşan Vadeler</p>
+              <div class="kpi-sub">8 - 30 Gün Kalanlar</div>
+            </div>
+          </div>
+          <div class="glass-card kpi-card notif-filter-kpi" data-notif-filter="INFO" style="cursor: pointer;">
+            <div class="kpi-icon blue">ℹ️</div>
+            <div class="kpi-data">
+              <h3 id="notif-kpi-info">0</h3>
+              <p>Hatırlatmalar</p>
+              <div class="kpi-sub">Sözleşme & Talep Takibi</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Filter Toolbar -->
+        <div class="filter-bar">
+          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;" id="notif-category-tabs">
+            <button class="btn-secondary active-date-tab notif-cat-btn" data-category="ALL" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              Tümü
+            </button>
+            <button class="btn-secondary notif-cat-btn" data-category="GUARANTEE" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              🛡️ Teminat Mektupları (<span id="notif-count-guarantee">0</span>)
+            </button>
+            <button class="btn-secondary notif-cat-btn" data-category="CONTRACT" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              📑 Sözleşmeler (<span id="notif-count-contract">0</span>)
+            </button>
+            <button class="btn-secondary notif-cat-btn" data-category="INVOICE" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              🧾 Faturalar (<span id="notif-count-invoice">0</span>)
+            </button>
+            <button class="btn-secondary notif-cat-btn" data-category="REQUEST" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              📋 Talepler (<span id="notif-count-request">0</span>)
+            </button>
+          </div>
+
+          <div class="search-input-box" style="min-width:220px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-notif-search" placeholder="Bildirimlerde ara...">
+          </div>
+        </div>
+
+        <!-- Notification List Cards Container -->
+        <div id="notifications-cards-container" class="notif-cards-grid" style="display:flex; flex-direction:column; gap:0.75rem;">
         </div>
       </section>
 
@@ -1425,6 +1499,9 @@
           <button class="btn-secondary" data-tab="savings" style="padding: 0.55rem 1.1rem; font-weight: 700; font-size: 0.88rem; border-color: var(--status-completed);">
             👤 Sekme 4: Personel Pazarlık Tasarrufu & Aylık Kırılım
           </button>
+          <button class="btn-secondary" data-tab="matrix" style="padding: 0.55rem 1.1rem; font-weight: 700; font-size: 0.88rem; border-color: var(--accent-primary);">
+            🏛️ Sekme 5: İhale Maddesi x Tedarikçi Matrisi
+          </button>
         </div>
 
         <!-- TAB 1: FINANCIAL & SAVINGS REPORT -->
@@ -1633,6 +1710,132 @@
                 </thead>
                 <tbody></tbody>
                 <tfoot style="background: var(--bg-card); font-weight: 800; border-top: 2px solid var(--border-color);"></tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 5: REGULATION X SUPPLIER DRILL-DOWN MATRIX -->
+        <div id="yearly-tab-matrix" class="yearly-tab-content" style="display: none;">
+          <!-- Top KPI Cards for Matrix -->
+          <div class="grid-4" style="margin-bottom: 1.5rem;">
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon yellow">📜</div>
+              <div class="kpi-data">
+                <h3 id="matrix-kpi-total-reg">0</h3>
+                <p>Kullanılan İhale Maddesi</p>
+                <div class="kpi-sub" id="matrix-kpi-total-reg-sub">Mevzuat Kalemleri</div>
+              </div>
+            </div>
+
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon blue">🏭</div>
+              <div class="kpi-data">
+                <h3 id="matrix-kpi-total-supp">0</h3>
+                <p>Aktif Tedarikçi Firma</p>
+                <div class="kpi-sub" id="matrix-kpi-total-supp-sub">Sipariş Geçilen</div>
+              </div>
+            </div>
+
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon purple">📦</div>
+              <div class="kpi-data">
+                <h3 id="matrix-kpi-total-orders">0</h3>
+                <p>Toplam Sipariş / Talep</p>
+                <div class="kpi-sub" id="matrix-kpi-total-orders-sub">İşlem Hacmi</div>
+              </div>
+            </div>
+
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon green">💰</div>
+              <div class="kpi-data">
+                <h3 id="matrix-kpi-total-spend">0 ₺</h3>
+                <p>Toplam Harcama Bedeli</p>
+                <div class="kpi-sub" id="matrix-kpi-total-spend-sub">Gerçekleşen Tutar</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts Row for Matrix -->
+          <div class="grid-2" style="margin-bottom: 1.5rem;">
+            <div class="glass-card">
+              <div class="card-header">
+                <h3>📊 En Yüksek Hacimli İhale Maddesi - Tedarikçi Eşleşmeleri</h3>
+                <button class="btn-secondary" id="btn-export-chart-matrix-bar" style="padding:0.25rem 0.6rem; font-size:0.75rem;">
+                  <span>📷</span> PNG İndir
+                </button>
+              </div>
+              <div style="height: 300px; position: relative;">
+                <canvas id="chart-yearly-matrix-bar"></canvas>
+              </div>
+            </div>
+
+            <div class="glass-card">
+              <div class="card-header">
+                <h3>🗂️ İhale Maddeleri Harcama Ağırlığı & Tedarikçi Dağılımı</h3>
+                <button class="btn-secondary" id="btn-export-chart-matrix-doughnut" style="padding:0.25rem 0.6rem; font-size:0.75rem;">
+                  <span>📷</span> PNG İndir
+                </button>
+              </div>
+              <div style="height: 300px; position: relative;">
+                <canvas id="chart-yearly-matrix-doughnut"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Filter & Action Bar -->
+          <div class="glass-card" style="margin-bottom: 1.5rem;">
+            <div class="filter-bar" style="flex-wrap: wrap; gap: 0.75rem; align-items: center;">
+              <div class="search-input-box" style="min-width: 220px; flex: 1;">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="filter-matrix-search" placeholder="Firma adı, talep konusu veya barkod no ara...">
+              </div>
+
+              <select class="filter-select" id="filter-matrix-regulation" style="min-width: 180px;">
+                <option value="ALL">🏛️ Tüm İhale Maddeleri</option>
+              </select>
+
+              <select class="filter-select" id="filter-matrix-supplier" style="min-width: 180px;">
+                <option value="ALL">🏭 Tüm Tedarikçiler</option>
+              </select>
+
+              <select class="filter-select" id="filter-matrix-groupby" style="min-width: 220px; font-weight: 700; border-color: var(--accent-primary);">
+                <option value="REG_FIRST">🏛️ Maddeye Göre Grupla (Madde ➔ Tedarikçi)</option>
+                <option value="SUPP_FIRST">🏭 Tedarikçiye Göre Grupla (Tedarikçi ➔ Madde)</option>
+              </select>
+
+              <div style="display: flex; gap: 0.5rem; margin-left: auto; flex-wrap: wrap;">
+                <button class="btn-secondary" id="btn-matrix-expand-all" style="padding: 0.5rem 0.85rem; font-size: 0.8rem;" title="Tüm grupları aç">
+                  <span>➕</span> Tümünü Aç
+                </button>
+                <button class="btn-secondary" id="btn-matrix-collapse-all" style="padding: 0.5rem 0.85rem; font-size: 0.8rem;" title="Tüm grupları kapat">
+                  <span>➖</span> Tümünü Kapat
+                </button>
+                <button class="btn-secondary" id="btn-export-matrix-excel" style="padding: 0.5rem 0.85rem; font-size: 0.8rem;">
+                  <span>📥</span> Excel İndir
+                </button>
+                <button class="btn-export-pdf" id="btn-export-matrix-pdf" style="padding: 0.5rem 0.85rem; font-size: 0.8rem;">
+                  <span>🖨️</span> PDF / Yazdır
+                </button>
+              </div>
+            </div>
+
+            <!-- Multi-Level Drill-Down Tree Table -->
+            <div class="table-container" style="margin-top: 1rem; overflow-x: auto;">
+              <table class="custom-table" id="table-yearly-matrix" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th style="width: 45px; text-align: center;"></th>
+                    <th>İhale / Yönetmelik Maddesi & Tedarikçi Hiyerarşisi</th>
+                    <th style="text-align: center; width: 140px;">Sipariş / İş Adedi</th>
+                    <th style="text-align: right; width: 160px;">Toplam Tutar (₺)</th>
+                    <th style="text-align: right; width: 140px;">Ort. Sipariş Tutarı</th>
+                    <th style="text-align: center; width: 110px;">Bütçe Payı %</th>
+                    <th style="text-align: center; width: 130px;">Talepler & İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-yearly-matrix"></tbody>
+                <tfoot id="tfoot-yearly-matrix" style="background: var(--bg-card); font-weight: 800; border-top: 2px solid var(--border-color);"></tfoot>
               </table>
             </div>
           </div>
@@ -2556,11 +2759,111 @@
           <span>🖨️</span> Resmi Belge Yazdır / PDF
         </button>
         <div style="display: flex; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btn-docs-from-view" onclick="App.openDocumentManagerForCurrentDetail()">
+            <span>📁</span> Dijital Arşiv & Evraklar
+          </button>
           <button type="button" class="btn-primary" id="btn-edit-from-view">
             <span>✏️</span> Düzenle
           </button>
           <button type="button" class="btn-secondary close-modal">Kapat</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DOKÜMAN & DİJİTAL ARŞİV YÖNETİCİSİ -->
+  <div class="modal-overlay" id="modal-document-manager">
+    <div class="modal-content" style="max-width: 820px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h3 id="doc-modal-title">📁 Dijital Arşiv & Evrak Yönetimi</h3>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 1rem 0; overflow-y: auto; flex: 1;">
+        <!-- Entity Info Summary Card -->
+        <div id="doc-entity-summary-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-primary); border-radius: var(--radius-md); padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;" id="doc-entity-type-label">Talep Evrakları</div>
+          <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin-top: 0.2rem;" id="doc-entity-title-label">249001 - Bilgisayar Malzemeleri Alımı</div>
+        </div>
+
+        <!-- Upload New File Card -->
+        <div style="background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+          <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+            <span>📤</span> Yeni Evrak / Belge Yükle
+          </h4>
+          <form id="form-upload-document" onsubmit="event.preventDefault(); App.handleUploadDocumentSubmit();">
+            <input type="hidden" id="doc-upload-entity-type">
+            <input type="hidden" id="doc-upload-entity-id">
+
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.8rem; font-weight: 600;">Belge Türü / Kategori <span class="required">*</span></label>
+                <select id="doc-upload-category" required style="padding: 0.5rem 0.75rem;">
+                  <option value="Teknik Şartname">📄 Teknik Şartname</option>
+                  <option value="Teklif Mektubu">📑 Teklif Mektubu / Fiyat Formu</option>
+                  <option value="Sözleşme Metni">📜 İmzalı Sözleşme Metni</option>
+                  <option value="Fatura Görseli">🧾 Fatura Görseli / E-Fatura</option>
+                  <option value="Teminat Mektubu">🛡️ Teminat Mektubu Fotokopisi</option>
+                  <option value="Muayene Kabul Tutanağı">✅ Muayene & Kabul Tutanağı</option>
+                  <option value="Piyasa Araştırma Tutanağı">📊 Piyasa Fiyat Araştırma Tutanağı</option>
+                  <option value="Diğer Evrak">📁 Diğer Resmi Belge / Ek</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.8rem; font-weight: 600;">Açıklama / Not</label>
+                <input type="text" id="doc-upload-description" placeholder="ör: Firma ıslak imzalı teklif..." style="padding: 0.5rem 0.75rem;">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <input type="file" id="doc-upload-file-input" required accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.rar" style="font-size: 0.82rem; flex: 1;">
+              <button type="submit" class="btn-primary" id="btn-submit-doc-upload" style="padding: 0.55rem 1.1rem; white-space: nowrap;">
+                <span>⬆️</span> Dosyayı Yükle
+              </button>
+            </div>
+            <div id="doc-upload-progress" style="display: none; font-size: 0.8rem; color: var(--accent-primary); margin-top: 0.5rem; font-weight: 600;">
+              ⏳ Dosya sunucuya yükleniyor, lütfen bekleyin...
+            </div>
+          </form>
+        </div>
+
+        <!-- Attached Documents Header & ZIP Download -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h4 style="font-size: 0.9rem; font-weight: 700; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+            <span>📎</span> Kayıtlı Evraklar (<span id="doc-list-count">0</span>)
+          </h4>
+          <button type="button" class="btn-secondary" id="btn-download-all-zip" onclick="App.downloadAllEntityDocsZip()" style="padding: 0.4rem 0.8rem; font-size: 0.78rem;">
+            <span>📦</span> Tüm Evrakları ZIP İndir
+          </button>
+        </div>
+
+        <!-- Documents Table / List -->
+        <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+          <table class="custom-table" id="table-entity-documents">
+            <thead>
+              <tr>
+                <th style="width: 45px;">Tür</th>
+                <th>Belge Adı</th>
+                <th>Kategori</th>
+                <th>Boyut</th>
+                <th>Yükleyen & Tarih</th>
+                <th style="text-align: right; width: 140px;">İşlemler</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-entity-documents">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                  Henüz eklenmiş bir evrak bulunmuyor.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="form-actions" style="justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 0.85rem;">
+        <button type="button" class="btn-secondary close-modal">Kapat</button>
       </div>
     </div>
   </div>

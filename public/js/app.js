@@ -20,6 +20,17 @@ const App = {
     pageSize: 15,
     yearlyActiveTab: 'financial',
     dismissedNotifs: [],
+    documents: [],
+    currentDocEntity: { entityType: null, entityId: null, title: '' },
+    notifFilter: 'ALL',
+    notifCategory: 'ALL',
+    notifSearch: '',
+    matrixSearch: '',
+    matrixRegulation: 'ALL',
+    matrixSupplier: 'ALL',
+    matrixGroupBy: 'REG_FIRST',
+    expandedMatrixGroups: new Set(),
+    expandedMatrixSubGroups: new Set(),
     charts: {}
   },
 
@@ -91,6 +102,7 @@ const App = {
         this.state.invoices = data.invoices || [];
         this.state.tenders = data.tenders || [];
         this.state.logs = data.logs || [];
+        this.state.documents = data.documents || [];
         if (data.rates) this.state.rates = data.rates;
         this.state.dismissedNotifs = JSON.parse(localStorage.getItem('dismissedNotifs') || '[]');
 
@@ -779,7 +791,29 @@ const App = {
 
     // Notification Center Event Listeners
     document.getElementById('btn-mark-all-notifications-read')?.addEventListener('click', () => this.markAllNotificationsRead());
-    document.getElementById('filter-notif-category')?.addEventListener('change', () => this.renderNotificationsView());
+    
+    document.querySelectorAll('.notif-filter-kpi').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.notif-filter-kpi').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        this.state.notifFilter = card.getAttribute('data-notif-filter') || 'ALL';
+        this.renderNotificationsView();
+      });
+    });
+
+    document.querySelectorAll('.notif-cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.notif-cat-btn').forEach(b => b.classList.remove('active-date-tab'));
+        btn.classList.add('active-date-tab');
+        this.state.notifCategory = btn.getAttribute('data-category') || 'ALL';
+        this.renderNotificationsView();
+      });
+    });
+
+    document.getElementById('filter-notif-search')?.addEventListener('input', (e) => {
+      this.state.notifSearch = e.target.value.toLowerCase().trim();
+      this.renderNotificationsView();
+    });
 
     // Delegation Execution & Filters
     document.getElementById('btn-execute-delegation')?.addEventListener('click', () => this.handleDelegation());
@@ -796,37 +830,63 @@ const App = {
     });
 
     // Print & Export Event Listeners
-    document.getElementById('btn-print-yearly-report')?.addEventListener('click', () => window.print());
-    document.getElementById('btn-export-yearly-excel')?.addEventListener('click', () => this.exportTableToExcel('table-yearly-monthly', 'Yillik_Faaliyet_Raporu.xls'));
+    document.getElementById('btn-print-yearly-report')?.addEventListener('click', () => this.printSection('view-yearly-report', 'YILLIK SATINALMA FAALİYET VE TASARRUF RAPORU'));
+    document.getElementById('btn-export-yearly-excel')?.addEventListener('click', () => this.exportYearlyFinancialToExcel());
+    document.getElementById('btn-export-matrix-excel')?.addEventListener('click', () => this.exportMatrixToExcel());
+    document.getElementById('btn-export-matrix-pdf')?.addEventListener('click', () => this.printSection('yearly-tab-matrix', 'İHALE MADDESİ & TEDARİKÇİ SİPARİŞ MATRİSİ'));
+    document.getElementById('btn-matrix-expand-all')?.addEventListener('click', () => this.expandAllMatrixGroups());
+    document.getElementById('btn-matrix-collapse-all')?.addEventListener('click', () => this.collapseAllMatrixGroups());
 
-    document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportToCSV());
-    document.getElementById('btn-export-requests-pdf')?.addEventListener('click', () => this.printSection('view-requests'));
+    // Matrix Filters
+    document.getElementById('filter-matrix-search')?.addEventListener('input', (e) => {
+      this.state.matrixSearch = e.target.value.toLowerCase().trim();
+      this.renderYearlyMatrixReport();
+    });
+    document.getElementById('filter-matrix-regulation')?.addEventListener('change', (e) => {
+      this.state.matrixRegulation = e.target.value;
+      this.renderYearlyMatrixReport();
+    });
+    document.getElementById('filter-matrix-supplier')?.addEventListener('change', (e) => {
+      this.state.matrixSupplier = e.target.value;
+      this.renderYearlyMatrixReport();
+    });
+    document.getElementById('filter-matrix-groupby')?.addEventListener('change', (e) => {
+      this.state.matrixGroupBy = e.target.value;
+      this.renderYearlyMatrixReport();
+    });
 
-    document.getElementById('btn-export-my-pdf')?.addEventListener('click', () => this.printSection('view-my-requests'));
+    // Dedicated Domain Excel & PDF Exporters
+    document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportRequestsToExcel());
+    document.getElementById('btn-export-requests-pdf')?.addEventListener('click', () => this.printSection('view-requests', 'SATINALMA TALEPLERİ VE SİPARİŞ LİSTESİ'));
 
-    document.getElementById('btn-export-contracts-excel')?.addEventListener('click', () => this.exportTableToExcel('table-contracts', 'Sozlesme_Listesi.xls'));
-    document.getElementById('btn-export-contracts-pdf')?.addEventListener('click', () => this.printSection('view-contracts'));
+    document.getElementById('btn-export-my-pdf')?.addEventListener('click', () => this.printSection('view-my-requests', 'KİŞİSEL TALEPLER VE İŞ LİSTESİ'));
 
-    document.getElementById('btn-export-invoices-excel')?.addEventListener('click', () => this.exportTableToExcel('table-invoices', 'Fatura_Listesi.xls'));
-    document.getElementById('btn-export-invoices-pdf')?.addEventListener('click', () => this.printSection('view-invoices'));
+    document.getElementById('btn-export-contracts-excel')?.addEventListener('click', () => this.exportContractsToExcel());
+    document.getElementById('btn-export-contracts-pdf')?.addEventListener('click', () => this.printSection('view-contracts', 'KURUMSAL SÖZLEŞMELER VE YÜKLENİCİ ÇİZELGESİ'));
 
-    document.getElementById('btn-export-unit-excel')?.addEventListener('click', () => this.exportTableToExcel('table-unit-detailed', 'Birim_Analizi.xls'));
-    document.getElementById('btn-export-unit-pdf')?.addEventListener('click', () => this.printSection('view-unit-analysis'));
+    document.getElementById('btn-export-invoices-excel')?.addEventListener('click', () => this.exportInvoicesToExcel());
+    document.getElementById('btn-export-invoices-pdf')?.addEventListener('click', () => this.printSection('view-invoices', 'FATURA VE ÖDEME TAKİP LİSTESİ'));
 
-    document.getElementById('btn-export-supplier-excel')?.addEventListener('click', () => this.exportTableToExcel('table-supplier-detailed', 'Tedarikci_Analizi.xls'));
-    document.getElementById('btn-export-supplier-pdf')?.addEventListener('click', () => this.printSection('view-supplier-analysis'));
+    document.getElementById('btn-export-guarantees-excel')?.addEventListener('click', () => this.exportGuaranteesToExcel());
+    document.getElementById('btn-export-guarantees-pdf')?.addEventListener('click', () => this.printSection('view-guarantees', 'TEMİNAT MEKTUPLARI VE KASA ÇİZELGESİ'));
 
-    document.getElementById('btn-export-logs-excel')?.addEventListener('click', () => this.exportTableToExcel('table-activity-logs', 'Aktivite_Loglari.xls'));
-    document.getElementById('btn-export-logs-pdf')?.addEventListener('click', () => this.printSection('view-activity-logs'));
+    document.getElementById('btn-export-unit-excel')?.addEventListener('click', () => this.exportUnitAnalysisToExcel());
+    document.getElementById('btn-export-unit-pdf')?.addEventListener('click', () => this.printSection('view-unit-analysis', 'BİRİM BAZLI HARCAMA VE PERFORMANS CETVELİ'));
 
-    document.getElementById('btn-export-delegation-excel')?.addEventListener('click', () => this.exportTableToExcel('table-delegation-requests', 'Delegasyon_Listesi.xls'));
-    document.getElementById('btn-export-delegation-pdf')?.addEventListener('click', () => this.printSection('view-workload'));
+    document.getElementById('btn-export-supplier-excel')?.addEventListener('click', () => this.exportSupplierAnalysisToExcel());
+    document.getElementById('btn-export-supplier-pdf')?.addEventListener('click', () => this.printSection('view-supplier-analysis', 'TEDARİKÇİ BAZLI HARCAMA VE İŞ HACMİ RAPORU'));
+
+    document.getElementById('btn-export-logs-excel')?.addEventListener('click', () => this.exportLogsToExcel());
+    document.getElementById('btn-export-logs-pdf')?.addEventListener('click', () => this.printSection('view-activity-logs', 'SİSTEM AKTİVİTE VE DENETİM LOGLARI'));
+
+    document.getElementById('btn-export-delegation-excel')?.addEventListener('click', () => this.exportDelegationToExcel());
+    document.getElementById('btn-export-delegation-pdf')?.addEventListener('click', () => this.printSection('view-workload', 'İŞ YÜKÜ VE PERSONEL DELEGASYON CETVELİ'));
 
     // Manual Backup Button
     document.getElementById('btn-trigger-backup-now')?.addEventListener('click', () => this.triggerManualBackup());
 
-    // Export Weekly Payment Schedule to CSV
-    document.getElementById('btn-export-weekly-payments')?.addEventListener('click', () => this.exportWeeklyPaymentsToCSV());
+    // Export Weekly Payment Schedule to Excel
+    document.getElementById('btn-export-weekly-payments')?.addEventListener('click', () => this.exportWeeklyPaymentsToExcel());
 
     // Re-import Excel
     document.getElementById('btn-reimport-excel')?.addEventListener('click', () => {
@@ -925,6 +985,8 @@ const App = {
     document.getElementById('btn-export-chart-unit-volume')?.addEventListener('click', () => this.exportChartToPNG('chart-unit-volume-bar', 'Birimler_Arasi_Kiyaslama_Grafigi.png'));
     document.getElementById('btn-export-chart-combo')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-combo', 'Aylik_Harcama_Talep_Grafigi.png'));
     document.getElementById('btn-export-chart-savings')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-savings', 'Pazarlik_Tasarrufu_Grafigi.png'));
+    document.getElementById('btn-export-chart-matrix-bar')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-matrix-bar', 'Ihale_Maddesi_Tedarikci_Grafigi.png'));
+    document.getElementById('btn-export-chart-matrix-doughnut')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-matrix-doughnut', 'Ihale_Maddesi_Harcama_Payi.png'));
     document.getElementById('btn-export-chart-sla')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-sla', 'SLA_Surec_Hizi_Grafigi.png'));
     document.getElementById('btn-export-chart-sla-dist')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-sla-distribution', 'Bekleme_Suresi_Dagilimi_Grafigi.png'));
     document.getElementById('btn-export-chart-regulations')?.addEventListener('click', () => this.exportChartToPNG('chart-yearly-regulations', 'Yonetmelik_Maddeleri_Grafigi.png'));
@@ -1265,7 +1327,27 @@ const App = {
     else if (view === 'settings') this.renderSettings();
   },
 
-  // 🔔 NOTIFICATION CENTER & ALERTS (GÜNCELLENMİŞ VE GELİŞTİRİLMİŞ)
+  // 🔔 NOTIFICATION CENTER & PROACTIVE ALARM ENGINE
+  parseDate(dateStr) {
+    if (!dateStr) return null;
+    const s = String(dateStr).trim();
+    if (s.includes('-')) {
+      const parts = s.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        if (parts[2].length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+    } else if (s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length === 3) {
+        if (parts[2].length >= 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        if (parts[0].length >= 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  },
+
   getAllNotifications() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -1273,112 +1355,210 @@ const App = {
     const dismissed = this.state.dismissedNotifs || [];
     const allNotifs = [];
 
-    // 1. SLA 14+ Days Overdue Requests
-    const overdueRequests = (this.state.requests || []).filter(r => {
-      if (r.status !== 'Açık') return false;
-      const d = new Date(r.arrivalDate || r.requestDate);
-      d.setHours(0, 0, 0, 0);
-      const diff = Math.max(0, Math.ceil((today - d) / (1000 * 60 * 60 * 24)));
-      return diff >= 14;
+    // 1. GUARANTEES (Teminat Mektubu Vadeleri)
+    const guarantees = (this.state.guarantees || []).filter(g => {
+      const st = (g.status || '').toLowerCase();
+      return st !== 'iade edildi' && st !== 'iade' && st !== 'nakte çevrildi' && st !== 'iptal';
     });
 
-    overdueRequests.forEach(r => {
-      const id = `sla_${r.id}`;
-      const d = new Date(r.arrivalDate || r.requestDate);
-      d.setHours(0, 0, 0, 0);
-      const diff = Math.max(0, Math.ceil((today - d) / (1000 * 60 * 60 * 24)));
+    guarantees.forEach(g => {
+      const exp = this.parseDate(g.expiryDate);
+      if (exp) {
+        exp.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+        
+        let level = null;
+        let countdownText = '';
+        let tagClass = '';
 
-      allNotifs.push({
-        id: id,
-        category: 'SLA',
-        icon: '🚨',
-        title: `Barkod #${r.requestBarcode || r.id} — ${r.subject || 'Talep'} (${diff} Gün Gecikmede!)`,
-        sub: `Birim: ${r.unit} | Atanan: ${r.assignedTo || 'Atanmadı'} | Geliş: ${r.arrivalDate || r.requestDate}`,
-        date: r.arrivalDate || r.requestDate,
-        isRead: dismissed.includes(id) || dismissed.includes('sla'),
-        action: () => {
-          this.switchView('requests');
-          setTimeout(() => this.viewRequestDetails(r.id), 100);
+        if (diffDays <= 0) {
+          level = 'CRITICAL';
+          countdownText = diffDays === 0 ? 'Bugün Vade Doluyor! 🚨' : `${Math.abs(diffDays)} Gün Önce Süresi Doldu! 🚨`;
+          tagClass = 'critical';
+        } else if (diffDays <= 7) {
+          level = 'CRITICAL';
+          countdownText = `Son ${diffDays} Gün Kaldı! 🔴`;
+          tagClass = 'critical';
+        } else if (diffDays <= 15) {
+          level = 'WARNING';
+          countdownText = `${diffDays} Gün Kaldı 🟠`;
+          tagClass = 'warning';
+        } else if (diffDays <= 30) {
+          level = 'WARNING';
+          countdownText = `${diffDays} Gün Kaldı 🟡`;
+          tagClass = 'warning';
         }
-      });
-    });
 
-    // 2. Contracts Expiring in <= 30 Days
-    const activeContracts = (this.state.contracts || []).filter(c => c.status === 'Aktif');
-    activeContracts.forEach(c => {
-      if (c.endDate) {
-        const endDt = new Date(c.endDate);
-        endDt.setHours(0, 0, 0, 0);
-        const diff = Math.ceil((endDt - today) / (1000 * 60 * 60 * 24));
-        if (diff >= 0 && diff <= 30) {
-          const id = `contract_${c.id}`;
-          allNotifs.push({
-            id: id,
-            category: 'CONTRACT',
-            icon: '📑',
-            title: `Sözleşme #${c.contractNo || c.id} — ${c.title} (Son ${diff} Gün!)`,
-            sub: `Yüklenici: ${c.supplier} | Bitiş Tarihi: ${c.endDate} | Tutar: ${c.totalAmount?.toLocaleString('tr-TR')} ₺`,
-            date: c.endDate,
-            isRead: dismissed.includes(id) || dismissed.includes('contract'),
-            action: () => {
-              this.switchView('contracts');
-              setTimeout(() => this.viewContractDetails(c.id), 100);
-            }
-          });
-        }
-      }
-    });
-
-    // 3. Guarantees Expiring in <= 30 Days
-    const activeGuarantees = (this.state.guarantees || []).filter(g => g.status === 'Aktif' || g.status === 'Vadesi Yaklaşan');
-    activeGuarantees.forEach(g => {
-      if (g.expiryDate) {
-        const expDt = new Date(g.expiryDate);
-        expDt.setHours(0, 0, 0, 0);
-        const diff = Math.ceil((expDt - today) / (1000 * 60 * 60 * 24));
-        if (diff <= 30) {
+        if (level) {
           const id = `guarantee_${g.id}`;
           allNotifs.push({
-            id: id,
+            id,
             category: 'GUARANTEE',
+            categoryName: 'Teminat Mektubu',
+            level,
             icon: '🛡️',
-            title: `Teminat Mektubu #${g.letterNo || g.id} — ${g.bankName} (${diff < 0 ? 'Süresi Doldu!' : `Son ${diff} Gün!`})`,
-            sub: `Firma: ${g.supplier} | İhale: ${g.title} | Tutar: ${g.amount?.toLocaleString('tr-TR')} ${g.currency || 'TRY'}`,
+            title: `Teminat Mektubu #${g.letterNo || g.id} — ${g.bank || g.bankName || 'Banka'} (${countdownText})`,
+            sub: `Firma: ${g.supplier || '-'} | Tutar: ${this.formatMoney(g.guaranteeAmount || g.amount || 0, g.currency || 'TRY', 2)} | Vade: ${g.expiryDate || '-'}`,
             date: g.expiryDate,
-            isRead: dismissed.includes(id) || dismissed.includes('guarantee'),
+            diffDays,
+            tag: countdownText,
+            tagClass,
+            isRead: dismissed.includes(id),
             action: () => {
               this.switchView('guarantees');
-              setTimeout(() => this.viewGuaranteeDetails(g.id), 100);
+              setTimeout(() => this.viewGuaranteeDetails(g.id), 120);
             }
           });
         }
       }
     });
 
-    // 4. Invoices Due in <= 7 Days
-    const activeInvoices = (this.state.invoices || []).filter(i => i.paymentStatus !== 'Ödendi');
-    activeInvoices.forEach(i => {
-      if (i.dueDate) {
-        const dDt = new Date(i.dueDate);
-        dDt.setHours(0, 0, 0, 0);
-        const diff = Math.ceil((dDt - today) / (1000 * 60 * 60 * 24));
-        if (diff <= 7) {
-          const id = `invoice_${i.id}`;
+    // 2. CONTRACTS (Sözleşme Bitiş & Yenileme Uyarısı)
+    const contracts = (this.state.contracts || []).filter(c => c.status === 'Aktif' || !c.status);
+    contracts.forEach(c => {
+      const endDt = this.parseDate(c.endDate);
+      if (endDt) {
+        endDt.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((endDt - today) / (1000 * 60 * 60 * 24));
+        
+        let level = null;
+        let countdownText = '';
+        let tagClass = '';
+
+        if (diffDays <= 0) {
+          level = 'CRITICAL';
+          countdownText = diffDays === 0 ? 'Bugün Sözleşme Bitiyor! 🚨' : `${Math.abs(diffDays)} Gün Önce Sözleşme Bitti! 🚨`;
+          tagClass = 'critical';
+        } else if (diffDays <= 30) {
+          level = 'CRITICAL';
+          countdownText = `Son ${diffDays} Gün! 🔴 (Yenileme / İhale Başlat)`;
+          tagClass = 'critical';
+        } else if (diffDays <= 60) {
+          level = 'WARNING';
+          countdownText = `${diffDays} Gün Kaldı 🟠 (2 Ay Kaldı)`;
+          tagClass = 'warning';
+        }
+
+        if (level) {
+          const id = `contract_${c.id}`;
           allNotifs.push({
-            id: id,
-            category: 'INVOICE',
-            icon: '🧾',
-            title: `Fatura #${i.invoiceNo || i.id} — ${i.supplier} (${diff < 0 ? `${Math.abs(diff)} Gün Gecikti!` : diff === 0 ? 'Bugün Vade!' : `${diff} Gün Kaldı`})`,
-            sub: `Vade Tarihi: ${i.dueDate} | Tutar: ${i.amount?.toLocaleString('tr-TR')} ${i.currency || 'TRY'}`,
-            date: i.dueDate,
-            isRead: dismissed.includes(id) || dismissed.includes('invoice'),
+            id,
+            category: 'CONTRACT',
+            categoryName: 'Sözleşme',
+            level,
+            icon: '📑',
+            title: `Sözleşme #${c.contractNo || c.id} — ${c.title || 'Sözleşme'} (${countdownText})`,
+            sub: `Yüklenici: ${c.supplier || '-'} | Birim: ${c.unit || '-'} | Bitiş: ${c.endDate || '-'} | Tutar: ${this.formatMoney(c.totalAmount || 0, c.currency || 'TRY', 2)}`,
+            date: c.endDate,
+            diffDays,
+            tag: countdownText,
+            tagClass,
+            isRead: dismissed.includes(id),
             action: () => {
-              this.switchView('invoices');
-              setTimeout(() => this.viewInvoiceDetails(i.id), 100);
+              this.switchView('contracts');
+              setTimeout(() => this.viewContractDetails(c.id), 120);
             }
           });
         }
       }
+    });
+
+    // 3. INVOICES (Fatura Vade & Gecikme Uyarısı)
+    const invoices = (this.state.invoices || []).filter(i => {
+      const st = (i.paymentStatus || i.status || '').toLowerCase();
+      return st !== 'ödendi' && st !== 'odendi';
+    });
+
+    invoices.forEach(i => {
+      const due = this.parseDate(i.dueDate || i.invoiceDate);
+      if (due) {
+        due.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+        
+        let level = null;
+        let countdownText = '';
+        let tagClass = '';
+
+        if (diffDays < 0 || (i.paymentStatus || i.status) === 'Gecikmede') {
+          level = 'CRITICAL';
+          countdownText = `${Math.abs(diffDays)} Gün Gecikti! 🚨`;
+          tagClass = 'critical';
+        } else if (diffDays === 0) {
+          level = 'CRITICAL';
+          countdownText = 'Bugün Ödeme Vadesi! ⚡';
+          tagClass = 'critical';
+        } else if (diffDays <= 7) {
+          level = 'WARNING';
+          countdownText = `${diffDays} Gün Kaldı ⏳`;
+          tagClass = 'warning';
+        } else if (diffDays <= 15) {
+          level = 'INFO';
+          countdownText = `${diffDays} Gün Kaldı`;
+          tagClass = 'info';
+        }
+
+        if (level) {
+          const id = `invoice_${i.id}`;
+          allNotifs.push({
+            id,
+            category: 'INVOICE',
+            categoryName: 'Fatura',
+            level,
+            icon: '🧾',
+            title: `Fatura #${i.invoiceNo || i.id} — ${i.supplier || 'Tedarikçi'} (${countdownText})`,
+            sub: `Vade: ${i.dueDate || i.invoiceDate || '-'} | Tutar: ${this.formatMoney(i.amount || 0, i.currency || 'TRY', 2)} | Durum: ${i.paymentStatus || i.status || 'Ödeme Bekliyor'}`,
+            date: i.dueDate || i.invoiceDate,
+            diffDays,
+            tag: countdownText,
+            tagClass,
+            isRead: dismissed.includes(id),
+            action: () => {
+              this.switchView('invoices');
+              setTimeout(() => this.viewInvoiceDetails(i.id), 120);
+            }
+          });
+        }
+      }
+    });
+
+    // 4. REQUESTS (14+ Gün Bekleyen Açık Talepler)
+    const requests = (this.state.requests || []).filter(r => r.status === 'Açık');
+    requests.forEach(r => {
+      const arr = this.parseDate(r.arrivalDate || r.requestDate);
+      if (arr) {
+        arr.setHours(0, 0, 0, 0);
+        const waitDays = Math.ceil((today - arr) / (1000 * 60 * 60 * 24));
+        if (waitDays >= 14) {
+          const id = `req_sla_${r.id}`;
+          allNotifs.push({
+            id,
+            category: 'REQUEST',
+            categoryName: 'Talep Takibi',
+            level: 'INFO',
+            icon: '📋',
+            title: `Talep #${r.requestBarcode || r.id} — ${r.subject || 'Talep'} (${waitDays} Gündür Bekliyor)`,
+            sub: `Birim: ${r.unit || '-'} | Atanan: ${r.assignedTo || 'Atanmadı'} | Geliş: ${r.arrivalDate || r.requestDate || '-'}`,
+            date: r.arrivalDate || r.requestDate,
+            diffDays: -waitDays,
+            tag: `${waitDays} Gün Beklemede`,
+            tagClass: 'info',
+            isRead: dismissed.includes(id),
+            action: () => {
+              this.switchView('requests');
+              setTimeout(() => this.viewRequestDetails(r.id), 120);
+            }
+          });
+        }
+      }
+    });
+
+    // Sort: CRITICAL first, then WARNING, then INFO; within level, by smallest diffDays
+    const levelWeight = { 'CRITICAL': 1, 'WARNING': 2, 'INFO': 3 };
+    allNotifs.sort((a, b) => {
+      const wA = levelWeight[a.level] || 99;
+      const wB = levelWeight[b.level] || 99;
+      if (wA !== wB) return wA - wB;
+      return a.diffDays - b.diffDays;
     });
 
     return allNotifs;
@@ -1389,7 +1569,7 @@ const App = {
     const unreadNotifs = allNotifs.filter(n => !n.isRead);
 
     const badge = document.getElementById('notif-badge');
-    const navBadge = document.getElementById('nav-notif-badge');
+    const navNotifCount = document.getElementById('nav-notif-count');
     const headerCount = document.getElementById('notif-header-count');
     const list = document.getElementById('notif-list');
 
@@ -1404,38 +1584,40 @@ const App = {
       }
     }
 
-    if (navBadge) {
+    if (navNotifCount) {
       if (unreadCount > 0) {
-        navBadge.style.display = 'inline-block';
-        navBadge.innerText = unreadCount;
+        navNotifCount.style.display = 'inline-block';
+        navNotifCount.innerText = unreadCount;
       } else {
-        navBadge.style.display = 'none';
+        navNotifCount.style.display = 'none';
       }
     }
 
     if (headerCount) {
-      headerCount.innerText = `${unreadCount} Okunmamış Bildirim`;
+      headerCount.innerText = `${unreadCount} Aktif Bildirim`;
     }
 
     if (list) {
-      if (unreadNotifs.length === 0) {
+      if (allNotifs.length === 0) {
         list.innerHTML = `
           <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
-            ✅ Tüm bildirimler okundu. Kritik uyarı bulunmamaktadır.
+            ✅ Kritik veya yaklaşan vade uyarısı bulunmamaktadır.
           </div>
         `;
       } else {
-        list.innerHTML = unreadNotifs.slice(0, 6).map((n, idx) => `
-          <div class="notif-item" style="padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border-color); display:flex; align-items:flex-start; gap:0.6rem; cursor:pointer;" onclick="App._triggerNotifAndRead('${n.id}', ${idx})">
-            <span style="font-size:1.2rem;">${n.icon}</span>
-            <div style="flex:1; min-width:0;">
-              <div class="notif-item-title" style="font-weight:700; font-size:0.82rem; color:var(--text-main); line-height:1.3;">${n.title}</div>
-              <div class="notif-item-sub" style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${n.sub}</div>
+        list.innerHTML = allNotifs.slice(0, 8).map((n, idx) => `
+          <div class="notif-item ${n.level.toLowerCase()}" style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); display:flex; align-items:flex-start; gap:0.65rem; cursor:pointer;" onclick="App.handleNotifAction('${n.id}')">
+            <span class="notif-icon">${n.icon}</span>
+            <div class="notif-content">
+              <div class="notif-title">
+                <span style="font-weight:700; color:var(--text-main); font-size:0.82rem;">${n.categoryName}</span>
+                <span class="notif-tag ${n.tagClass}">${n.tag}</span>
+              </div>
+              <div style="font-size:0.8rem; font-weight:600; color:var(--text-main); line-height:1.3; margin-bottom:0.2rem;">${n.title}</div>
+              <div class="notif-desc">${n.sub}</div>
             </div>
-            <button onclick="event.stopPropagation(); App.dismissNotif('${n.id}')" title="Okundu işaretle ve kaldır" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:0.95rem; padding:0.1rem 0.3rem;" onmouseover="this.style.color='var(--status-rejected)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
           </div>
         `).join('');
-        this._notifActions = unreadNotifs.slice(0, 6).map(n => n.action);
       }
     }
 
@@ -1447,14 +1629,10 @@ const App = {
   handleNotifAction(notifId) {
     const allNotifs = this.getAllNotifications();
     const notif = allNotifs.find(n => n.id === notifId);
-    this.dismissNotif(notifId);
+    document.getElementById('notification-dropdown')?.classList.remove('show');
     if (notif && typeof notif.action === 'function') {
       notif.action();
     }
-  },
-
-  _triggerNotifAndRead(notifId, idx) {
-    this.handleNotifAction(notifId);
   },
 
   dismissNotif(id) {
@@ -1482,64 +1660,369 @@ const App = {
   },
 
   renderNotificationsView() {
-    const container = document.getElementById('notifications-full-list');
+    const container = document.getElementById('notifications-cards-container');
     if (!container) return;
 
-    const categoryFilter = document.getElementById('filter-notif-category')?.value || 'ALL';
-    let allNotifs = this.getAllNotifications();
+    const allNotifs = this.getAllNotifications();
 
-    if (categoryFilter === 'UNREAD') {
-      allNotifs = allNotifs.filter(n => !n.isRead);
-    } else if (categoryFilter !== 'ALL') {
-      allNotifs = allNotifs.filter(n => n.category === categoryFilter);
+    // Compute KPI Counts
+    const countTotal = allNotifs.length;
+    const countCritical = allNotifs.filter(n => n.level === 'CRITICAL').length;
+    const countWarning = allNotifs.filter(n => n.level === 'WARNING').length;
+    const countInfo = allNotifs.filter(n => n.level === 'INFO').length;
+
+    const elTotal = document.getElementById('notif-kpi-total');
+    const elCrit = document.getElementById('notif-kpi-critical');
+    const elWarn = document.getElementById('notif-kpi-warning');
+    const elInfo = document.getElementById('notif-kpi-info');
+
+    if (elTotal) elTotal.innerText = countTotal;
+    if (elCrit) elCrit.innerText = countCritical;
+    if (elWarn) elWarn.innerText = countWarning;
+    if (elInfo) elInfo.innerText = countInfo;
+
+    // Category Counts
+    const countGuar = allNotifs.filter(n => n.category === 'GUARANTEE').length;
+    const countCont = allNotifs.filter(n => n.category === 'CONTRACT').length;
+    const countInv = allNotifs.filter(n => n.category === 'INVOICE').length;
+    const countReq = allNotifs.filter(n => n.category === 'REQUEST').length;
+
+    const elCGuar = document.getElementById('notif-count-guarantee');
+    const elCCont = document.getElementById('notif-count-contract');
+    const elCInv = document.getElementById('notif-count-invoice');
+    const elCReq = document.getElementById('notif-count-request');
+
+    if (elCGuar) elCGuar.innerText = countGuar;
+    if (elCCont) elCCont.innerText = countCont;
+    if (elCInv) elCInv.innerText = countInv;
+    if (elCReq) elCReq.innerText = countReq;
+
+    // Filter by Level KPI (ALL, CRITICAL, WARNING, INFO)
+    let filtered = allNotifs;
+    if (this.state.notifFilter && this.state.notifFilter !== 'ALL') {
+      filtered = filtered.filter(n => n.level === this.state.notifFilter);
     }
 
-    if (allNotifs.length === 0) {
+    // Filter by Category Tab (ALL, GUARANTEE, CONTRACT, INVOICE, REQUEST)
+    if (this.state.notifCategory && this.state.notifCategory !== 'ALL') {
+      filtered = filtered.filter(n => n.category === this.state.notifCategory);
+    }
+
+    // Filter by Search Text
+    if (this.state.notifSearch) {
+      const q = this.state.notifSearch;
+      filtered = filtered.filter(n => 
+        (n.title && n.title.toLowerCase().includes(q)) ||
+        (n.sub && n.sub.toLowerCase().includes(q)) ||
+        (n.categoryName && n.categoryName.toLowerCase().includes(q))
+      );
+    }
+
+    if (filtered.length === 0) {
       container.innerHTML = `
         <div class="glass-card" style="text-align: center; padding: 3rem 1.5rem; color: var(--text-muted);">
           <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
           <h4 style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 0.25rem;">Seçilen kritere uygun bildirim bulunmuyor</h4>
-          <p style="font-size: 0.85rem;">Tüm kritik uyarılarınız günceldir veya okundu olarak işaretlenmiştir.</p>
+          <p style="font-size: 0.85rem;">Tüm kritik ve yaklaşan vadeler güncel durumdadır.</p>
         </div>
       `;
       return;
     }
 
-    container.innerHTML = allNotifs.map(n => {
-      let catBadge = '';
-      if (n.category === 'SLA') catBadge = `<span class="badge priority-kritik">🚨 SLA Gecikmesi</span>`;
-      else if (n.category === 'CONTRACT') catBadge = `<span class="badge priority-yüksek">📑 Sözleşme Bitişi</span>`;
-      else if (n.category === 'GUARANTEE') catBadge = `<span class="badge priority-orta">🛡️ Teminat Vadesi</span>`;
-      else if (n.category === 'INVOICE') catBadge = `<span class="badge status-open">🧾 Fatura Ödemesi</span>`;
+    container.innerHTML = filtered.map(n => {
+      let levelBadge = '';
+      if (n.level === 'CRITICAL') levelBadge = `<span class="badge priority-kritik">🚨 ACİL / VADESİ GELEN</span>`;
+      else if (n.level === 'WARNING') levelBadge = `<span class="badge priority-yüksek">⏳ YAKLAŞAN VADE</span>`;
+      else levelBadge = `<span class="badge priority-orta">ℹ️ TAKİP HATIRLATMASI</span>`;
 
       return `
-        <div class="glass-card" style="padding: 1.25rem; display: flex; gap: 1rem; align-items: center; justify-content: space-between; opacity: ${n.isRead ? '0.65' : '1'}; border-left: 4px solid ${n.isRead ? 'var(--border-color)' : 'var(--accent-primary)'}; transition: all 0.2s ease;">
-          <div style="display: flex; gap: 1rem; align-items: flex-start; flex: 1;">
-            <div style="font-size: 2rem; background: var(--bg-hover); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); flex-shrink: 0;">${n.icon}</div>
-            <div>
-              <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
-                ${catBadge}
-                <span style="font-size: 0.78rem; color: var(--text-muted);">📅 ${n.date || 'Bugün'}</span>
-                ${n.isRead ? `<span style="font-size: 0.75rem; color: var(--text-muted);">✓ Okundu</span>` : `<span class="badge status-completed" style="font-size:0.7rem;">YENİ BİLDİRİM</span>`}
+        <div class="notif-card-row ${n.level.toLowerCase()}">
+          <div style="display: flex; gap: 1rem; align-items: center; flex: 1;">
+            <div style="font-size: 2.2rem; background: var(--bg-hover, rgba(255,255,255,0.05)); width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); flex-shrink: 0;">
+              ${n.icon}
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.3rem; flex-wrap: wrap;">
+                ${levelBadge}
+                <span class="badge status-open" style="font-size:0.72rem;">${n.categoryName}</span>
+                <span class="notif-tag ${n.tagClass}" style="font-size:0.72rem;">${n.tag}</span>
+                <span style="font-size: 0.78rem; color: var(--text-muted); margin-left: auto;">📅 Vade/Tarih: <strong>${n.date || '-'}</strong></span>
               </div>
-              <h4 style="font-size: 1rem; margin-bottom: 0.35rem; color: var(--text-main); font-weight: 700;">${n.title}</h4>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0; line-height: 1.4;">${n.sub}</p>
+              <h4 style="font-size: 1rem; margin: 0 0 0.3rem 0; color: var(--text-main); font-weight: 700;">${n.title}</h4>
+              <p style="font-size: 0.84rem; color: var(--text-muted); margin: 0; line-height: 1.4;">${n.sub}</p>
             </div>
           </div>
 
-          <div style="display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0;">
-            <button class="btn-primary" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;" onclick="App.handleNotifAction('${n.id}')">
-              <span>👁️</span> İncele
+          <div style="display: flex; gap: 0.6rem; align-items: center; flex-shrink: 0;">
+            <button class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.82rem;" onclick="App.handleNotifAction('${n.id}')">
+              <span>👁️</span> İncele & Kayda Git
             </button>
-            ${!n.isRead ? `
-              <button class="btn-secondary" style="padding: 0.45rem 0.75rem; font-size: 0.8rem;" onclick="App.dismissNotif('${n.id}')">
-                <span>✕</span> Okundu Yap
-              </button>
-            ` : ''}
           </div>
         </div>
       `;
     }).join('');
+  },
+
+  renderDashboardAlerts() {
+    const container = document.getElementById('dashboard-alerts-container');
+    if (!container) return;
+    const notifs = this.getAllNotifications();
+    const criticalNotifs = notifs.filter(n => n.level === 'CRITICAL');
+    const warningNotifs = notifs.filter(n => n.level === 'WARNING');
+    
+    if (criticalNotifs.length === 0 && warningNotifs.length === 0) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
+
+    const totalUrgent = criticalNotifs.length + warningNotifs.length;
+    const topItems = [...criticalNotifs, ...warningNotifs].slice(0, 3);
+
+    container.style.display = 'block';
+    container.innerHTML = `
+      <div class="dashboard-alert-banner">
+        <div class="alert-left">
+          <div class="alert-icon">⚠️</div>
+          <div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--status-rejected); display: flex; align-items: center; gap: 0.5rem;">
+              <span>Dikkat Gerektiren ${totalUrgent} Kritik Hatırlatma / Yaklaşan Vade</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-main); margin-top: 0.2rem;">
+              ${topItems.map(item => `<strong>${item.icon} ${item.title}</strong>`).join(' &bull; ')}
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="App.switchView('notifications')" style="padding: 0.45rem 0.9rem; font-size: 0.8rem; white-space: nowrap; background: var(--status-rejected); border-color: var(--status-rejected);">
+          <span>🔔</span> Bildirim Merkezini Aç (${totalUrgent})
+        </button>
+      </div>
+    `;
+  },
+
+  // ============================================================
+  // 📁 DİJİTAL ARŞİV & DOKÜMAN YÖNETİM MOTORU
+  // ============================================================
+  openDocumentManager(entityType, entityId, entityTitle = '') {
+    this.state.currentDocEntity = {
+      entityType,
+      entityId: parseInt(entityId, 10),
+      title: entityTitle
+    };
+
+    const typeNames = {
+      request: 'Talep Evrakları',
+      contract: 'Sözleşme Evrakları',
+      invoice: 'Fatura & Ödeme Evrakları',
+      guarantee: 'Teminat Mektubu Evrakları',
+      tender: 'İhale Süreç Evrakları'
+    };
+
+    const elTypeLabel = document.getElementById('doc-entity-type-label');
+    const elTitleLabel = document.getElementById('doc-entity-title-label');
+    const elModalTitle = document.getElementById('doc-modal-title');
+    const elEntityTypeInput = document.getElementById('doc-upload-entity-type');
+    const elEntityIdInput = document.getElementById('doc-upload-entity-id');
+
+    if (elTypeLabel) elTypeLabel.innerText = typeNames[entityType] || 'Kayıt Evrakları';
+    if (elTitleLabel) elTitleLabel.innerText = entityTitle || `#${entityId}`;
+    if (elModalTitle) elModalTitle.innerText = `📁 Dijital Arşiv — ${typeNames[entityType] || 'Evraklar'}`;
+    if (elEntityTypeInput) elEntityTypeInput.value = entityType;
+    if (elEntityIdInput) elEntityIdInput.value = entityId;
+
+    this.renderEntityDocuments();
+    this.openModal('modal-document-manager');
+  },
+
+  openDocumentManagerForCurrentDetail() {
+    if (!this.state.currentActiveDetail || !this.state.currentActiveDetail.data) {
+      this.showToast("Lütfen önce bir kayıt seçin.", "warning");
+      return;
+    }
+    const { type, data } = this.state.currentActiveDetail;
+    let title = '';
+    if (type === 'request') title = `#${data.requestBarcode || data.id} — ${data.subject || 'Talep'}`;
+    else if (type === 'contract') title = `#${data.contractNo || data.id} — ${data.title || 'Sözleşme'}`;
+    else if (type === 'invoice') title = `#${data.invoiceNo || data.id} — ${data.supplier || 'Fatura'}`;
+    else if (type === 'guarantee') title = `#${data.letterNo || data.id} — ${data.bank || data.bankName || 'Teminat'}`;
+    else if (type === 'tender') title = `#${data.tenderNo || data.id} — ${data.title || 'İhale'}`;
+    this.openDocumentManager(type, data.id, title);
+  },
+
+  async renderEntityDocuments() {
+    const { entityType, entityId } = this.state.currentDocEntity;
+    const tbody = document.getElementById('tbody-entity-documents');
+    const countEl = document.getElementById('doc-list-count');
+    if (!tbody || !entityType || !entityId) return;
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center; padding:1.5rem; color:var(--text-muted);">
+          ⏳ Evraklar yükleniyor...
+        </td>
+      </tr>
+    `;
+
+    try {
+      const res = await fetch(`/api/documents?entityType=${entityType}&entityId=${entityId}`);
+      if (res.ok) {
+        const docs = await res.json();
+        if (countEl) countEl.innerText = docs.length;
+
+        if (docs.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">
+                📎 Bu kayda eklenmiş henüz bir evrak bulunmuyor. Yukarıdaki formdan yeni belge yükleyebilirsiniz.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        tbody.innerHTML = docs.map(doc => {
+          const ext = (doc.fileName.split('.').pop() || '').toLowerCase();
+          let badgeType = 'other';
+          let icon = '📄';
+
+          if (ext === 'pdf') { badgeType = 'pdf'; icon = '📕'; }
+          else if (['doc', 'docx'].includes(ext)) { badgeType = 'doc'; icon = '📘'; }
+          else if (['xls', 'xlsx', 'csv'].includes(ext)) { badgeType = 'xls'; icon = '📗'; }
+          else if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) { badgeType = 'img'; icon = '🖼️'; }
+          else if (['zip', 'rar', '7z'].includes(ext)) { badgeType = 'zip'; icon = '📦'; }
+
+          const sizeKB = doc.fileSize ? (doc.fileSize / 1024).toFixed(1) + ' KB' : '-';
+
+          return `
+            <tr>
+              <td><span class="file-badge ${badgeType}">${icon} .${ext}</span></td>
+              <td>
+                <div style="font-weight: 700; color: var(--text-main); font-size: 0.88rem;">${doc.fileName}</div>
+                ${doc.description ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">${doc.description}</div>` : ''}
+              </td>
+              <td><span class="badge status-open" style="font-size:0.75rem;">${doc.category || 'Genel'}</span></td>
+              <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">${sizeKB}</td>
+              <td style="font-size: 0.78rem; color: var(--text-muted);">
+                <div>👤 ${doc.uploadedBy || 'Sistem'}</div>
+                <div>📅 ${doc.uploadedAt || '-'}</div>
+              </td>
+              <td style="text-align: right;">
+                <div class="action-btns" style="justify-content: flex-end;">
+                  <button class="btn-icon" onclick="App.previewDocument(${doc.id})" title="Önizle / Yeni Sekmede Aç">👁️</button>
+                  <button class="btn-icon" onclick="App.downloadDocument(${doc.id})" title="İndir">📥</button>
+                  <button class="btn-icon" onclick="App.deleteDocument(${doc.id})" title="Sil">🗑️</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--status-rejected); padding:1rem;">Evraklar yüklenirken sunucu hatası oluştu.</td></tr>`;
+      }
+    } catch (err) {
+      console.error("Doküman yükleme hatası:", err);
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--status-rejected); padding:1rem;">Evrak listesine erişilemedi.</td></tr>`;
+    }
+  },
+
+  async handleUploadDocumentSubmit() {
+    const { entityType, entityId } = this.state.currentDocEntity;
+    if (!entityType || !entityId) return;
+
+    const fileInput = document.getElementById('doc-upload-file-input');
+    const categoryInput = document.getElementById('doc-upload-category');
+    const descInput = document.getElementById('doc-upload-description');
+    const progressEl = document.getElementById('doc-upload-progress');
+    const submitBtn = document.getElementById('btn-submit-doc-upload');
+
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      this.showToast("Lütfen yüklenecek bir dosya seçin.", "warning");
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      this.showToast("Dosya boyutu maksimum 25 MB olabilir.", "error");
+      return;
+    }
+
+    if (progressEl) progressEl.style.display = 'block';
+    if (submitBtn) submitBtn.disabled = true;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const fileData = e.target.result;
+        const payload = {
+          entityType,
+          entityId,
+          fileName: file.name,
+          fileType: file.type,
+          fileData,
+          category: categoryInput?.value || 'Genel',
+          description: descInput?.value?.trim() || '',
+          uploadedBy: this.state.currentUser ? this.state.currentUser.name : 'Sistem'
+        };
+
+        const res = await fetch('/api/documents/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          this.showToast(`"${file.name}" belgesi başarıyla yüklendi!`, "success", "📎");
+          this.logAction('Evrak Yüklendi', `${entityType} #${entityId} için "${file.name}" yüklendi.`);
+          if (fileInput) fileInput.value = '';
+          if (descInput) descInput.value = '';
+          await this.renderEntityDocuments();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          this.showToast("Dosya yüklenemedi: " + (err.error || 'Sunucu hatası'), "error");
+        }
+      } catch (err) {
+        console.error(err);
+        this.showToast("Dosya yüklenirken hata oluştu.", "error");
+      } finally {
+        if (progressEl) progressEl.style.display = 'none';
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    };
+    reader.readAsDataURL(file);
+  },
+
+  previewDocument(docId) {
+    window.open(`/api/documents/${docId}/preview`, '_blank');
+  },
+
+  downloadDocument(docId) {
+    window.location.href = `/api/documents/${docId}/download`;
+  },
+
+  async deleteDocument(docId) {
+    this.showConfirm("Evrakı Sil", "Bu evrakı sistemden ve sunucu diskinden kalıcı olarak silmek istediğinize emin misiniz?", async () => {
+      try {
+        const res = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        if (res.ok) {
+          this.showToast("Evrak başarıyla silindi.", "warning", "🗑️");
+          this.logAction('Evrak Silindi', `Doküman ID #${docId} silindi.`);
+          await this.renderEntityDocuments();
+        } else {
+          this.showToast("Evrak silinemedi.", "error");
+        }
+      } catch (err) {
+        console.error(err);
+        this.showToast("Evrak silinirken hata oluştu.", "error");
+      }
+    }, '🗑️');
+  },
+
+  downloadAllEntityDocsZip() {
+    const { entityType, entityId } = this.state.currentDocEntity;
+    if (!entityType || !entityId) return;
+    this.showToast("Tüm evraklar ZIP olarak hazırlanıyor...", "info", "📦");
+    window.location.href = `/api/documents/export-zip?entityType=${entityType}&entityId=${entityId}`;
   },
 
   // 🔍 GLOBAL SEARCH SYSTEM (Ctrl + K)
@@ -1668,6 +2151,7 @@ const App = {
 
   // 1. DASHBOARD RENDERER
   renderDashboard() {
+    this.renderDashboardAlerts();
     const requests = this.getFilteredRequests();
 
     const totalCount = requests.length;
@@ -2066,6 +2550,7 @@ const App = {
         <td class="sticky-col-right" style="white-space:nowrap;">
           <div class="action-btns">
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
+            <button class="btn-icon" onclick="App.openDocumentManager('request', '${r.id}', '#${r.requestBarcode || r.id} — ${r.subject?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
             <button class="btn-icon" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>
             <button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil">🗑️</button>
           </div>
@@ -2498,6 +2983,7 @@ const App = {
           <td>
             <div class="action-btns">
               <a href="#contract/${c.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'contract', '${c.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
+              <button class="btn-icon" onclick="App.openDocumentManager('contract', '${c.id}', 'Sözleşme #${c.contractNo} — ${c.title?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
               <button class="btn-icon" onclick="App.openContractModal('${c.id}')" title="Düzenle">✏️</button>
               <button class="btn-icon" onclick="App.deleteContract('${c.id}')" title="Sözleşmeyi Sil">🗑️</button>
             </div>
@@ -3169,6 +3655,7 @@ const App = {
           <td style="text-align: center;">
             <div class="action-btns" style="justify-content: center;">
               <button class="btn-icon" onclick="App.viewGuaranteeDetails('${g.id}')" title="Görüntüle">👁️</button>
+              <button class="btn-icon" onclick="App.openDocumentManager('guarantee', '${g.id}', 'Teminat #${g.letterNo} — ${g.bankName?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
               <button class="btn-icon" onclick="App.openGuaranteeModal('${g.id}')" title="Düzenle">✏️</button>
               ${g.status !== 'İade Edildi' ? `<button class="btn-icon" onclick="App.returnGuaranteeToFirm('${g.id}')" title="Firmaya İade Et">↩️</button>` : ''}
               <button class="btn-icon" onclick="App.deleteGuarantee('${g.id}')" title="Sil">🗑️</button>
@@ -3481,6 +3968,7 @@ const App = {
           <td>
             <div class="action-btns" style="justify-content:center;">
               <button class="btn-icon" onclick="App.viewTenderDetails('${t.id}')" title="Detayları İncele">👁️</button>
+              <button class="btn-icon" onclick="App.openDocumentManager('tender', '${t.id}', 'İhale #${t.tenderNo} — ${t.title?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
               <button class="btn-icon" onclick="App.openTenderModal('${t.id}')" title="Düzenle">✏️</button>
               <button class="btn-icon" onclick="App.deleteTender('${t.id}')" title="Sil">🗑️</button>
             </div>
@@ -3764,6 +4252,7 @@ const App = {
           <td>
             <div class="action-btns">
               <a href="#invoice/${inv.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'invoice', ${inv.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
+              <button class="btn-icon" onclick="App.openDocumentManager('invoice', '${inv.id}', 'Fatura #${inv.invoiceNo} — ${inv.supplier?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
               <button class="btn-icon" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>
               ${inv.paymentStatus !== 'Ödendi' ? `<button class="btn-icon" onclick="App.markInvoiceAsPaid(${inv.id})" title="Ödendi İşaretle">✅</button>` : ''}
               <button class="btn-icon" onclick="App.deleteInvoice(${inv.id})" title="Faturayı Sil">🗑️</button>
@@ -4827,6 +5316,435 @@ const App = {
         `;
       }
     }
+
+    // TAB 5: REGULATION X SUPPLIER DRILL-DOWN MATRIX REPORT
+    else if (activeTab === 'matrix') {
+      this.renderYearlyMatrixReport(requests);
+    }
+  },
+
+  // ============================================================
+  // 🏛️ SEKME 5: İHALE MADDESİ X TEDARİKÇİ MATRİSİ RENDERER
+  // ============================================================
+  renderYearlyMatrixReport(requests = null) {
+    const activeRequests = requests || this.getFilteredRequests();
+
+    // 1. Populate Dropdown Filters (Regulations and Suppliers)
+    const regSelect = document.getElementById('filter-matrix-regulation');
+    const suppSelect = document.getElementById('filter-matrix-supplier');
+    const currentRegVal = this.state.matrixRegulation || 'ALL';
+    const currentSuppVal = this.state.matrixSupplier || 'ALL';
+    const groupBy = this.state.matrixGroupBy || 'REG_FIRST';
+    const searchText = (this.state.matrixSearch || '').toLowerCase().trim();
+
+    const uniqueRegs = new Set();
+    const uniqueSupps = new Set();
+
+    activeRequests.forEach(r => {
+      let reg = (r.regulation || 'Belirtilmemiş').trim();
+      if (reg.startsWith('Madde ')) reg = reg.replace('Madde ', '');
+      if (reg) uniqueRegs.add(reg);
+
+      const supp = (r.supplier || '').trim();
+      if (supp && supp !== '-') uniqueSupps.add(supp);
+    });
+
+    if (regSelect) {
+      const sortedRegs = Array.from(uniqueRegs).sort();
+      const prevVal = regSelect.value || currentRegVal;
+      regSelect.innerHTML = '<option value="ALL">🏛️ Tüm İhale Maddeleri</option>' +
+        sortedRegs.map(reg => `<option value="${reg}">Madde ${reg}</option>`).join('');
+      regSelect.value = prevVal;
+    }
+
+    if (suppSelect) {
+      const sortedSupps = Array.from(uniqueSupps).sort((a, b) => a.localeCompare(b, 'tr'));
+      const prevVal = suppSelect.value || currentSuppVal;
+      suppSelect.innerHTML = '<option value="ALL">🏭 Tüm Tedarikçiler</option>' +
+        sortedSupps.map(s => `<option value="${s}">${s}</option>`).join('');
+      suppSelect.value = prevVal;
+    }
+
+    // 2. Filter Requests for Analysis
+    const matchingRequests = activeRequests.filter(r => {
+      let reg = (r.regulation || 'Belirtilmemiş').trim();
+      if (reg.startsWith('Madde ')) reg = reg.replace('Madde ', '');
+      const supp = (r.supplier || '').trim();
+
+      if (currentRegVal !== 'ALL' && reg !== currentRegVal) return false;
+      if (currentSuppVal !== 'ALL' && supp !== currentSuppVal) return false;
+
+      if (searchText) {
+        const mSupp = supp.toLowerCase().includes(searchText);
+        const mSubj = (r.subject || '').toLowerCase().includes(searchText);
+        const mBar = (r.requestBarcode || '').toString().toLowerCase().includes(searchText);
+        const mReg = reg.toLowerCase().includes(searchText);
+        const mUnit = (r.unit || '').toLowerCase().includes(searchText);
+        if (!mSupp && !mSubj && !mBar && !mReg && !mUnit) return false;
+      }
+      return true;
+    });
+
+    // 3. Compute KPI Summary Cards
+    const distinctUsedRegs = new Set();
+    const distinctUsedSupps = new Set();
+    let grandTotalSpend = 0;
+    const totalOrdersCount = matchingRequests.length;
+
+    matchingRequests.forEach(r => {
+      let reg = (r.regulation || 'Belirtilmemiş').trim();
+      if (reg.startsWith('Madde ')) reg = reg.replace('Madde ', '');
+      distinctUsedRegs.add(reg);
+
+      const supp = (r.supplier || '').trim();
+      if (supp && supp !== '-') distinctUsedSupps.add(supp);
+
+      grandTotalSpend += (r.actualAmount || 0);
+    });
+
+    const elKpiReg = document.getElementById('matrix-kpi-total-reg');
+    const elKpiSupp = document.getElementById('matrix-kpi-total-supp');
+    const elKpiOrders = document.getElementById('matrix-kpi-total-orders');
+    const elKpiSpend = document.getElementById('matrix-kpi-total-spend');
+
+    if (elKpiReg) elKpiReg.innerText = distinctUsedRegs.size;
+    if (elKpiSupp) elKpiSupp.innerText = distinctUsedSupps.size;
+    if (elKpiOrders) elKpiOrders.innerText = totalOrdersCount;
+    if (elKpiSpend) elKpiSpend.innerText = `${grandTotalSpend.toLocaleString('tr-TR')} ₺`;
+
+    // 4. Group Data Structure
+    // Either Regulation ➔ Supplier ➔ Requests OR Supplier ➔ Regulation ➔ Requests
+    const treeData = {};
+    const pairMap = {}; // for Top Pairs chart
+    const regSpendMap = {}; // for Doughnut chart
+
+    matchingRequests.forEach(r => {
+      let reg = (r.regulation || 'Belirtilmemiş').trim();
+      if (reg.startsWith('Madde ')) reg = reg.replace('Madde ', '');
+      const supp = (r.supplier && r.supplier !== '-') ? r.supplier.trim() : 'Tedarikçi Belirtilmemiş';
+      const spend = r.actualAmount || 0;
+
+      // Pair tracking
+      const pairKey = `Madde ${reg} & ${supp.length > 18 ? supp.substring(0, 18) + '...' : supp}`;
+      pairMap[pairKey] = (pairMap[pairKey] || 0) + spend;
+
+      // Reg tracking
+      regSpendMap[reg] = (regSpendMap[reg] || 0) + spend;
+
+      const mainKey = groupBy === 'REG_FIRST' ? `Madde ${reg}` : supp;
+      const subKey = groupBy === 'REG_FIRST' ? supp : `Madde ${reg}`;
+
+      if (!treeData[mainKey]) {
+        treeData[mainKey] = {
+          name: mainKey,
+          totalCount: 0,
+          totalSpend: 0,
+          subGroups: {}
+        };
+      }
+
+      treeData[mainKey].totalCount++;
+      treeData[mainKey].totalSpend += spend;
+
+      if (!treeData[mainKey].subGroups[subKey]) {
+        treeData[mainKey].subGroups[subKey] = {
+          name: subKey,
+          totalCount: 0,
+          totalSpend: 0,
+          requests: []
+        };
+      }
+
+      treeData[mainKey].subGroups[subKey].totalCount++;
+      treeData[mainKey].subGroups[subKey].totalSpend += spend;
+      treeData[mainKey].subGroups[subKey].requests.push(r);
+    });
+
+    // 5. Visual Charts
+    // Chart 1: Bar Chart (Top 8 Pairs)
+    const sortedPairs = Object.entries(pairMap).sort((a,b) => b[1] - a[1]).slice(0, 8);
+    this.createOrUpdateChart('chart-yearly-matrix-bar', 'bar', {
+      labels: sortedPairs.map(p => p[0]),
+      datasets: [{
+        label: 'Gerçekleşen Harcama (TRY)',
+        data: sortedPairs.map(p => p[1]),
+        backgroundColor: '#3b82f6',
+        borderRadius: 6
+      }]
+    }, {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { font: { size: 9 }, maxRotation: 25 } }
+      }
+    });
+
+    // Chart 2: Doughnut Chart (Regulation Distribution)
+    const sortedRegSpend = Object.entries(regSpendMap).sort((a,b) => b[1] - a[1]).slice(0, 7);
+    const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+    this.createOrUpdateChart('chart-yearly-matrix-doughnut', 'doughnut', {
+      labels: sortedRegSpend.map(r => `Madde ${r[0]}`),
+      datasets: [{
+        data: sortedRegSpend.map(r => r[1]),
+        backgroundColor: chartColors.slice(0, sortedRegSpend.length)
+      }]
+    }, {
+      responsive: true,
+      maintainAspectRatio: false
+    });
+
+    // 6. Build Tree Table HTML
+    const tbody = document.getElementById('tbody-yearly-matrix');
+    const tfoot = document.getElementById('tfoot-yearly-matrix');
+    if (!tbody) return;
+
+    const sortedMainKeys = Object.keys(treeData).sort((a,b) => treeData[b].totalSpend - treeData[a].totalSpend);
+
+    if (sortedMainKeys.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:2.5rem;">Filtreleme kriterlerine uygun ihale maddesi ve tedarikçi eşleşmesi bulunamadı.</td></tr>`;
+      if (tfoot) tfoot.innerHTML = '';
+      return;
+    }
+
+    if (!this.state.expandedMatrixGroups) this.state.expandedMatrixGroups = new Set();
+    if (!this.state.expandedMatrixSubGroups) this.state.expandedMatrixSubGroups = new Set();
+
+    let html = '';
+
+    sortedMainKeys.forEach((mainKey, mainIdx) => {
+      const mainGroup = treeData[mainKey];
+      const mainGroupId = `mg_${mainIdx}`;
+      const isMainExpanded = this.state.expandedMatrixGroups.has(mainGroupId);
+      const mainShare = grandTotalSpend > 0 ? ((mainGroup.totalSpend / grandTotalSpend) * 100).toFixed(1) : 0;
+      const mainAvg = mainGroup.totalCount > 0 ? (mainGroup.totalSpend / mainGroup.totalCount).toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : 0;
+      const subGroupCount = Object.keys(mainGroup.subGroups).length;
+
+      const isReg = mainKey.startsWith('Madde ');
+      const badgeHtml = isReg
+        ? `<span class="matrix-badge-reg">📜 ${mainKey}</span>`
+        : `<span class="matrix-badge-supp">🏭 ${mainKey}</span>`;
+
+      // Level 1: Main Group Row
+      html += `
+        <tr class="matrix-row-group" onclick="App.toggleMatrixGroup('${mainGroupId}')">
+          <td style="text-align:center;">
+            <button class="matrix-toggle-btn ${isMainExpanded ? 'expanded' : ''}" onclick="event.stopPropagation(); App.toggleMatrixGroup('${mainGroupId}')">▶</button>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+              ${badgeHtml}
+              <span style="font-size:0.82rem; color:var(--text-muted); font-weight:normal;">(${subGroupCount} ${groupBy === 'REG_FIRST' ? 'Tedarikçi' : 'Madde'})</span>
+            </div>
+          </td>
+          <td style="text-align:center; font-weight:700;">${mainGroup.totalCount} Sipariş</td>
+          <td style="text-align:right; font-weight:800; color:var(--status-completed); font-family:var(--font-mono); font-size:0.95rem;">${mainGroup.totalSpend.toLocaleString('tr-TR')} ₺</td>
+          <td style="text-align:right; font-family:var(--font-mono); color:var(--text-muted);">${mainAvg} ₺</td>
+          <td style="text-align:center; font-weight:700;"><span class="badge priority-orta">%${mainShare}</span></td>
+          <td style="text-align:center;">
+            <span style="font-size:0.75rem; color:var(--accent-primary); font-weight:700;">${isMainExpanded ? '▲ Kapat' : '▼ Detay Gör'}</span>
+          </td>
+        </tr>
+      `;
+
+      // If Main Group is expanded, render Sub-Groups
+      if (isMainExpanded) {
+        const sortedSubKeys = Object.keys(mainGroup.subGroups).sort((a,b) => mainGroup.subGroups[b].totalSpend - mainGroup.subGroups[a].totalSpend);
+
+        sortedSubKeys.forEach((subKey, subIdx) => {
+          const subGroup = mainGroup.subGroups[subKey];
+          const subGroupId = `${mainGroupId}_sg_${subIdx}`;
+          const isSubExpanded = this.state.expandedMatrixSubGroups.has(subGroupId);
+          const subShare = mainGroup.totalSpend > 0 ? ((subGroup.totalSpend / mainGroup.totalSpend) * 100).toFixed(1) : 0;
+          const subAvg = subGroup.totalCount > 0 ? (subGroup.totalSpend / subGroup.totalCount).toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : 0;
+
+          const isSubReg = subKey.startsWith('Madde ');
+          const subBadgeHtml = isSubReg
+            ? `<span class="matrix-badge-reg">📜 ${subKey}</span>`
+            : `<span class="matrix-badge-supp">🏭 ${subKey}</span>`;
+
+          // Level 2: Sub-Group Row
+          html += `
+            <tr class="matrix-row-subgroup" onclick="App.toggleMatrixSubGroup('${subGroupId}')">
+              <td style="text-align:center; padding-left:1.5rem;">
+                <button class="matrix-toggle-btn ${isSubExpanded ? 'expanded' : ''}" style="width:22px; height:22px; font-size:0.75rem;" onclick="event.stopPropagation(); App.toggleMatrixSubGroup('${subGroupId}')">▶</button>
+              </td>
+              <td style="padding-left:1.5rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <span style="color:var(--text-muted); font-size:0.8rem;">↳</span>
+                  ${subBadgeHtml}
+                </div>
+              </td>
+              <td style="text-align:center; font-weight:600; color:var(--text-main);">${subGroup.totalCount} Talep</td>
+              <td style="text-align:right; font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${subGroup.totalSpend.toLocaleString('tr-TR')} ₺</td>
+              <td style="text-align:right; font-family:var(--font-mono); font-size:0.82rem; color:var(--text-muted);">${subAvg} ₺</td>
+              <td style="text-align:center; font-size:0.8rem; color:var(--text-muted);">%${subShare} (grup payı)</td>
+              <td style="text-align:center;">
+                <button class="btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.72rem; font-weight:700;" onclick="event.stopPropagation(); App.toggleMatrixSubGroup('${subGroupId}')">
+                  ${isSubExpanded ? '▲ Gizle' : `🔍 Talepleri Gör (${subGroup.totalCount})`}
+                </button>
+              </td>
+            </tr>
+          `;
+
+          // Level 3: Nested Exact Demands Table
+          if (isSubExpanded) {
+            html += `
+              <tr>
+                <td colspan="7" style="padding:0;">
+                  <div class="matrix-subtable-container">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                      <div style="font-weight:700; font-size:0.82rem; color:var(--text-main);">
+                        📦 <strong>${mainKey}</strong> / <strong>${subKey}</strong> Sipariş Edilen Talepler Listesi (${subGroup.requests.length} Adet)
+                      </div>
+                      <span style="font-size:0.75rem; color:var(--text-muted);">Toplam: <strong style="color:var(--status-completed);">${subGroup.totalSpend.toLocaleString('tr-TR')} ₺</strong></span>
+                    </div>
+
+                    <table class="matrix-subtable">
+                      <thead>
+                        <tr>
+                          <th style="width:110px;">Talep Barkod</th>
+                          <th>Talep Konusu & Açıklaması</th>
+                          <th>Birim</th>
+                          <th style="width:105px;">Sipariş Tarihi</th>
+                          <th style="width:110px;">Sipariş No</th>
+                          <th style="text-align:right; width:130px;">Tutar (₺)</th>
+                          <th style="width:130px;">Sorumlu</th>
+                          <th style="text-align:center; width:95px;">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${subGroup.requests.map(r => `
+                          <tr>
+                            <td>
+                              <a href="#request/${r.id}" onclick="App._handleLinkClick(event, 'request', '${r.id}')" style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary); text-decoration:none;">
+                                #${r.requestBarcode || r.id}
+                              </a>
+                            </td>
+                            <td>
+                              <div style="font-weight:600; color:var(--text-main);">${r.subject || 'Konu belirtilmemiş'}</div>
+                              ${r.description ? `<div style="font-size:0.75rem; color:var(--text-muted);">${r.description.substring(0, 50)}...</div>` : ''}
+                            </td>
+                            <td style="font-size:0.8rem;">${r.unit || '-'}</td>
+                            <td style="font-size:0.8rem; color:var(--text-muted);">${r.orderDate || r.arrivalDate || '-'}</td>
+                            <td style="font-family:var(--font-mono); font-size:0.8rem;">${r.orderBarcode || '-'}</td>
+                            <td style="text-align:right; font-weight:700; font-family:var(--font-mono); color:var(--status-completed);">${(r.actualAmount || 0).toLocaleString('tr-TR')} ₺</td>
+                            <td style="font-size:0.8rem;">${r.assignedTo || '-'}</td>
+                            <td style="text-align:center;">
+                              <div class="action-btns" style="justify-content:center; gap:0.25rem;">
+                                <button class="btn-icon" onclick="App.viewRequestDetails('${r.id}')" title="Detayı Görüntüle">👁️</button>
+                                <button class="btn-icon" onclick="App.openDocumentManager('request', '${r.id}', '#${r.requestBarcode || r.id} — ${r.subject?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
+                              </div>
+                            </td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }
+        });
+      }
+    });
+
+    tbody.innerHTML = html;
+
+    // 7. Render Table Footer Totals
+    if (tfoot) {
+      tfoot.innerHTML = `
+        <tr>
+          <td></td>
+          <td>GENEL TOPLAM (${distinctUsedRegs.size} Madde / ${distinctUsedSupps.size} Tedarikçi)</td>
+          <td style="text-align:center; font-size:1rem;">${totalOrdersCount} Sipariş</td>
+          <td style="text-align:right; font-size:1.1rem; color:var(--status-completed); font-family:var(--font-mono);">${grandTotalSpend.toLocaleString('tr-TR')} ₺</td>
+          <td style="text-align:right; font-family:var(--font-mono);">${totalOrdersCount > 0 ? (grandTotalSpend / totalOrdersCount).toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : 0} ₺</td>
+          <td style="text-align:center;">%100.0</td>
+          <td></td>
+        </tr>
+      `;
+    }
+  },
+
+  toggleMatrixGroup(groupId) {
+    if (!this.state.expandedMatrixGroups) this.state.expandedMatrixGroups = new Set();
+    if (this.state.expandedMatrixGroups.has(groupId)) {
+      this.state.expandedMatrixGroups.delete(groupId);
+    } else {
+      this.state.expandedMatrixGroups.add(groupId);
+    }
+    this.renderYearlyMatrixReport();
+  },
+
+  toggleMatrixSubGroup(subGroupId) {
+    if (!this.state.expandedMatrixSubGroups) this.state.expandedMatrixSubGroups = new Set();
+    if (this.state.expandedMatrixSubGroups.has(subGroupId)) {
+      this.state.expandedMatrixSubGroups.delete(subGroupId);
+    } else {
+      this.state.expandedMatrixSubGroups.add(subGroupId);
+    }
+    this.renderYearlyMatrixReport();
+  },
+
+  expandAllMatrixGroups() {
+    if (!this.state.expandedMatrixGroups) this.state.expandedMatrixGroups = new Set();
+    if (!this.state.expandedMatrixSubGroups) this.state.expandedMatrixSubGroups = new Set();
+
+    for (let i = 0; i < 50; i++) {
+      this.state.expandedMatrixGroups.add(`mg_${i}`);
+      for (let j = 0; j < 50; j++) {
+        this.state.expandedMatrixSubGroups.add(`mg_${i}_sg_${j}`);
+      }
+    }
+    this.renderYearlyMatrixReport();
+  },
+
+  collapseAllMatrixGroups() {
+    this.state.expandedMatrixGroups = new Set();
+    this.state.expandedMatrixSubGroups = new Set();
+    this.renderYearlyMatrixReport();
+  },
+
+  exportMatrixToExcel() {
+    const activeRequests = this.getFilteredRequests();
+    const currentRegVal = this.state.matrixRegulation || 'ALL';
+    const currentSuppVal = this.state.matrixSupplier || 'ALL';
+    const searchText = (this.state.matrixSearch || '').toLowerCase().trim();
+
+    const filtered = activeRequests.filter(r => {
+      let reg = (r.regulation || 'Belirtilmemiş').trim();
+      if (reg.startsWith('Madde ')) reg = reg.replace('Madde ', '');
+      const supp = (r.supplier || '').trim();
+
+      if (currentRegVal !== 'ALL' && reg !== currentRegVal) return false;
+      if (currentSuppVal !== 'ALL' && supp !== currentSuppVal) return false;
+
+      if (searchText) {
+        const mSupp = supp.toLowerCase().includes(searchText);
+        const mSubj = (r.subject || '').toLowerCase().includes(searchText);
+        const mBar = (r.requestBarcode || '').toString().toLowerCase().includes(searchText);
+        if (!mSupp && !mSubj && !mBar) return false;
+      }
+      return true;
+    });
+
+    let csv = "Mevzuat Maddesi;Tedarikçi Firma;Talep Barkodu;Talep Konusu;Birim;Sipariş No;Sipariş Tarihi;Gerçekleşen Tutar (TRY);Sorumlu Uzman\n";
+
+    filtered.forEach(r => {
+      let reg = (r.regulation || 'Belirtilmemiş').trim();
+      if (reg.startsWith('Madde ')) reg = reg.replace('Madde ', '');
+      const supp = (r.supplier || '').trim();
+      const subject = (r.subject || '').replace(/;/g, ' ').replace(/"/g, '""');
+      const unit = (r.unit || '').replace(/;/g, ' ');
+      csv += `"Madde ${reg}";"${supp}";"${r.requestBarcode || r.id}";"${subject}";"${unit}";"${r.orderBarcode || ''}";"${r.orderDate || ''}";"${r.actualAmount || 0}";"${r.assignedTo || ''}"\n`;
+    });
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Ihale_Maddesi_Tedarikci_Matrisi_${this.state.selectedYear}.csv`;
+    link.click();
+    this.showToast("İhale Maddesi x Tedarikçi Raporu Excel formatında indirildi!", "success", "📥");
   },
 
   openPersonnelSavingsDetailView(userName, acadMonthIdx = 'ALL') {
@@ -5913,69 +6831,566 @@ const App = {
     this.render();
   },
 
-  exportToCSV() {
-    this.exportTableToExcel('table-requests', `Satinalma_Talepleri_${this.state.selectedYear}.csv`);
-  },
+  // ============================================================
+  // 📊 EXECUTIVE EXCEL (XLSX) & PDF PRINT ENGINES
+  // ============================================================
 
-  exportTableToExcel(tableId, filename = 'Export.csv') {
-    const table = document.getElementById(tableId);
-    if (!table) {
-      this.showToast("Dışa aktarılacak tablo bulunamadı.", "warning");
+  exportToExcelXLSX({ filename, sheetName, title, headers, rows }) {
+    const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
+    const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
+    const dateStr = new Date().toLocaleDateString('tr-TR');
+
+    // Check if SheetJS XLSX is available
+    if (typeof XLSX !== 'undefined') {
+      const wb = XLSX.utils.book_new();
+
+      // Build 2D Array of Rows (AOA)
+      const aoa = [
+        ["T.C. PİRİ REİS ÜNİVERSİTESİ"],
+        ["İDARİ VE MALİ İŞLER DAİRE BAŞKANLIĞI — " + (title || 'SATINALMA MÜDÜRLÜĞÜ RAPORU').toUpperCase()],
+        [`Rapor Tarihi: ${dateStr} | Dönem: ${yearStr} | Raporu Hazırlayan: ${userStr} | Toplam Kayıt: ${rows.length}`],
+        [], // Empty separator row
+        headers,
+        ...rows
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Auto-calculate column widths based on max content length
+      const colProps = headers.map((h, colIdx) => {
+        let maxLen = (h || '').toString().length;
+        rows.forEach(r => {
+          const val = r[colIdx];
+          if (val !== undefined && val !== null) {
+            const strLen = typeof val === 'number' ? val.toLocaleString('tr-TR').length : val.toString().length;
+            if (strLen > maxLen) maxLen = strLen;
+          }
+        });
+        return { wch: Math.min(65, Math.max(maxLen + 4, 12)) };
+      });
+      ws['!cols'] = colProps;
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Rapor');
+      
+      const cleanFilename = filename.endsWith('.xlsx') ? filename : `${filename.replace(/\.[^/.]+$/, "")}.xlsx`;
+      XLSX.writeFile(wb, cleanFilename);
+      this.showToast(`"${cleanFilename}" Excel dosyası başarıyla indirildi!`, "success", "📥");
+      this.logAction('Excel Dışa Aktarıldı (XLSX)', `Rapor: ${title}, Kayıt: ${rows.length}`);
       return;
     }
 
-    // Convert extension to .csv so Excel opens natively without format mismatch warning dialogs
-    if (filename.endsWith('.xls') || filename.endsWith('.xlsx')) {
-      filename = filename.replace(/\.(xls|xlsx)$/i, '.csv');
-    }
-    if (!filename.endsWith('.csv')) {
-      filename += '.csv';
-    }
+    // Fallback: UTF-8 BOM CSV
+    let csv = `T.C. PİRİ REİS ÜNİVERSİTESİ - ${title}\n`;
+    csv += `Rapor Tarihi: ${dateStr}; Dönem: ${yearStr}; Raporlayan: ${userStr}\n\n`;
+    csv += headers.map(h => `"${(h || '').replace(/"/g, '""')}"`).join(';') + '\n';
+    rows.forEach(r => {
+      csv += r.map(c => {
+        if (c === null || c === undefined) return '""';
+        if (typeof c === 'number') return c.toString().replace('.', ',');
+        return `"${c.toString().replace(/"/g, '""')}"`;
+      }).join(';') + '\n';
+    });
 
-    let csvContent = '';
-    const rows = table.querySelectorAll('tr');
-    
-    rows.forEach(row => {
-      // Skip hidden rows unless it's tfoot or header
-      if (row.offsetParent === null && !row.closest('tfoot')) return;
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename.endsWith('.csv') ? filename : `${filename.replace(/\.[^/.]+$/, "")}.csv`;
+    link.click();
+    this.showToast("Rapor Excel (CSV) formatında indirildi!", "success", "📥");
+  },
 
-      const cols = row.querySelectorAll('th, td');
-      const rowData = [];
+  exportRequestsToExcel() {
+    const reqs = this.getFilteredRequests();
+    const search = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('filter-status')?.value || 'ALL';
+    const unit = document.getElementById('filter-unit')?.value || 'ALL';
+    const priority = document.getElementById('filter-priority')?.value || 'ALL';
+    const supplier = document.getElementById('filter-supplier')?.value || 'ALL';
 
-      cols.forEach(col => {
-        // Skip action buttons column
-        if (col.querySelector('.action-btns') || col.classList.contains('no-export')) return;
-        
-        let text = col.innerText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-        // Clean button text inside cells if any
-        text = text.replace(/🔍\s*Detay/g, '').trim();
-
-        // Escape double quotes for CSV
-        text = text.replace(/"/g, '""');
-        
-        // Wrap in quotes if text contains semicolon or special chars
-        if (text.includes(';') || text.includes('"') || text.includes('\n')) {
-          text = `"${text}"`;
+    const filtered = reqs.filter(r => {
+      if (status !== 'ALL' && r.status !== status) return false;
+      if (unit !== 'ALL' && r.unit !== unit) return false;
+      if (priority !== 'ALL' && r.priority !== priority) return false;
+      if (supplier !== 'ALL' && r.supplier !== supplier) return false;
+      if (search) {
+        const barcode = (r.requestBarcode || '').toString().toLowerCase();
+        const subject = (r.subject || '').toLowerCase();
+        const sup = (r.supplier || '').toLowerCase();
+        const un = (r.unit || '').toLowerCase();
+        const ord = (r.orderBarcode || '').toString().toLowerCase();
+        if (!barcode.includes(search) && !subject.includes(search) && !sup.includes(search) && !un.includes(search) && !ord.includes(search)) {
+          return false;
         }
-        rowData.push(text);
-      });
+      }
+      return true;
+    });
 
-      if (rowData.length > 0) {
-        csvContent += rowData.join(';') + '\r\n';
+    const headers = [
+      'Talep Barkod', 'Talep Tarihi', 'Geliş Tarihi', 'Talep Konusu & Malzeme', 'Talep Eden Birim', 
+      'Sorumlu Uzman', 'Öncelik', 'Durum', 'Sipariş No', 'Sipariş Tarihi', 
+      'Tedarikçi Firma', 'İhale / Mevzuat Maddesi', 'Tahmini Bütçe (TRY)', 'Gerçekleşen Tutar (TRY)', 'Para Birimi', 'Açıklama'
+    ];
+
+    let totalEst = 0;
+    let totalAct = 0;
+
+    const rows = filtered.map(r => {
+      const est = parseFloat(r.estimatedAmount || r.budgetAmount) || 0;
+      const act = parseFloat(r.actualAmount) || 0;
+      totalEst += est;
+      totalAct += act;
+
+      return [
+        r.requestBarcode || r.id,
+        r.requestDate || '',
+        r.arrivalDate || '',
+        r.subject || '',
+        r.unit || '',
+        r.assignedTo || '',
+        r.priority || 'Normal',
+        r.status || 'Açık',
+        r.orderBarcode || '',
+        r.orderDate || '',
+        r.supplier || '',
+        r.regulation ? (r.regulation.startsWith('Madde ') ? r.regulation : `Madde ${r.regulation}`) : '',
+        est,
+        act,
+        r.currency || 'TRY',
+        r.description || ''
+      ];
+    });
+
+    rows.push([
+      'GENEL TOPLAM', '', '', `${filtered.length} Adet Talep`, '', 
+      '', '', '', '', '', 
+      '', '', totalEst, totalAct, 'TRY', ''
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Satinalma_Talepleri_${this.state.selectedYear}`,
+      sheetName: 'Satınalma Talepleri',
+      title: 'SATINALMA TALEPLERİ VE SİPARİŞ LİSTESİ',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  exportContractsToExcel() {
+    const contracts = this.state.contracts || [];
+    const search = (document.getElementById('filter-contract-search')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('filter-contract-status')?.value || 'ALL';
+
+    const filtered = contracts.filter(c => {
+      if (status !== 'ALL' && c.status !== status) return false;
+      if (search) {
+        const no = (c.contractNo || '').toLowerCase();
+        const sup = (c.supplier || '').toLowerCase();
+        const subj = (c.subject || '').toLowerCase();
+        if (!no.includes(search) && !sup.includes(search) && !subj.includes(search)) return false;
+      }
+      return true;
+    });
+
+    const headers = [
+      'Sözleşme No', 'Yüklenici / Tedarikçi Firma', 'Sözleşme Konusu', 'Sorumlu Birim',
+      'Başlangıç Tarihi', 'Bitiş Tarihi', 'Sözleşme Bedeli', 'Para Birimi', 'Durum', 'Açıklama'
+    ];
+
+    let grandTotal = 0;
+    const rows = filtered.map(c => {
+      const amt = parseFloat(c.amount) || 0;
+      grandTotal += amt;
+      return [
+        c.contractNo || c.id,
+        c.supplier || '',
+        c.subject || '',
+        c.unit || '',
+        c.startDate || '',
+        c.endDate || '',
+        amt,
+        c.currency || 'TRY',
+        c.status || 'Aktif',
+        c.notes || ''
+      ];
+    });
+
+    rows.push([
+      'GENEL TOPLAM', `${filtered.length} Sözleşme`, '', '',
+      '', '', grandTotal, 'TRY', '', ''
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Kurumsal_Sozlesmeler_${this.state.selectedYear}`,
+      sheetName: 'Sözleşmeler',
+      title: 'KURUMSAL SÖZLEŞMELER VE YÜKLENİCİ ÇİZELGESİ',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  exportInvoicesToExcel() {
+    const invoices = this.state.invoices || [];
+    const search = (document.getElementById('filter-invoice-search')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('filter-invoice-status')?.value || 'ALL';
+
+    const filtered = invoices.filter(inv => {
+      if (status !== 'ALL' && inv.status !== status) return false;
+      if (search) {
+        const no = (inv.invoiceNo || '').toLowerCase();
+        const sup = (inv.supplier || '').toLowerCase();
+        if (!no.includes(search) && !sup.includes(search)) return false;
+      }
+      return true;
+    });
+
+    const headers = [
+      'Fatura No', 'Tedarikçi Firma', 'Fatura Tarihi', 'Vade Tarihi', 
+      'Fatura Tutarı', 'Para Birimi', 'Ödeme Durumu', 'Ödeme Tarihi', 'İlişkili Talep/Sözleşme', 'Açıklama'
+    ];
+
+    let grandTotal = 0;
+    const rows = filtered.map(inv => {
+      const amt = parseFloat(inv.amount) || 0;
+      grandTotal += amt;
+      return [
+        inv.invoiceNo || inv.id,
+        inv.supplier || '',
+        inv.invoiceDate || '',
+        inv.dueDate || '',
+        amt,
+        inv.currency || 'TRY',
+        inv.status || 'Ödeme Bekliyor',
+        inv.paymentDate || '',
+        inv.relatedRequestBarcode || '',
+        inv.notes || ''
+      ];
+    });
+
+    rows.push([
+      'GENEL TOPLAM', `${filtered.length} Fatura`, '', '',
+      grandTotal, 'TRY', '', '', '', ''
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Fatura_Listesi_${this.state.selectedYear}`,
+      sheetName: 'Faturalar',
+      title: 'FATURA VE ÖDEME TAKİP LİSTESİ',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  exportGuaranteesToExcel() {
+    const guarantees = this.state.guarantees || [];
+    const search = (document.getElementById('filter-guarantee-search')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('filter-guarantee-status')?.value || 'ALL';
+    const type = document.getElementById('filter-guarantee-type')?.value || 'ALL';
+
+    const filtered = guarantees.filter(g => {
+      if (status !== 'ALL' && g.status !== status) return false;
+      if (type !== 'ALL' && g.type !== type) return false;
+      if (search) {
+        const no = (g.letterNo || '').toLowerCase();
+        const bank = (g.bank || '').toLowerCase();
+        const sup = (g.supplier || '').toLowerCase();
+        if (!no.includes(search) && !bank.includes(search) && !sup.includes(search)) return false;
+      }
+      return true;
+    });
+
+    const headers = [
+      'Mektup No', 'Banka Adı', 'Teminat Türü', 'Tedarikçi / Yüklenici', 'İlişkili İhale / İş',
+      'Teminat Tutarı', 'Para Birimi', 'Düzenleme Tarihi', 'Vade Tarihi', 'Kasa Konumu', 'Durum', 'Notlar'
+    ];
+
+    let grandTotal = 0;
+    const rows = filtered.map(g => {
+      const amt = parseFloat(g.amount) || 0;
+      grandTotal += amt;
+      return [
+        g.letterNo || g.id,
+        g.bank || '',
+        g.type || '',
+        g.supplier || '',
+        g.relatedWork || '',
+        amt,
+        g.currency || 'TRY',
+        g.issueDate || '',
+        g.expiryDate || '',
+        g.storageLocation || '',
+        g.status || 'Aktif',
+        g.notes || ''
+      ];
+    });
+
+    rows.push([
+      'GENEL TOPLAM', `${filtered.length} Teminat Mektubu`, '', '', '',
+      grandTotal, 'TRY', '', '', '', '', ''
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Teminat_Mektuplari_${this.state.selectedYear}`,
+      sheetName: 'Teminat Mektupları',
+      title: 'TEMİNAT MEKTUPLARI VE KASA ÇİZELGESİ',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  exportUnitAnalysisToExcel() {
+    const requests = this.getFilteredRequests();
+    const unitMap = {};
+    let totalSpendAll = 0;
+
+    requests.forEach(r => {
+      const u = r.unit || 'Diğer / Belirtilmemiş';
+      const sp = parseFloat(r.actualAmount) || 0;
+      totalSpendAll += sp;
+      if (!unitMap[u]) {
+        unitMap[u] = { count: 0, completed: 0, open: 0, spend: 0, waitDays: 0, compWithDates: 0 };
+      }
+      unitMap[u].count++;
+      if (r.status === 'Tamamlandı') unitMap[u].completed++;
+      else unitMap[u].open++;
+      unitMap[u].spend += sp;
+
+      if (r.arrivalDate && r.orderDate) {
+        const d1 = new Date(r.arrivalDate);
+        const d2 = new Date(r.orderDate);
+        const diff = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+        if (!isNaN(diff) && diff >= 0 && diff < 180) {
+          unitMap[u].waitDays += diff;
+          unitMap[u].compWithDates++;
+        }
       }
     });
 
-    // UTF-8 BOM (\uFEFF) ensures Excel opens Turkish characters (Ş, Ğ, Ç, İ, Ö, Ü, ₺) perfectly
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    
-    this.logAction('Excel Dışa Aktarıldı', `Tablo: ${tableId}, Dosya: ${filename}`);
+    const sortedUnits = Object.entries(unitMap).sort((a,b) => b[1].spend - a[1].spend);
+    const headers = [
+      'Sıra', 'Birim / Fakülte Adı', 'Talep Adedi', 'Tamamlanan', 'Açık / İşlemde', 
+      'Bütçe Payı %', 'Ortalama Temin Süresi (SLA Gün)', 'Toplam Harcama (TRY)'
+    ];
+
+    let grandCount = 0;
+    let grandCompleted = 0;
+    let grandOpen = 0;
+
+    const rows = sortedUnits.map(([unitName, s], idx) => {
+      grandCount += s.count;
+      grandCompleted += s.completed;
+      grandOpen += s.open;
+      const share = totalSpendAll > 0 ? ((s.spend / totalSpendAll) * 100).toFixed(1) : 0;
+      const sla = s.compWithDates > 0 ? (s.waitDays / s.compWithDates).toFixed(1) : '-';
+
+      return [
+        idx + 1,
+        unitName,
+        s.count,
+        s.completed,
+        s.open,
+        parseFloat(share),
+        sla === '-' ? 0 : parseFloat(sla),
+        s.spend
+      ];
+    });
+
+    rows.push([
+      '', 'GENEL TOPLAM', grandCount, grandCompleted, grandOpen,
+      100, '', totalSpendAll
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Birim_Harcama_Analizi_${this.state.selectedYear}`,
+      sheetName: 'Birim Analizi',
+      title: 'BİRİM BAZLI HARCAMA VE PERFORMANS CETVELİ',
+      headers: headers,
+      rows: rows
+    });
   },
 
-  printSection(sectionId = null, docTitle = 'SATİNALMA MÜDÜRLÜĞÜ FAALİYET VE HARCAMA RAPORU') {
+  exportSupplierAnalysisToExcel() {
+    const requests = this.getFilteredRequests();
+    const suppMap = {};
+    let totalSpendAll = 0;
+
+    requests.forEach(r => {
+      const s = (r.supplier && r.supplier !== '-') ? r.supplier.trim() : 'Diğer / Belirtilmemiş';
+      const sp = parseFloat(r.actualAmount) || 0;
+      totalSpendAll += sp;
+      if (!suppMap[s]) {
+        suppMap[s] = { count: 0, completed: 0, open: 0, spend: 0 };
+      }
+      suppMap[s].count++;
+      if (r.status === 'Tamamlandı') suppMap[s].completed++;
+      else suppMap[s].open++;
+      suppMap[s].spend += sp;
+    });
+
+    const sortedSuppliers = Object.entries(suppMap).sort((a,b) => b[1].spend - a[1].spend);
+    const headers = [
+      'Sıra', 'Tedarikçi Firma Adı', 'Talep Adedi', 'Tamamlanan Sipariş', 'Açık / İşlemde', 'Toplam Harcama (TRY)', 'Bütçe Payı %'
+    ];
+
+    let grandCount = 0;
+    const rows = sortedSuppliers.map(([suppName, s], idx) => {
+      grandCount += s.count;
+      const share = totalSpendAll > 0 ? ((s.spend / totalSpendAll) * 100).toFixed(1) : 0;
+      return [
+        idx + 1,
+        suppName,
+        s.count,
+        s.completed,
+        s.open,
+        s.spend,
+        parseFloat(share)
+      ];
+    });
+
+    rows.push([
+      '', 'GENEL TOPLAM', grandCount, '', '', totalSpendAll, 100
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Tedarikci_Analizi_${this.state.selectedYear}`,
+      sheetName: 'Tedarikçi Analizi',
+      title: 'TEDARİKÇİ BAZLI HARCAMA VE İŞ HACMİ RAPORU',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  exportYearlyFinancialToExcel() {
+    const requests = this.getFilteredRequests();
+    const months = ['Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos'];
+    const monthlyData = Array(12).fill(0).map(() => ({ count: 0, est: 0, act: 0, sav: 0 }));
+
+    let totalSpend = 0;
+    let totalEstimated = 0;
+    let totalSavings = 0;
+
+    requests.forEach(r => {
+      const act = parseFloat(r.actualAmount) || 0;
+      const est = parseFloat(r.estimatedAmount || r.budgetAmount || act) || 0;
+      const sav = Math.max(0, est - act);
+
+      totalSpend += act;
+      totalEstimated += est;
+      totalSavings += sav;
+
+      if (r.requestDate) {
+        const m = parseInt(r.requestDate.split('-')[1]) - 1;
+        const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
+        if (acadIdx >= 0 && acadIdx < 12) {
+          monthlyData[acadIdx].count++;
+          monthlyData[acadIdx].est += est;
+          monthlyData[acadIdx].act += act;
+          monthlyData[acadIdx].sav += sav;
+        }
+      }
+    });
+
+    const headers = [
+      'Ay (Akademik Yıl)', 'Talep Adedi', 'Tahmini Bütçe (TRY)', 'Gerçekleşen Harcama (TRY)', 'Pazarlık Tasarrufu (TRY)', 'Tasarruf Oranı %'
+    ];
+
+    const rows = months.map((mName, i) => {
+      const d = monthlyData[i];
+      const rate = d.est > 0 ? ((d.sav / d.est) * 100).toFixed(1) : 0;
+      return [
+        mName,
+        d.count,
+        d.est,
+        d.act,
+        d.sav,
+        parseFloat(rate)
+      ];
+    });
+
+    const grandRate = totalEstimated > 0 ? ((totalSavings / totalEstimated) * 100).toFixed(1) : 0;
+    rows.push([
+      'GENEL TOPLAM', requests.length, totalEstimated, totalSpend, totalSavings, parseFloat(grandRate)
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Yillik_Finansal_Faaliyet_Raporu_${this.state.selectedYear}`,
+      sheetName: 'Finansal Rapor',
+      title: 'YILLIK SATINALMA FAALİYET, BÜTÇE VE TASARRUF CETVELİ',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  exportLogsToExcel() {
+    const logs = this.state.logs || [];
+    const headers = ['Zaman / Tarih', 'Kullanıcı', 'Eylem Türü', 'Detay'];
+    const rows = logs.map(l => [
+      l.timestamp || '',
+      l.user || 'Sistem',
+      l.action || '',
+      l.details || ''
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Sistem_Loglari_${new Date().toISOString().split('T')[0]}`,
+      sheetName: 'Loglar',
+      title: 'SİSTEM AKTİVİTE VE DENETİM LOGLARI',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  exportDelegationToExcel() {
+    const reqs = this.getFilteredRequests().filter(r => r.status === 'Açık');
+    const headers = ['Talep Barkod', 'Talep Konusu', 'Talep Eden Birim', 'Atanan Uzman', 'Öncelik', 'Geliş Tarihi'];
+    const rows = reqs.map(r => [
+      r.requestBarcode || r.id,
+      r.subject || '',
+      r.unit || '',
+      r.assignedTo || '',
+      r.priority || '',
+      r.arrivalDate || ''
+    ]);
+
+    this.exportToExcelXLSX({
+      filename: `Delegasyon_Listesi_${this.state.selectedYear}`,
+      sheetName: 'Delegasyon',
+      title: 'İŞ YÜKÜ VE PERSONEL DELEGASYON LİSTESİ',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  exportWeeklyPaymentsToExcel() {
+    const invoices = this.state.invoices || [];
+    const openInvoices = invoices.filter(i => i.status !== 'Ödendi');
+    const headers = ['Fatura No', 'Tedarikçi Firma', 'Vade Tarihi', 'Fatura Tutarı (TRY)', 'Para Birimi', 'Durum'];
+
+    let grandTotal = 0;
+    const rows = openInvoices.map(inv => {
+      const amt = parseFloat(inv.amount) || 0;
+      grandTotal += amt;
+      return [
+        inv.invoiceNo || inv.id,
+        inv.supplier || '',
+        inv.dueDate || '',
+        amt,
+        inv.currency || 'TRY',
+        inv.status || ''
+      ];
+    });
+
+    rows.push(['GENEL TOPLAM', `${openInvoices.length} Fatura`, '', grandTotal, 'TRY', '']);
+
+    this.exportToExcelXLSX({
+      filename: `Haftalik_Odeme_Plani_${new Date().toISOString().split('T')[0]}`,
+      sheetName: 'Haftalık Ödemeler',
+      title: 'HAFTALIK NAKİT VE FATURA ÖDEME PLANI',
+      headers: headers,
+      rows: rows
+    });
+  },
+
+  printSection(sectionId = null, docTitle = 'SATINALMA MÜDÜRLÜĞÜ FAALİYET VE HARCAMA RAPORU') {
     let secEl = sectionId ? document.getElementById(sectionId) : null;
     if (!secEl) {
       secEl = document.querySelector('.view-section:not([style*="display: none"]):not([style*="display:none"])');
@@ -5986,41 +7401,81 @@ const App = {
       return;
     }
 
-    let banner = secEl.querySelector('.print-header-banner');
-    let createdBanner = false;
+    const todayStr = new Date().toLocaleDateString('tr-TR');
+    const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
+    const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
 
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.className = 'print-header-banner';
-      createdBanner = true;
-
-      const todayStr = new Date().toLocaleDateString('tr-TR');
-      const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
-      const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
-
-      banner.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-          <div style="text-align:left;">
-            <div style="font-size:1.3rem; font-weight:800; color:#0f172a; letter-spacing:0.02em;">T.C. PİRİ REİS ÜNİVERSİTESİ</div>
-            <div style="font-size:1rem; font-weight:700; color:#1e3a8a; margin-top:0.2rem;">${docTitle}</div>
-          </div>
-          <div style="text-align:right; font-size:0.8rem; color:#475569; line-height:1.4;">
-            <div><strong>Tarih:</strong> ${todayStr}</div>
-            <div><strong>Dönem:</strong> ${yearStr}</div>
-            <div><strong>Raporlayan:</strong> ${userStr}</div>
-          </div>
+    // Create Corporate Header Banner
+    const banner = document.createElement('div');
+    banner.className = 'print-header-banner';
+    banner.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:12px;">
+        <div style="text-align:left;">
+          <div style="font-size:1.15rem; font-weight:800; color:#0f172a; letter-spacing:0.02em;">T.C. PİRİ REİS ÜNİVERSİTESİ</div>
+          <div style="font-size:0.85rem; font-weight:700; color:#1e3a8a; margin-top:2px;">İDARİ VE MALİ İŞLER DAİRE BAŞKANLIĞI — SATINALMA MÜDÜRLÜĞÜ</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0f172a; margin-top:4px;">${docTitle}</div>
         </div>
-      `;
-      secEl.insertBefore(banner, secEl.firstChild);
-    }
+        <div style="text-align:right; font-size:7.5pt; color:#334155; line-height:1.4;">
+          <div><strong>Rapor Tarihi:</strong> ${todayStr}</div>
+          <div><strong>Kapsam Dönemi:</strong> ${yearStr}</div>
+          <div><strong>Raporu Hazırlayan:</strong> ${userStr}</div>
+          <div><strong>Sistem:</strong> Satınalma Takip ERP</div>
+        </div>
+      </div>
+    `;
+    secEl.insertBefore(banner, secEl.firstChild);
+
+    // Create Corporate Signature Footer
+    const footer = document.createElement('div');
+    footer.className = 'print-footer-signatures';
+    footer.innerHTML = `
+      <div class="print-signature-box">
+        <div class="sig-title">RAPORU HAZIRLAYAN</div>
+        <div style="font-size:7.5pt; color:#475569;">${userStr}</div>
+        <div style="font-size:7pt; color:#64748b;">Satınalma Uzmanı / Görevlisi</div>
+        <div class="sig-space"></div>
+        <div class="sig-line">İmza / Tarih</div>
+      </div>
+      <div class="print-signature-box">
+        <div class="sig-title">KONTROL EDEN</div>
+        <div style="font-size:7.5pt; color:#475569;">Satınalma Şube Müdürü</div>
+        <div style="font-size:7pt; color:#64748b;">İdari ve Mali İşler Daire Bşk.</div>
+        <div class="sig-space"></div>
+        <div class="sig-line">İmza / Tarih</div>
+      </div>
+      <div class="print-signature-box">
+        <div class="sig-title">ONAYLAYAN</div>
+        <div style="font-size:7.5pt; color:#475569;">Genel Sekreterlik / Rektörlük</div>
+        <div style="font-size:7pt; color:#64748b;">Harcama Yetkilisi</div>
+        <div class="sig-space"></div>
+        <div class="sig-line">İmza / Tarih</div>
+      </div>
+    `;
+    secEl.appendChild(footer);
 
     secEl.classList.add('active-print');
+
+    // If printing requests view, temporarily render all requests without pagination limit
+    let originalPage = this.state.currentPage;
+    let originalSize = this.state.pageSize;
+    if (sectionId === 'view-requests') {
+      this.state.pageSize = 500;
+      this.state.currentPage = 1;
+      this.renderRequestsTable();
+    }
+
     window.print();
 
-    if (createdBanner && banner) {
-      banner.remove();
-    }
+    // Clean up print DOM
+    banner.remove();
+    footer.remove();
     secEl.classList.remove('active-print');
+
+    if (sectionId === 'view-requests') {
+      this.state.pageSize = originalSize;
+      this.state.currentPage = originalPage;
+      this.renderRequestsTable();
+    }
   },
 
   async fetchBackups() {

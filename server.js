@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const pg = require('pg');
+const archiver = require('archiver');
 // Parse NUMERIC / DECIMAL database fields as numbers instead of strings
 pg.types.setTypeParser(1700, (val) => (val === null ? null : parseFloat(val)));
 pg.types.setTypeParser(20, (val) => (val === null ? null : parseInt(val, 10)));
@@ -15,6 +16,10 @@ const { Pool } = pg;
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 // PostgreSQL Bağlantı Havuzu
 const pool = new Pool({
@@ -128,7 +133,7 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/data' && method === 'GET') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       
-      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders] = await Promise.all([
+      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders, documents] = await Promise.all([
         getTableData('users'),
         getTableData('requests'),
         getTableData('contracts'),
@@ -138,7 +143,8 @@ const server = http.createServer(async (req, res) => {
         pool.query('SELECT id, name FROM units ORDER BY name ASC'),
         pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
         pool.query('SELECT * FROM rates'),
-        getTableData('tenders').catch(() => [])
+        getTableData('tenders').catch(() => []),
+        getTableData('documents').catch(() => [])
       ]);
 
       const ratesObj = {};
@@ -152,7 +158,8 @@ const server = http.createServer(async (req, res) => {
         units: units.rows,
         regulations: regulations.rows,
         rates: Object.keys(ratesObj).length > 0 ? ratesObj : { USD: 36.50, EUR: 39.80 },
-        tenders: tenders || []
+        tenders: tenders || [],
+        documents: documents || []
       };
 
       res.writeHead(200);
@@ -173,11 +180,172 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Document specific endpoints
+    if (urlPath === '/api/documents' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const entityType = url.searchParams.get('entityType');
+      const entityId = url.searchParams.get('entityId');
+      let query = 'SELECT * FROM documents';
+      const params = [];
+      if (entityType && entityId) {
+        query += ' WHERE "entityType" = $1 AND "entityId" = $2 ORDER BY id DESC';
+        params.push(entityType, parseInt(entityId, 10));
+      } else if (entityType) {
+        query += ' WHERE "entityType" = $1 ORDER BY id DESC';
+        params.push(entityType);
+      } else {
+        query += ' ORDER BY id DESC';
+      }
+      const result = await pool.query(query, params);
+      res.writeHead(200);
+      res.end(JSON.stringify(result.rows));
+      return;
+    }
+
+    if (urlPath === '/api/documents/upload' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const body = await readBody(req);
+      if (!body) {
+        res.writeHead(400); res.end(JSON.stringify({ error: 'Dosya verisi bulunamadı.' })); return;
+      }
+      try {
+        const data = JSON.parse(body);
+        const { entityType, entityId, fileName, fileData, fileType, category, description, uploadedBy } = data;
+        
+        if (!entityType || !entityId || !fileName || !fileData) {
+          res.writeHead(400); res.end(JSON.stringify({ error: 'Gerekli alanlar eksik (entityType, entityId, fileName, fileData).' })); return;
+        }
+
+        const base64Content = fileData.includes(';base64,') ? fileData.split(';base64,')[1] : fileData;
+        const buffer = Buffer.from(base64Content, 'base64');
+        const sanitizedName = fileName.replace(/[^a-zA-Z0-9._\-çÇğĞıİöÖşŞüÜ]/g, '_');
+        const storedFileName = `${Date.now()}_${Math.floor(Math.random()*1000)}_${sanitizedName}`;
+        const destPath = path.join(UPLOAD_DIR, storedFileName);
+
+        fs.writeFileSync(destPath, buffer);
+
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+        const insertQuery = `
+          INSERT INTO documents ("entityType", "entityId", "fileName", "storedFileName", "fileSize", "fileType", "category", "description", "uploadedBy", "uploadedAt")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *
+        `;
+        const result = await pool.query(insertQuery, [
+          entityType,
+          parseInt(entityId, 10),
+          fileName,
+          storedFileName,
+          buffer.length,
+          fileType || 'application/octet-stream',
+          category || 'Genel',
+          description || '',
+          uploadedBy || 'Sistem',
+          dateStr
+        ]);
+
+        res.writeHead(201);
+        res.end(JSON.stringify({ success: true, document: result.rows[0] }));
+        return;
+      } catch (err) {
+        console.error('Dosya yükleme hatası:', err);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Dosya kaydedilemedi: ' + err.message }));
+        return;
+      }
+    }
+
+    if (urlPath === '/api/documents/export-zip' && method === 'GET') {
+      const entityType = url.searchParams.get('entityType');
+      const entityId = url.searchParams.get('entityId');
+      if (!entityType || !entityId) {
+        res.writeHead(400); res.end(JSON.stringify({ error: 'entityType ve entityId parametreleri gereklidir.' })); return;
+      }
+      const docsRes = await pool.query(
+        'SELECT * FROM documents WHERE "entityType" = $1 AND "entityId" = $2 ORDER BY id ASC',
+        [entityType, parseInt(entityId, 10)]
+      );
+      const docs = docsRes.rows;
+      if (docs.length === 0) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('İndirilecek kayıtlı evrak bulunamadı.');
+        return;
+      }
+      const zipArchive = new (archiver.ZipArchive || archiver)({ zlib: { level: 9 } });
+      const safeZipName = `${entityType}_${entityId}_tum_evraklar.zip`;
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(safeZipName)}`
+      });
+      zipArchive.pipe(res);
+      for (const doc of docs) {
+        const fPath = path.join(UPLOAD_DIR, doc.storedFileName);
+        if (fs.existsSync(fPath)) {
+          const zipEntryName = doc.category ? `${doc.category} - ${doc.fileName}` : doc.fileName;
+          zipArchive.file(fPath, { name: zipEntryName });
+        }
+      }
+      zipArchive.finalize();
+      return;
+    }
+
     // 2. Generic REST CRUD API
     const parts = urlPath.split('/').filter(Boolean);
+
+    // Document download / preview
+    if (parts[0] === 'api' && parts[1] === 'documents' && parts[2] && (parts[3] === 'download' || parts[3] === 'preview') && method === 'GET') {
+      const docId = parseInt(parts[2], 10);
+      const isPreview = parts[3] === 'preview';
+      const docRes = await pool.query('SELECT * FROM documents WHERE id = $1', [docId]);
+      if (docRes.rowCount === 0) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Doküman bulunamadı.');
+        return;
+      }
+      const doc = docRes.rows[0];
+      const filePath = path.join(UPLOAD_DIR, doc.storedFileName);
+      if (!fs.existsSync(filePath)) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Fiziksel dosya sunucuda bulunamadı.');
+        return;
+      }
+      const stat = fs.statSync(filePath);
+      const disposition = isPreview ? 'inline' : 'attachment';
+      res.writeHead(200, {
+        'Content-Type': doc.fileType || 'application/octet-stream',
+        'Content-Length': stat.size,
+        'Content-Disposition': `${disposition}; filename*=UTF-8''${encodeURIComponent(doc.fileName)}`
+      });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+
+    // Document delete
+    if (parts[0] === 'api' && parts[1] === 'documents' && parts[2] && method === 'DELETE') {
+      const docId = parseInt(parts[2], 10);
+      const docRes = await pool.query('SELECT * FROM documents WHERE id = $1', [docId]);
+      if (docRes.rowCount > 0) {
+        const doc = docRes.rows[0];
+        const fPath = path.join(UPLOAD_DIR, doc.storedFileName);
+        if (fs.existsSync(fPath)) {
+          try { fs.unlinkSync(fPath); } catch (e) { console.error('Dosya silinirken hata:', e.message); }
+        }
+        await pool.query('DELETE FROM documents WHERE id = $1', [docId]);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: true }));
+        return;
+      } else {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Doküman bulunamadı' }));
+        return;
+      }
+    }
+
     if (parts[0] === 'api' && parts.length >= 2 && urlPath !== '/api/data') {
       const table = parts[1];
-      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations', 'tenders'];
+      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations', 'tenders', 'documents'];
       
       if (allowedTables.includes(table)) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -541,6 +709,20 @@ async function initDatabaseSchema() {
         "winnerSupplier" VARCHAR(255),
         "actualAmount" NUMERIC(12,2),
         notes TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS documents (
+        id SERIAL PRIMARY KEY,
+        "entityType" VARCHAR(50) NOT NULL,
+        "entityId" INTEGER NOT NULL,
+        "fileName" VARCHAR(255) NOT NULL,
+        "storedFileName" VARCHAR(255) NOT NULL,
+        "fileSize" NUMERIC,
+        "fileType" VARCHAR(100),
+        "category" VARCHAR(100),
+        description TEXT,
+        "uploadedBy" VARCHAR(100),
+        "uploadedAt" VARCHAR(100)
       );
     `);
 
