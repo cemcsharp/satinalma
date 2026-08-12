@@ -2492,13 +2492,36 @@ th.sticky-col-left, th.sticky-col-right {
   border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
+/* Printable Single Document View */
+#printable-official-document {
+  display: none;
+}
+
 /* ============================================================
    🖨️ EXECUTIVE CORPORATE PRINT & PDF STYLES
    ============================================================ */
 @media print {
   @page {
-    size: A4 landscape;
-    margin: 8mm 8mm 10mm 8mm;
+    size: A4 portrait;
+    margin: 8mm 8mm 8mm 8mm;
+  }
+
+  body.printing-detail #printable-official-document {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  body.printing-detail .app-container,
+  body.printing-detail .modal-overlay,
+  body.printing-detail .view-section,
+  body.printing-detail #toast-container {
+    display: none !important;
+    visibility: hidden !important;
   }
 
   /* Reset layout & backgrounds for crisp paper printing */
@@ -2511,10 +2534,11 @@ th.sticky-col-left, th.sticky-col-right {
     padding: 0 !important;
     width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
   }
 
-  /* Hide all app chrome, sidebars, buttons, filters, popups */
+  /* Hide all app chrome, sidebars, buttons, filters, popups, signatures */
   .sidebar,
   .header,
   .navbar,
@@ -2541,6 +2565,8 @@ th.sticky-col-left, th.sticky-col-right {
   #invoice-date-tabs,
   #yearly-report-tabs,
   .chart-header-actions,
+  .print-signatures,
+  .print-footer-signatures,
   .no-print {
     display: none !important;
     visibility: hidden !important;
@@ -2578,8 +2604,8 @@ th.sticky-col-left, th.sticky-col-right {
     border-radius: 4px !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
-    margin-bottom: 10px !important;
-    padding: 8px !important;
+    margin-bottom: 8px !important;
+    padding: 6px 8px !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
@@ -2587,26 +2613,26 @@ th.sticky-col-left, th.sticky-col-right {
   /* KPI cards grid in print */
   .grid-4, .grid-3, .grid-2 {
     display: grid !important;
-    gap: 8px !important;
-    margin-bottom: 10px !important;
+    gap: 6px !important;
+    margin-bottom: 8px !important;
   }
   .kpi-card {
     border: 1px solid #cbd5e1 !important;
-    padding: 6px 10px !important;
+    padding: 4px 8px !important;
     background: #f8fafc !important;
   }
   .kpi-card h3 {
-    font-size: 1.1rem !important;
+    font-size: 1rem !important;
     color: #0f172a !important;
     margin: 0 !important;
   }
   .kpi-card p {
-    font-size: 0.72rem !important;
+    font-size: 0.7rem !important;
     color: #475569 !important;
-    margin: 2px 0 0 0 !important;
+    margin: 1px 0 0 0 !important;
   }
   .kpi-sub {
-    font-size: 0.65rem !important;
+    font-size: 0.62rem !important;
     color: #64748b !important;
   }
 
@@ -2622,8 +2648,8 @@ th.sticky-col-left, th.sticky-col-right {
   table.matrix-subtable {
     width: 100% !important;
     border-collapse: collapse !important;
-    font-size: 8pt !important;
-    margin: 6px 0 !important;
+    font-size: 7.5pt !important;
+    margin: 4px 0 !important;
     page-break-inside: auto !important;
   }
 
@@ -2632,20 +2658,20 @@ th.sticky-col-left, th.sticky-col-right {
     background: #f1f5f9 !important;
     color: #0f172a !important;
     font-weight: 700 !important;
-    font-size: 7.5pt !important;
+    font-size: 7pt !important;
     text-transform: uppercase !important;
     border: 1px solid #94a3b8 !important;
-    padding: 4px 6px !important;
+    padding: 3px 5px !important;
     text-align: left !important;
   }
 
   table.custom-table td,
   table.matrix-subtable td {
     border: 1px solid #cbd5e1 !important;
-    padding: 4px 6px !important;
+    padding: 3px 5px !important;
     color: #1e293b !important;
     background: #ffffff !important;
-    font-size: 8pt !important;
+    font-size: 7.5pt !important;
   }
 
   table tr {
@@ -2672,9 +2698,9 @@ th.sticky-col-left, th.sticky-col-right {
     background: transparent !important;
     border: 1px solid #64748b !important;
     color: #0f172a !important;
-    font-size: 7pt !important;
+    font-size: 6.5pt !important;
     font-weight: 600 !important;
-    padding: 1px 4px !important;
+    padding: 1px 3px !important;
     border-radius: 3px !important;
     display: inline-block !important;
   }
@@ -2683,39 +2709,8 @@ th.sticky-col-left, th.sticky-col-right {
   .print-header-banner {
     display: block !important;
     border-bottom: 2px solid #0f172a !important;
-    padding-bottom: 8px !important;
-    margin-bottom: 10px !important;
-  }
-
-  /* Print Footer Signatures */
-  .print-footer-signatures {
-    display: flex !important;
-    justify-content: space-between !important;
-    margin-top: 18px !important;
-    padding-top: 10px !important;
-    border-top: 1px dashed #94a3b8 !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-  .print-signature-box {
-    text-align: center !important;
-    width: 30% !important;
-    font-size: 7.5pt !important;
-    line-height: 1.3 !important;
-  }
-  .print-signature-box .sig-title {
-    font-weight: 700 !important;
-    color: #0f172a !important;
-    font-size: 8pt !important;
-  }
-  .print-signature-box .sig-space {
-    height: 38px !important;
-  }
-  .print-signature-box .sig-line {
-    border-top: 1px solid #94a3b8 !important;
-    margin-top: 4px !important;
-    padding-top: 2px !important;
-    color: #64748b !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 8px !important;
   }
 }
 

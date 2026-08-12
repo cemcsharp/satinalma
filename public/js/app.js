@@ -3389,142 +3389,141 @@ const App = {
     const { type, data } = this.state.currentActiveDetail;
     const printBody = document.getElementById('print-doc-body');
     const printDate = document.getElementById('print-doc-date');
-    const printTitle = document.querySelector('#printable-official-document .print-header div:nth-child(2)');
+    const printTitle = document.getElementById('print-doc-title');
 
     const todayStr = new Date().toLocaleDateString('tr-TR');
-    if (printDate) printDate.innerText = `Belge Düzenleme Tarihi: ${todayStr}`;
+    if (printDate) printDate.innerText = `Tarih: ${todayStr}`;
 
     if (!printBody) return;
 
     if (type === 'request') {
-      if (printTitle) printTitle.innerText = 'SATİNALMA TALEP VE SİPARİŞ FORMU';
+      if (printTitle) printTitle.innerText = 'TALEP VE SİPARİŞ FORMU';
       printBody.innerHTML = `
-        <div style="border: 2px solid #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+        <div style="border: 1.5px solid #0f172a; padding: 1rem; border-radius: 6px; background: #fff; page-break-inside: avoid;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 0.6rem; margin-bottom: 0.75rem;">
             <div>
-              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">TALEP BARKODU</div>
-              <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.requestBarcode || '-'}</div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">TALEP BARKODU</div>
+              <div style="font-size: 1.3rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">#${data.requestBarcode || '-'}</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">DURUM & ÖNCELİK</div>
-              <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a;">${data.status} (${data.priority || 'Orta'})</div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">DURUM & ÖNCELİK</div>
+              <div style="font-size: 1rem; font-weight: 700; color: #0f172a;">${data.status} (${data.priority || 'Orta'})</div>
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; font-size: 0.95rem; margin-bottom: 1.5rem;">
-            <div><strong>İlgili Birim:</strong> ${data.unit}</div>
-            <div><strong>Takip Eden Personel:</strong> ${data.assignedTo}</div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem 1rem; font-size: 8.5pt; margin-bottom: 0.75rem;">
+            <div><strong>İlgili Birim:</strong> ${data.unit || '-'}</div>
+            <div><strong>Sorumlu Uzman:</strong> ${data.assignedTo || '-'}</div>
             <div><strong>Geliş Tarihi:</strong> ${data.arrivalDate || data.requestDate || '-'}</div>
             <div><strong>Sipariş Tarihi:</strong> ${data.orderDate || '-'}</div>
-            <div><strong>Sipariş Barkodu:</strong> ${data.orderBarcode || '-'}</div>
+            <div><strong>Sipariş No:</strong> ${data.orderBarcode || '-'}</div>
             <div><strong>Tedarikçi Firma:</strong> ${data.supplier || '-'}</div>
-            <div><strong>Yönetmelik Maddesi:</strong> ${data.regulation ? 'Madde ' + data.regulation : '-'}</div>
-            <div><strong>Gerçekleşen Tutar:</strong> <span style="font-size: 1.15rem; font-weight: 800; color: #16a34a;">${data.actualAmount > 0 ? data.actualAmount.toLocaleString('tr-TR') + ' ' + (data.currency || 'TRY') : '-'}</span></div>
+            <div><strong>Yönetmelik Maddesi:</strong> ${data.regulation ? (data.regulation.startsWith('Madde ') ? data.regulation : 'Madde ' + data.regulation) : '-'}</div>
+            <div><strong>Gerçekleşen Tutar:</strong> <span style="font-size: 1rem; font-weight: 800; color: #16a34a;">${data.actualAmount > 0 ? (data.actualAmount).toLocaleString('tr-TR') + ' ' + (data.currency || 'TRY') : '-'}</span></div>
           </div>
 
-          <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem;">
-            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">TALEP KONUSU:</div>
-            <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a;">${data.subject}</div>
-            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">AÇIKLAMA VE NOTLAR:</div>
-            <div style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; color: #1e293b;">${data.description || 'Not bulunmamaktadır.'}</div>
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 0.6rem;">
+            <div style="font-size: 7.5pt; font-weight: 700; color: #475569; margin-bottom: 0.2rem;">TALEP KONUSU:</div>
+            <div style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a;">${data.subject || '-'}</div>
+            <div style="font-size: 7.5pt; font-weight: 700; color: #475569; margin-bottom: 0.2rem;">AÇIKLAMA VE NOTLAR:</div>
+            <div style="font-size: 8.5pt; line-height: 1.4; white-space: pre-wrap; background: #f8fafc; padding: 0.6rem; border-radius: 4px; border: 1px solid #e2e8f0; color: #1e293b;">${data.description || 'Not bulunmamaktadır.'}</div>
           </div>
         </div>
       `;
     } else if (type === 'contract') {
-      if (printTitle) printTitle.innerText = 'RESMİ SÖZLEŞME VE TEMİNAT TAKİP FORMU';
+      if (printTitle) printTitle.innerText = 'SÖZLEŞME VE TEMİNAT FORMU';
       printBody.innerHTML = `
-        <div style="border: 2px solid #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+        <div style="border: 1.5px solid #0f172a; padding: 1rem; border-radius: 6px; background: #fff; page-break-inside: avoid;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 0.6rem; margin-bottom: 0.75rem;">
             <div>
-              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">SÖZLEŞME NO</div>
-              <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.contractNo}</div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">SÖZLEŞME NO</div>
+              <div style="font-size: 1.3rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.contractNo}</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">SÖZLEŞME DURUMU</div>
-              <div style="font-size: 1.1rem; font-weight: 700; color: #16a34a;">${data.status}</div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">SÖZLEŞME DURUMU</div>
+              <div style="font-size: 1rem; font-weight: 700; color: #16a34a;">${data.status}</div>
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; font-size: 0.95rem; margin-bottom: 1.5rem;">
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem 1rem; font-size: 8.5pt; margin-bottom: 0.75rem;">
             <div><strong>Sözleşme Konusu:</strong> ${data.title}</div>
             <div><strong>Yüklenici Tedarikçi:</strong> ${data.supplier}</div>
             <div><strong>Sorumlu Birim:</strong> ${data.unit}</div>
             <div><strong>Takip Eden Personel:</strong> ${data.assignedTo || '-'}</div>
             <div><strong>Başlangıç Tarihi:</strong> ${data.startDate}</div>
             <div><strong>Bitiş Tarihi:</strong> ${data.endDate}</div>
-            <div><strong>Teminat Mektubu Tutarı:</strong> ${data.guaranteeAmount ? data.guaranteeAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</div>
+            <div><strong>Teminat Mektubu Tutarı:</strong> ${data.guaranteeAmount ? (data.guaranteeAmount).toLocaleString('tr-TR') + ' ₺' : '-'}</div>
             <div><strong>Teminat Bitiş Tarihi:</strong> ${data.guaranteeExpiry || '-'}</div>
-            <div style="grid-column: span 2;"><strong>Toplam Sözleşme Bedeli:</strong> <span style="font-size: 1.2rem; font-weight: 800; color: #16a34a;">${(data.totalAmount || 0).toLocaleString('tr-TR')} ${data.currency || 'TRY'}</span></div>
+            <div style="grid-column: span 2;"><strong>Toplam Sözleşme Bedeli:</strong> <span style="font-size: 1.05rem; font-weight: 800; color: #16a34a;">${(data.totalAmount || 0).toLocaleString('tr-TR')} ${data.currency || 'TRY'}</span></div>
           </div>
 
-          <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem;">
-            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">SÖZLEŞME NOTLARI VE ŞARTLAR:</div>
-            <div style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Not bulunmamaktadır.'}</div>
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 0.6rem;">
+            <div style="font-size: 7.5pt; font-weight: 700; color: #475569; margin-bottom: 0.2rem;">SÖZLEŞME NOTLARI VE ŞARTLAR:</div>
+            <div style="font-size: 8.5pt; line-height: 1.4; white-space: pre-wrap; background: #f8fafc; padding: 0.6rem; border-radius: 4px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Not bulunmamaktadır.'}</div>
           </div>
         </div>
       `;
     } else if (type === 'invoice') {
-      if (printTitle) printTitle.innerText = 'FATURA VE MUHASEBE TESLİM FORMU';
+      if (printTitle) printTitle.innerText = 'FATURA VE ÖDEME FORMU';
       printBody.innerHTML = `
-        <div style="border: 2px solid #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+        <div style="border: 1.5px solid #0f172a; padding: 1rem; border-radius: 6px; background: #fff; page-break-inside: avoid;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 0.6rem; margin-bottom: 0.75rem;">
             <div>
-              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">FATURA NO</div>
-              <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.invoiceNo}</div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">FATURA NO</div>
+              <div style="font-size: 1.3rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.invoiceNo}</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">ÖDEME DURUMU</div>
-              <div style="font-size: 1.1rem; font-weight: 700; color: #16a34a;">${data.paymentStatus}</div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">ÖDEME DURUMU</div>
+              <div style="font-size: 1rem; font-weight: 700; color: #16a34a;">${data.paymentStatus}</div>
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; font-size: 0.95rem; margin-bottom: 1.5rem;">
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem 1rem; font-size: 8.5pt; margin-bottom: 0.75rem;">
             <div><strong>Tedarikçi Firma:</strong> ${data.supplier}</div>
             <div><strong>Bağlı Barkod / Sözleşme:</strong> ${data.relatedBarcode || '-'}</div>
             <div><strong>Fatura Tarihi:</strong> ${data.invoiceDate}</div>
             <div><strong>Vade Tarihi:</strong> ${data.dueDate}</div>
             <div><strong>Muhasebeye Teslim:</strong> ${data.accountingDeliveryDate || '-'}</div>
             <div><strong>Ödeme Yapılma Tarihi:</strong> ${data.paymentDate || '-'}</div>
-            <div style="grid-column: span 2;"><strong>Fatura Tutarı:</strong> <span style="font-size: 1.2rem; font-weight: 800; color: #16a34a;">${(data.amount || 0).toLocaleString('tr-TR')} ${data.currency || 'TRY'}</span></div>
+            <div style="grid-column: span 2;"><strong>Fatura Tutarı:</strong> <span style="font-size: 1.05rem; font-weight: 800; color: #16a34a;">${(data.amount || 0).toLocaleString('tr-TR')} ${data.currency || 'TRY'}</span></div>
           </div>
 
-          <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem;">
-            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">AÇIKLAMA VE NOTLAR:</div>
-            <div style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Açıklama girilmemiş.'}</div>
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 0.6rem;">
+            <div style="font-size: 7.5pt; font-weight: 700; color: #475569; margin-bottom: 0.2rem;">AÇIKLAMA VE NOTLAR:</div>
+            <div style="font-size: 8.5pt; line-height: 1.4; white-space: pre-wrap; background: #f8fafc; padding: 0.6rem; border-radius: 4px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Açıklama girilmemiş.'}</div>
           </div>
         </div>
       `;
     } else if (type === 'tender') {
-      if (printTitle) printTitle.innerText = 'İHALE PLANLAMA VE SÜREÇ TAKİP FORMU';
+      if (printTitle) printTitle.innerText = 'İHALE PLANLAMA VE SÜREÇ FORMU';
       printBody.innerHTML = `
-        <div style="border: 2px solid #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #cbd5e1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+        <div style="border: 1.5px solid #0f172a; padding: 1rem; border-radius: 6px; background: #fff; page-break-inside: avoid;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 0.6rem; margin-bottom: 0.75rem;">
             <div>
-              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">İHALE NO / KODU</div>
-              <div style="font-size: 1.5rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.tenderNo}</div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">İHALE NO / KODU</div>
+              <div style="font-size: 1.3rem; font-weight: 800; font-family: monospace; color: #1e3a8a;">${data.tenderNo}</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700;">AŞAMA DURUMU</div>
-              <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a;">${data.status}</div>
+              <div style="font-size: 7.5pt; color: #64748b; font-weight: 700;">AŞAMA DURUMU</div>
+              <div style="font-size: 1rem; font-weight: 700; color: #0f172a;">${data.status}</div>
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; font-size: 0.95rem; margin-bottom: 1.5rem;">
-            <div style="grid-column: span 2;"><strong>İhale Konusu / Başlığı:</strong> <span style="font-size: 1.1rem; font-weight: 700;">${data.title}</span></div>
-            <div><strong>İhale Oturum Tarihi:</strong> ${data.tenderDate} ${data.tenderTime || ''}</div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem 1rem; font-size: 8.5pt; margin-bottom: 0.75rem;">
+            <div style="grid-column: span 2;"><strong>İhale Konusu:</strong> <span style="font-weight: 700;">${data.title}</span></div>
+            <div><strong>Oturum Tarihi:</strong> ${data.tenderDate} ${data.tenderTime || ''}</div>
             <div><strong>Sorumlu Birim:</strong> ${data.unit}</div>
-            <div><strong>İlişkili Talep Barkodu:</strong> ${data.relatedBarcode ? '#' + data.relatedBarcode : '-'}</div>
-            <div><strong>İhale Usulü / Madde:</strong> ${data.regulation || '-'}</div>
+            <div><strong>İlişkili Barkod:</strong> ${data.relatedBarcode ? '#' + data.relatedBarcode : '-'}</div>
+            <div><strong>İhale Usulü:</strong> ${data.regulation || '-'}</div>
             <div><strong>Sorumlu Uzman:</strong> ${data.assignedTo || '-'}</div>
-            <div><strong>Para Birimi:</strong> ${data.currency || 'TRY'}</div>
-            <div><strong>Tahmini Maliyet (Bütçe):</strong> <span style="font-size: 1.15rem; font-weight: 800; color: #1e3a8a;">${(data.estimatedAmount || 0).toLocaleString('tr-TR')} ${data.currency || '₺'}</span></div>
+            <div><strong>Tahmini Maliyet:</strong> ${(data.estimatedAmount || 0).toLocaleString('tr-TR')} ${data.currency || '₺'}</div>
             <div><strong>Kazanan Yüklenici:</strong> ${data.winnerSupplier || 'Henüz Sonuçlanmadı'}</div>
-            <div style="grid-column: span 2;"><strong>Gerçekleşen Bedel:</strong> <span style="font-size: 1.2rem; font-weight: 800; color: #16a34a;">${data.actualAmount ? data.actualAmount.toLocaleString('tr-TR') + ' ' + (data.currency || '₺') : '-'}</span></div>
+            <div style="grid-column: span 2;"><strong>Gerçekleşen Bedel:</strong> <span style="font-size: 1.05rem; font-weight: 800; color: #16a34a;">${data.actualAmount ? data.actualAmount.toLocaleString('tr-TR') + ' ' + (data.currency || '₺') : '-'}</span></div>
           </div>
 
-          <div style="border-top: 1px solid #cbd5e1; padding-top: 1rem;">
-            <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">İHALE NOTLARI VE AÇIKLAMA:</div>
-            <div style="font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Not bulunmamaktadır.'}</div>
+          <div style="border-top: 1px solid #cbd5e1; padding-top: 0.6rem;">
+            <div style="font-size: 7.5pt; font-weight: 700; color: #475569; margin-bottom: 0.2rem;">İHALE NOTLARI VE AÇIKLAMA:</div>
+            <div style="font-size: 8.5pt; line-height: 1.4; white-space: pre-wrap; background: #f8fafc; padding: 0.6rem; border-radius: 4px; border: 1px solid #e2e8f0; color: #1e293b;">${data.notes || 'Not bulunmamaktadır.'}</div>
           </div>
         </div>
       `;
@@ -7390,7 +7389,7 @@ const App = {
     });
   },
 
-  printSection(sectionId = null, docTitle = 'SATINALMA MÜDÜRLÜĞÜ FAALİYET VE HARCAMA RAPORU') {
+  printSection(sectionId = null, docTitle = 'SATINALMA FAALİYET VE HARCAMA RAPORU') {
     let secEl = sectionId ? document.getElementById(sectionId) : null;
     if (!secEl) {
       secEl = document.querySelector('.view-section:not([style*="display: none"]):not([style*="display:none"])');
@@ -7402,56 +7401,24 @@ const App = {
     }
 
     const todayStr = new Date().toLocaleDateString('tr-TR');
-    const userStr = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi';
     const yearStr = this.state.selectedYear === 'ALL' ? 'Tüm Yıllar (Genel)' : `${this.state.selectedYear} Akademik Yılı`;
 
-    // Create Corporate Header Banner
+    // Create Clean Header Banner
     const banner = document.createElement('div');
     banner.className = 'print-header-banner';
     banner.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; width:100%; border-bottom:2px solid #0f172a; padding-bottom:6px; margin-bottom:8px;">
         <div style="text-align:left;">
-          <div style="font-size:1.15rem; font-weight:800; color:#0f172a; letter-spacing:0.02em;">T.C. PİRİ REİS ÜNİVERSİTESİ</div>
-          <div style="font-size:0.85rem; font-weight:700; color:#1e3a8a; margin-top:2px;">İDARİ VE MALİ İŞLER DAİRE BAŞKANLIĞI — SATINALMA MÜDÜRLÜĞÜ</div>
-          <div style="font-size:0.95rem; font-weight:800; color:#0f172a; margin-top:4px;">${docTitle}</div>
+          <div style="font-size:1.15rem; font-weight:800; color:#0f172a; letter-spacing:0.01em;">Piri Reis Üniversitesi — Satınalma Müdürlüğü</div>
+          <div style="font-size:0.92rem; font-weight:700; color:#1e3a8a; margin-top:2px;">${docTitle}</div>
         </div>
-        <div style="text-align:right; font-size:7.5pt; color:#334155; line-height:1.4;">
+        <div style="text-align:right; font-size:7.5pt; color:#475569; line-height:1.3;">
           <div><strong>Rapor Tarihi:</strong> ${todayStr}</div>
           <div><strong>Kapsam Dönemi:</strong> ${yearStr}</div>
-          <div><strong>Raporu Hazırlayan:</strong> ${userStr}</div>
-          <div><strong>Sistem:</strong> Satınalma Takip ERP</div>
         </div>
       </div>
     `;
     secEl.insertBefore(banner, secEl.firstChild);
-
-    // Create Corporate Signature Footer
-    const footer = document.createElement('div');
-    footer.className = 'print-footer-signatures';
-    footer.innerHTML = `
-      <div class="print-signature-box">
-        <div class="sig-title">RAPORU HAZIRLAYAN</div>
-        <div style="font-size:7.5pt; color:#475569;">${userStr}</div>
-        <div style="font-size:7pt; color:#64748b;">Satınalma Uzmanı / Görevlisi</div>
-        <div class="sig-space"></div>
-        <div class="sig-line">İmza / Tarih</div>
-      </div>
-      <div class="print-signature-box">
-        <div class="sig-title">KONTROL EDEN</div>
-        <div style="font-size:7.5pt; color:#475569;">Satınalma Şube Müdürü</div>
-        <div style="font-size:7pt; color:#64748b;">İdari ve Mali İşler Daire Bşk.</div>
-        <div class="sig-space"></div>
-        <div class="sig-line">İmza / Tarih</div>
-      </div>
-      <div class="print-signature-box">
-        <div class="sig-title">ONAYLAYAN</div>
-        <div style="font-size:7.5pt; color:#475569;">Genel Sekreterlik / Rektörlük</div>
-        <div style="font-size:7pt; color:#64748b;">Harcama Yetkilisi</div>
-        <div class="sig-space"></div>
-        <div class="sig-line">İmza / Tarih</div>
-      </div>
-    `;
-    secEl.appendChild(footer);
 
     secEl.classList.add('active-print');
 
@@ -7468,7 +7435,6 @@ const App = {
 
     // Clean up print DOM
     banner.remove();
-    footer.remove();
     secEl.classList.remove('active-print');
 
     if (sectionId === 'view-requests') {
