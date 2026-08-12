@@ -2304,28 +2304,85 @@ th.sticky-col-left, th.sticky-col-right {
 
 /* Dashboard Alert Banner */
 .dashboard-alert-banner {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(234, 179, 8, 0.08) 100%);
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--status-rejected);
   border-radius: var(--radius-md);
-  padding: 0.85rem 1.25rem;
+  padding: 0.65rem 1rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  transition: var(--transition-fast);
 }
+
 .dashboard-alert-banner .alert-left {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
-.dashboard-alert-banner .alert-icon {
-  font-size: 1.6rem;
-  animation: shake 2.5s infinite;
+
+.alert-icon-wrapper {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-@keyframes shake {
-  0%, 100% { transform: rotate(0deg); }
-  10%, 30% { transform: rotate(-10deg); }
-  20%, 40% { transform: rotate(10deg); }
+
+.alert-pill-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color);
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  max-width: 320px;
+}
+
+.alert-pill-item:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-hover);
+  transform: translateY(-1px);
+}
+
+.alert-pill-item .pill-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.alert-pill-item .pill-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.alert-pill-item .pill-tag.critical {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.alert-pill-item .pill-tag.warning {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.alert-pill-item .pill-tag.info {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
 }
 
 /* ============================================================

@@ -1355,10 +1355,10 @@ const App = {
     const dismissed = this.state.dismissedNotifs || [];
     const allNotifs = [];
 
-    // 1. GUARANTEES (Teminat Mektubu Vadeleri)
+    // 1. GUARANTEES (Teminat Mektubu Vadeleri - Sadece aktif ve son 15 gün ile gelecek 30 gün arasındaki kayıtlar)
     const guarantees = (this.state.guarantees || []).filter(g => {
       const st = (g.status || '').toLowerCase();
-      return st !== 'iade edildi' && st !== 'iade' && st !== 'nakte çevrildi' && st !== 'iptal';
+      return st !== 'iade edildi' && st !== 'iade' && st !== 'nakte çevrildi' && st !== 'iptal' && st !== 'hükümsüz' && st !== 'kapandı';
     });
 
     guarantees.forEach(g => {
@@ -1371,19 +1371,19 @@ const App = {
         let countdownText = '';
         let tagClass = '';
 
-        if (diffDays <= 0) {
+        if (diffDays >= -15 && diffDays < 0) {
           level = 'CRITICAL';
-          countdownText = diffDays === 0 ? 'Bugün Vade Doluyor! 🚨' : `${Math.abs(diffDays)} Gün Önce Süresi Doldu! 🚨`;
+          countdownText = `${Math.abs(diffDays)} Gün Önce Süresi Doldu! 🚨`;
           tagClass = 'critical';
-        } else if (diffDays <= 7) {
+        } else if (diffDays === 0) {
+          level = 'CRITICAL';
+          countdownText = 'Bugün Vade Doluyor! ⚡';
+          tagClass = 'critical';
+        } else if (diffDays > 0 && diffDays <= 7) {
           level = 'CRITICAL';
           countdownText = `Son ${diffDays} Gün Kaldı! 🔴`;
           tagClass = 'critical';
-        } else if (diffDays <= 15) {
-          level = 'WARNING';
-          countdownText = `${diffDays} Gün Kaldı 🟠`;
-          tagClass = 'warning';
-        } else if (diffDays <= 30) {
+        } else if (diffDays > 7 && diffDays <= 30) {
           level = 'WARNING';
           countdownText = `${diffDays} Gün Kaldı 🟡`;
           tagClass = 'warning';
@@ -1397,7 +1397,7 @@ const App = {
             categoryName: 'Teminat Mektubu',
             level,
             icon: '🛡️',
-            title: `Teminat Mektubu #${g.letterNo || g.id} — ${g.bank || g.bankName || 'Banka'} (${countdownText})`,
+            title: `Teminat Mektubu #${g.letterNo || g.id} — ${g.bank || g.bankName || 'Banka'}`,
             sub: `Firma: ${g.supplier || '-'} | Tutar: ${this.formatMoney(g.guaranteeAmount || g.amount || 0, g.currency || 'TRY', 2)} | Vade: ${g.expiryDate || '-'}`,
             date: g.expiryDate,
             diffDays,
@@ -1413,7 +1413,7 @@ const App = {
       }
     });
 
-    // 2. CONTRACTS (Sözleşme Bitiş & Yenileme Uyarısı)
+    // 2. CONTRACTS (Sözleşme Bitiş & Yenileme Uyarısı - Sadece Aktif sözleşmeler ve son 15 gün ile gelecek 60 gün)
     const contracts = (this.state.contracts || []).filter(c => c.status === 'Aktif' || !c.status);
     contracts.forEach(c => {
       const endDt = this.parseDate(c.endDate);
@@ -1425,17 +1425,21 @@ const App = {
         let countdownText = '';
         let tagClass = '';
 
-        if (diffDays <= 0) {
+        if (diffDays >= -15 && diffDays < 0) {
           level = 'CRITICAL';
-          countdownText = diffDays === 0 ? 'Bugün Sözleşme Bitiyor! 🚨' : `${Math.abs(diffDays)} Gün Önce Sözleşme Bitti! 🚨`;
+          countdownText = `${Math.abs(diffDays)} Gün Önce Bitti! 🚨`;
           tagClass = 'critical';
-        } else if (diffDays <= 30) {
+        } else if (diffDays === 0) {
           level = 'CRITICAL';
-          countdownText = `Son ${diffDays} Gün! 🔴 (Yenileme / İhale Başlat)`;
+          countdownText = 'Bugün Sözleşme Bitiyor! ⚡';
           tagClass = 'critical';
-        } else if (diffDays <= 60) {
+        } else if (diffDays > 0 && diffDays <= 30) {
+          level = 'CRITICAL';
+          countdownText = `Son ${diffDays} Gün! 🔴 (Yenileme)`;
+          tagClass = 'critical';
+        } else if (diffDays > 30 && diffDays <= 60) {
           level = 'WARNING';
-          countdownText = `${diffDays} Gün Kaldı 🟠 (2 Ay Kaldı)`;
+          countdownText = `${diffDays} Gün Kaldı 🟠`;
           tagClass = 'warning';
         }
 
@@ -1447,7 +1451,7 @@ const App = {
             categoryName: 'Sözleşme',
             level,
             icon: '📑',
-            title: `Sözleşme #${c.contractNo || c.id} — ${c.title || 'Sözleşme'} (${countdownText})`,
+            title: `Sözleşme #${c.contractNo || c.id} — ${c.title || 'Sözleşme'}`,
             sub: `Yüklenici: ${c.supplier || '-'} | Birim: ${c.unit || '-'} | Bitiş: ${c.endDate || '-'} | Tutar: ${this.formatMoney(c.totalAmount || 0, c.currency || 'TRY', 2)}`,
             date: c.endDate,
             diffDays,
@@ -1463,7 +1467,7 @@ const App = {
       }
     });
 
-    // 3. INVOICES (Fatura Vade & Gecikme Uyarısı)
+    // 3. INVOICES (Fatura Vade & Gecikme Uyarısı - Sadece Ödenmemiş ve son 30 gün ile gelecek 7 gün)
     const invoices = (this.state.invoices || []).filter(i => {
       const st = (i.paymentStatus || i.status || '').toLowerCase();
       return st !== 'ödendi' && st !== 'odendi';
@@ -1479,7 +1483,7 @@ const App = {
         let countdownText = '';
         let tagClass = '';
 
-        if (diffDays < 0 || (i.paymentStatus || i.status) === 'Gecikmede') {
+        if (diffDays >= -30 && diffDays < 0) {
           level = 'CRITICAL';
           countdownText = `${Math.abs(diffDays)} Gün Gecikti! 🚨`;
           tagClass = 'critical';
@@ -1487,14 +1491,10 @@ const App = {
           level = 'CRITICAL';
           countdownText = 'Bugün Ödeme Vadesi! ⚡';
           tagClass = 'critical';
-        } else if (diffDays <= 7) {
+        } else if (diffDays > 0 && diffDays <= 7) {
           level = 'WARNING';
           countdownText = `${diffDays} Gün Kaldı ⏳`;
           tagClass = 'warning';
-        } else if (diffDays <= 15) {
-          level = 'INFO';
-          countdownText = `${diffDays} Gün Kaldı`;
-          tagClass = 'info';
         }
 
         if (level) {
@@ -1505,7 +1505,7 @@ const App = {
             categoryName: 'Fatura',
             level,
             icon: '🧾',
-            title: `Fatura #${i.invoiceNo || i.id} — ${i.supplier || 'Tedarikçi'} (${countdownText})`,
+            title: `Fatura #${i.invoiceNo || i.id} — ${i.supplier || 'Tedarikçi'}`,
             sub: `Vade: ${i.dueDate || i.invoiceDate || '-'} | Tutar: ${this.formatMoney(i.amount || 0, i.currency || 'TRY', 2)} | Durum: ${i.paymentStatus || i.status || 'Ödeme Bekliyor'}`,
             date: i.dueDate || i.invoiceDate,
             diffDays,
@@ -1521,26 +1521,26 @@ const App = {
       }
     });
 
-    // 4. REQUESTS (14+ Gün Bekleyen Açık Talepler)
-    const requests = (this.state.requests || []).filter(r => r.status === 'Açık');
+    // 4. REQUESTS (Sadece 'Kritik' öncelikli ve 7+ gündür açık bekleyen talepler)
+    const requests = (this.state.requests || []).filter(r => r.status === 'Açık' && r.priority === 'Kritik');
     requests.forEach(r => {
       const arr = this.parseDate(r.arrivalDate || r.requestDate);
       if (arr) {
         arr.setHours(0, 0, 0, 0);
         const waitDays = Math.ceil((today - arr) / (1000 * 60 * 60 * 24));
-        if (waitDays >= 14) {
+        if (waitDays >= 7) {
           const id = `req_sla_${r.id}`;
           allNotifs.push({
             id,
             category: 'REQUEST',
-            categoryName: 'Talep Takibi',
+            categoryName: 'Kritik Talep',
             level: 'INFO',
-            icon: '📋',
-            title: `Talep #${r.requestBarcode || r.id} — ${r.subject || 'Talep'} (${waitDays} Gündür Bekliyor)`,
-            sub: `Birim: ${r.unit || '-'} | Atanan: ${r.assignedTo || 'Atanmadı'} | Geliş: ${r.arrivalDate || r.requestDate || '-'}`,
+            icon: '🔴',
+            title: `Kritik Talep #${r.requestBarcode || r.id} — ${r.subject || 'Talep'}`,
+            sub: `Birim: ${r.unit || '-'} | Atanan: ${r.assignedTo || 'Atanmadı'} | Bekleme: ${waitDays} Gün`,
             date: r.arrivalDate || r.requestDate,
             diffDays: -waitDays,
-            tag: `${waitDays} Gün Beklemede`,
+            tag: `${waitDays} Gündür Bekliyor`,
             tagClass: 'info',
             isRead: dismissed.includes(id),
             action: () => {
@@ -1766,38 +1766,66 @@ const App = {
   renderDashboardAlerts() {
     const container = document.getElementById('dashboard-alerts-container');
     if (!container) return;
+
+    if (this.state.dashboardAlertsDismissed) {
+      container.style.display = 'none';
+      return;
+    }
+
     const notifs = this.getAllNotifications();
-    const criticalNotifs = notifs.filter(n => n.level === 'CRITICAL');
-    const warningNotifs = notifs.filter(n => n.level === 'WARNING');
+    const urgentNotifs = notifs.filter(n => n.level === 'CRITICAL' || n.level === 'WARNING');
     
-    if (criticalNotifs.length === 0 && warningNotifs.length === 0) {
+    if (urgentNotifs.length === 0) {
       container.style.display = 'none';
       container.innerHTML = '';
       return;
     }
 
-    const totalUrgent = criticalNotifs.length + warningNotifs.length;
-    const topItems = [...criticalNotifs, ...warningNotifs].slice(0, 3);
+    const topItems = urgentNotifs.slice(0, 3);
+    const totalCount = urgentNotifs.length;
 
     container.style.display = 'block';
     container.innerHTML = `
       <div class="dashboard-alert-banner">
-        <div class="alert-left">
-          <div class="alert-icon">⚠️</div>
-          <div>
-            <div style="font-weight: 800; font-size: 0.95rem; color: var(--status-rejected); display: flex; align-items: center; gap: 0.5rem;">
-              <span>Dikkat Gerektiren ${totalUrgent} Kritik Hatırlatma / Yaklaşan Vade</span>
+        <div class="alert-left" style="flex: 1; min-width: 0;">
+          <div class="alert-icon-wrapper">
+            <span style="font-size: 1.15rem;">🔔</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <span style="font-weight: 700; font-size: 0.88rem; color: var(--text-main);">
+                Dikkat Gerektiren Hatırlatmalar
+              </span>
+              <span class="badge priority-kritik" style="font-size: 0.72rem; padding: 0.15rem 0.45rem;">${totalCount} Kayıt</span>
             </div>
-            <div style="font-size: 0.8rem; color: var(--text-main); margin-top: 0.2rem;">
-              ${topItems.map(item => `<strong>${item.icon} ${item.title}</strong>`).join(' &bull; ')}
+            <div class="alert-items-list" style="display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap;">
+              ${topItems.map(item => `
+                <div class="alert-pill-item" onclick="App.handleNotifAction('${item.id}')" title="${item.sub}">
+                  <span>${item.icon}</span>
+                  <span class="pill-title">${item.title}</span>
+                  <span class="pill-tag ${item.tagClass}">${item.tag}</span>
+                </div>
+              `).join('')}
             </div>
           </div>
         </div>
-        <button class="btn-primary" onclick="App.switchView('notifications')" style="padding: 0.45rem 0.9rem; font-size: 0.8rem; white-space: nowrap; background: var(--status-rejected); border-color: var(--status-rejected);">
-          <span>🔔</span> Bildirim Merkezini Aç (${totalUrgent})
-        </button>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+          <button class="btn-primary" onclick="App.switchView('notifications')" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; white-space: nowrap;">
+            <span>Tümünü Gör (${totalCount})</span> &rarr;
+          </button>
+          <button type="button" class="btn-icon" onclick="App.dismissDashboardAlerts()" title="Bu hatırlatma çubuğunu gizle" style="font-size: 0.85rem; padding: 0.3rem 0.5rem; color: var(--text-muted); cursor:pointer;">
+            ✕
+          </button>
+        </div>
       </div>
     `;
+  },
+
+  dismissDashboardAlerts() {
+    this.state.dashboardAlertsDismissed = true;
+    const container = document.getElementById('dashboard-alerts-container');
+    if (container) container.style.display = 'none';
   },
 
   // ============================================================
