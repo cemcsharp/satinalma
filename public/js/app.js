@@ -7001,9 +7001,9 @@ const App = {
 
       // Build 2D Array of Rows (AOA)
       const aoa = [
-        ["T.C. PİRİ REİS ÜNİVERSİTESİ"],
-        ["İDARİ VE MALİ İŞLER DAİRE BAŞKANLIĞI — " + (title || 'SATINALMA MÜDÜRLÜĞÜ RAPORU').toUpperCase()],
-        [`Rapor Tarihi: ${dateStr} | Dönem: ${yearStr} | Raporu Hazırlayan: ${userStr} | Toplam Kayıt: ${rows.length}`],
+        ["PİRİ REİS ÜNİVERSİTESİ — SATINALMA MÜDÜRLÜĞÜ"],
+        [(title || 'RESMİ RAPOR VE LİSTE').toUpperCase()],
+        [`Rapor Tarihi: ${dateStr} | Dönem: ${yearStr} | Hazırlayan: ${userStr} | Toplam Kayıt: ${rows.length}`],
         [], // Empty separator row
         headers,
         ...rows
@@ -7035,7 +7035,7 @@ const App = {
     }
 
     // Fallback: UTF-8 BOM CSV
-    let csv = `T.C. PİRİ REİS ÜNİVERSİTESİ - ${title}\n`;
+    let csv = `PİRİ REİS ÜNİVERSİTESİ — SATINALMA MÜDÜRLÜĞÜ - ${title}\n`;
     csv += `Rapor Tarihi: ${dateStr}; Dönem: ${yearStr}; Raporlayan: ${userStr}\n\n`;
     csv += headers.map(h => `"${(h || '').replace(/"/g, '""')}"`).join(';') + '\n';
     rows.forEach(r => {
