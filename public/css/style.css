@@ -1018,7 +1018,7 @@ table.custom-table tbody tr:hover {
   pointer-events: auto;
 }
 
-.modal-content {
+.modal-content, .modal-container {
   background: var(--bg-sidebar);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -1029,13 +1029,14 @@ table.custom-table tbody tr:hover {
   overflow-x: hidden;
   box-sizing: border-box;
   padding: 1.75rem;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
   transform: translateY(20px);
   transition: transform 0.25s ease;
   color: var(--text-main);
 }
 
-.modal-overlay.active .modal-content {
+.modal-overlay.active .modal-content,
+.modal-overlay.active .modal-container {
   transform: translateY(0);
 }
 
