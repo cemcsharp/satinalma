@@ -9,6 +9,8 @@ const path = require('path');
 const https = require('https');
 const pg = require('pg');
 const archiver = require('archiver');
+const nodemailer = require('nodemailer');
+
 // Parse NUMERIC / DECIMAL database fields as numbers instead of strings
 pg.types.setTypeParser(1700, (val) => (val === null ? null : parseFloat(val)));
 pg.types.setTypeParser(20, (val) => (val === null ? null : parseInt(val, 10)));
@@ -17,8 +19,13 @@ const { Pool } = pg;
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const BACKUP_DIR = path.join(__dirname, 'backups');
+
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+if (!fs.existsSync(BACKUP_DIR)) {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
 // PostgreSQL Bağlantı Havuzu
@@ -97,16 +104,102 @@ async function getTableData(tableName) {
 
 function sanitizeVal(val, k) {
   if (val === undefined || val === null || (typeof val === 'number' && isNaN(val))) return null;
-  if (typeof val === 'string' && val.trim() === '' && ['estimatedAmount', 'budgetAmount', 'actualAmount', 'totalAmount', 'amount', 'guaranteeAmount', 'sequenceNo', '_diffDays', 'exchangeRate'].includes(k)) {
+  if (typeof val === 'string' && val.trim() === '' && ['estimatedAmount', 'budgetAmount', 'actualAmount', 'totalAmount', 'amount', 'guaranteeAmount', 'sequenceNo', '_diffDays', 'exchangeRate', 'speedScore', 'qualityScore', 'complianceScore', 'communicationScore', 'overallScore'].includes(k)) {
     return null;
   }
   return val;
+}
+
+// ----------------------------------------------------
+// 🗄️ DATABASE BACKUP ENGINE HELPERS
+// ----------------------------------------------------
+async function exportAllDatabaseData() {
+  const tables = ['users', 'units', 'regulations', 'rates', 'requests', 'contracts', 'invoices', 'guarantees', 'tenders', 'documents', 'logs', 'vendor_ratings', 'settings'];
+  const snapshot = { exportedAt: new Date().toISOString(), version: '2.0.0' };
+  for (const t of tables) {
+    try {
+      const r = await pool.query(`SELECT * FROM ${t} ORDER BY id ASC`);
+      snapshot[t] = r.rows;
+    } catch (e) {
+      snapshot[t] = [];
+    }
+  }
+  return snapshot;
+}
+
+async function createBackupFile(isAuto = false) {
+  const data = await exportAllDatabaseData();
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const timestamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const prefix = isAuto ? 'auto_backup' : 'manual_backup';
+  const filename = `${prefix}_${timestamp}.json`;
+  const filePath = path.join(BACKUP_DIR, filename);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  console.log(`🗄️ Veritabanı yedeği alındı: ${filename}`);
+
+  // Retain only latest 30 backups to prevent disk bloat
+  try {
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json'));
+    if (files.length > 30) {
+      files.sort();
+      const toDelete = files.slice(0, files.length - 30);
+      for (const df of toDelete) {
+        try { fs.unlinkSync(path.join(BACKUP_DIR, df)); } catch(e) {}
+      }
+    }
+  } catch (e) {}
+
+  return { filename, size: fs.statSync(filePath).size, createdAt: now.toISOString(), isAuto };
+}
+
+// Scheduled Daily Backup (checks hourly)
+let lastAutoBackupDate = '';
+setInterval(async () => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (lastAutoBackupDate !== todayStr) {
+    lastAutoBackupDate = todayStr;
+    try {
+      await createBackupFile(true);
+    } catch (e) {
+      console.error('Otomatik yedek alma hatası:', e.message);
+    }
+  }
+}, 60 * 60 * 1000);
+
+// ----------------------------------------------------
+// 📧 SMTP HELPER FUNCTIONS
+// ----------------------------------------------------
+async function getSmtpConfig() {
+  try {
+    const res = await pool.query("SELECT value FROM settings WHERE key = 'smtp_config'");
+    if (res.rowCount > 0 && res.rows[0].value) {
+      return JSON.parse(res.rows[0].value);
+    }
+  } catch (e) {}
+  return null;
+}
+
+function createSmtpTransporter(config) {
+  return nodemailer.createTransport({
+    host: config.host,
+    port: parseInt(config.port, 10) || 587,
+    secure: config.secure === true || config.port == 465,
+    auth: {
+      user: config.user,
+      pass: config.pass
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
 }
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const urlPath = url.pathname;
   const method = req.method.toUpperCase();
+  const parts = urlPath.split('/').filter(Boolean);
 
   const pad = (n) => String(n).padStart(2, '0');
   const now = new Date();
@@ -133,7 +226,7 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/data' && method === 'GET') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       
-      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders, documents] = await Promise.all([
+      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders, documents, vendorRatings, settings] = await Promise.all([
         getTableData('users'),
         getTableData('requests'),
         getTableData('contracts'),
@@ -144,7 +237,9 @@ const server = http.createServer(async (req, res) => {
         pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
         pool.query('SELECT * FROM rates'),
         getTableData('tenders').catch(() => []),
-        getTableData('documents').catch(() => [])
+        getTableData('documents').catch(() => []),
+        getTableData('vendor_ratings').catch(() => []),
+        getTableData('settings').catch(() => [])
       ]);
 
       const ratesObj = {};
@@ -153,13 +248,22 @@ const server = http.createServer(async (req, res) => {
         if (r.lastUpdated) ratesObj.lastUpdated = r.lastUpdated;
       });
 
+      const settingsMap = {};
+      (settings || []).forEach(s => {
+        if (s.key !== 'smtp_config') {
+          settingsMap[s.key] = s.value;
+        }
+      });
+
       const payload = {
         users, requests, contracts, invoices, guarantees, logs,
         units: units.rows,
         regulations: regulations.rows,
         rates: Object.keys(ratesObj).length > 0 ? ratesObj : { USD: 36.50, EUR: 39.80 },
         tenders: tenders || [],
-        documents: documents || []
+        documents: documents || [],
+        vendorRatings: vendorRatings || [],
+        settings: settingsMap
       };
 
       res.writeHead(200);
@@ -176,6 +280,338 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         res.writeHead(200);
         res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+      return;
+    }
+
+    // ----------------------------------------------------
+    // 📧 SMTP & E-MAIL ENDPOINTS
+    // ----------------------------------------------------
+    if (urlPath === '/api/settings/smtp' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const cfg = await getSmtpConfig();
+      if (cfg) {
+        const safeCfg = { ...cfg, pass: cfg.pass ? '••••••••' : '' };
+        res.writeHead(200); res.end(JSON.stringify(safeCfg));
+      } else {
+        res.writeHead(200); res.end(JSON.stringify({ host: '', port: 587, secure: false, user: '', pass: '', from: '', fromName: 'Piri Reis Üni. Satınalma', isEnabled: false }));
+      }
+      return;
+    }
+
+    if (urlPath === '/api/settings/smtp' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const body = await readBody(req);
+      const newCfg = JSON.parse(body || '{}');
+      
+      const existingCfg = await getSmtpConfig() || {};
+      if (newCfg.pass === '••••••••' || !newCfg.pass) {
+        newCfg.pass = existingCfg.pass || '';
+      }
+
+      await pool.query(`
+        INSERT INTO settings (key, value) VALUES ('smtp_config', $1)
+        ON CONFLICT (key) DO UPDATE SET value = $1
+      `, [JSON.stringify(newCfg)]);
+
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, message: 'SMTP e-posta ayarları başarıyla kaydedildi.' }));
+      return;
+    }
+
+    if (urlPath === '/api/email/test' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const body = await readBody(req);
+      const { testEmail } = JSON.parse(body || '{}');
+      
+      const cfg = await getSmtpConfig();
+      if (!cfg || !cfg.host || !cfg.user) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ success: false, error: 'SMTP ayarları yapılandırılmamış. Lütfen önce sunucu ve kullanıcı bilgilerini giriniz.' }));
+        return;
+      }
+
+      try {
+        const transporter = createSmtpTransporter(cfg);
+        const target = testEmail || cfg.user;
+        const info = await transporter.sendMail({
+          from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
+          to: target,
+          subject: '✅ Piri Reis Üniversitesi Satınalma Takip — SMTP Test E-Postası',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+              <div style="background: #1e3a8a; padding: 20px; color: #fff; text-align: center;">
+                <h2 style="margin: 0; font-size: 1.3rem;">Piri Reis Üniversitesi</h2>
+                <p style="margin: 5px 0 0; font-size: 0.9rem; opacity: 0.9;">Satınalma Takip Sistemi — E-Posta Servisi</p>
+              </div>
+              <div style="padding: 24px; color: #1e293b;">
+                <h3 style="color: #10b981; margin-top: 0;">🎉 SMTP Bağlantısı Başarılı!</h3>
+                <p>Bu e-posta, Satınalma Takip Sistemi üzerinden SMTP sunucu yapılandırmanızı doğrulamak amacıyla test olarak gönderilmiştir.</p>
+                <p style="font-size: 0.85rem; color: #64748b; margin-top: 20px; border-top: 1px solid #f1f5f9; padding-top: 10px;">
+                  Gönderim Zamanı: ${new Date().toLocaleString('tr-TR')}
+                </p>
+              </div>
+            </div>
+          `
+        });
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true, message: `Test e-postası başarıyla gönderildi: ${target}`, messageId: info.messageId }));
+      } catch (err) {
+        console.error('SMTP test hatası:', err);
+        res.writeHead(500);
+        res.end(JSON.stringify({ success: false, error: 'E-posta gönderilemedi: ' + err.message }));
+      }
+      return;
+    }
+
+    if (urlPath === '/api/email/send-alert' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const body = await readBody(req);
+      const { to, subject, title, details, actionUrl } = JSON.parse(body || '{}');
+
+      const cfg = await getSmtpConfig();
+      if (!cfg || !cfg.isEnabled || !cfg.host) {
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: false, message: 'SMTP bildirimleri pasif durumda.' }));
+        return;
+      }
+
+      try {
+        const transporter = createSmtpTransporter(cfg);
+        await transporter.sendMail({
+          from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
+          to,
+          subject: subject || '🔔 Satınalma Takip Bildirimi',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
+              <div style="background: #1e3a8a; padding: 18px; color: #fff;">
+                <h2 style="margin: 0; font-size: 1.2rem;">Piri Reis Üniversitesi — Satınalma Müdürlüğü</h2>
+              </div>
+              <div style="padding: 20px; color: #0f172a;">
+                <h3 style="margin-top: 0; color: #1e3a8a;">${title || 'Önemli Bildirim'}</h3>
+                <div style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.5; color: #334155; margin: 15px 0;">${details || ''}</div>
+                <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 0.8rem; color: #64748b;">
+                  Bu otomatik bir sistem bildirimidir. Piri Reis Üniversitesi Satınalma Takip Sistemi tarafından oluşturulmuştur.
+                </div>
+              </div>
+            </div>
+          `
+        });
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        console.error('Email alert error:', err.message);
+        res.writeHead(500);
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+      return;
+    }
+
+    // ----------------------------------------------------
+    // 📥 EXCEL BATCH IMPORT ENDPOINT
+    // ----------------------------------------------------
+    if ((urlPath === '/api/demands/batch' || urlPath === '/api/import-excel-requests') && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const body = await readBody(req);
+      const parsed = JSON.parse(body || '{}');
+      const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+      if (!Array.isArray(items) || items.length === 0) {
+        res.writeHead(400); res.end(JSON.stringify({ error: 'İçe aktarılacak kayıt bulunamadı.' })); return;
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const inserted = [];
+        for (const item of items) {
+          delete item.id;
+          const keys = Object.keys(item);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(item[k], k));
+
+          const query = `INSERT INTO requests (${cols}) VALUES (${placeholders}) RETURNING *`;
+          const resInsert = await client.query(query, values);
+          inserted.push(resInsert.rows[0]);
+        }
+
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        await client.query(
+          'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+          [dateStr, 'Sistem (Excel Import)', 'Toplu Talep İçe Aktarma', `${inserted.length} adet talep Excel dosyasından toplu yüklendi.`]
+        );
+
+        await client.query('COMMIT');
+        res.writeHead(201);
+        res.end(JSON.stringify({ success: true, count: inserted.length, items: inserted }));
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Batch import error:', err);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: err.message }));
+      } finally {
+        client.release();
+      }
+      return;
+    }
+
+    // ----------------------------------------------------
+    // 🗄️ BACKUP & RESTORE MANAGEMENT ENDPOINTS
+    // ----------------------------------------------------
+    if (urlPath === '/api/backups' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const files = fs.existsSync(BACKUP_DIR) ? fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json') || f.endsWith('.sql')) : [];
+      files.sort().reverse();
+      const list = files.map(f => {
+        const fPath = path.join(BACKUP_DIR, f);
+        const stat = fs.statSync(fPath);
+        const sizeKB = (stat.size / 1024).toFixed(1) + ' KB';
+        const d = new Date(stat.mtime);
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateStr = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        return {
+          filename: f,
+          size: sizeKB,
+          createdAt: dateStr,
+          mtime: stat.mtime,
+          isAuto: f.startsWith('auto_backup')
+        };
+      });
+      res.writeHead(200);
+      res.end(JSON.stringify(list));
+      return;
+    }
+
+    if ((urlPath === '/api/backups/create' || urlPath === '/api/backup-now') && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const backupInfo = await createBackupFile(false);
+      res.writeHead(201);
+      res.end(JSON.stringify({ success: true, backup: backupInfo }));
+      return;
+    }
+
+    if ((urlPath.startsWith('/api/backups/download/') || urlPath === '/api/backups/download') && method === 'GET') {
+      let filename = url.searchParams.get('filename');
+      if (!filename && urlPath.startsWith('/api/backups/download/')) {
+        filename = path.basename(urlPath.replace('/api/backups/download/', ''));
+      }
+      if (!filename || (!filename.endsWith('.json') && !filename.endsWith('.sql'))) {
+        res.writeHead(400); res.end('Geçersiz dosya adı'); return;
+      }
+      const filePath = path.join(BACKUP_DIR, filename);
+      if (!fs.existsSync(filePath)) {
+        res.writeHead(404); res.end('Yedek dosyası bulunamadı'); return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="${filename}"`
+      });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+
+    if (urlPath === '/api/backups/restore' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const body = await readBody(req);
+      const { filename } = JSON.parse(body || '{}');
+      if (!filename) {
+        res.writeHead(400); res.end(JSON.stringify({ error: 'Yedek dosya adı belirtilmedi.' })); return;
+      }
+      const filePath = path.join(BACKUP_DIR, filename);
+      if (!fs.existsSync(filePath)) {
+        res.writeHead(404); res.end(JSON.stringify({ error: 'Yedek dosyası bulunamadı.' })); return;
+      }
+
+      const backupData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      
+      const tablesToClear = ['requests', 'contracts', 'invoices', 'guarantees', 'tenders', 'documents', 'vendor_ratings'];
+      for (const t of tablesToClear) {
+        await pool.query(`TRUNCATE TABLE ${t} RESTART IDENTITY CASCADE`).catch(() => {});
+      }
+
+      if (backupData.requests) {
+        for (const reqItem of backupData.requests) {
+          delete reqItem.id;
+          const keys = Object.keys(reqItem);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(reqItem[k], k));
+          await pool.query(`INSERT INTO requests (${cols}) VALUES (${placeholders})`, values).catch(() => {});
+        }
+      }
+
+      if (backupData.contracts) {
+        for (const c of backupData.contracts) {
+          delete c.id;
+          const keys = Object.keys(c);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(c[k], k));
+          await pool.query(`INSERT INTO contracts (${cols}) VALUES (${placeholders})`, values).catch(() => {});
+        }
+      }
+
+      if (backupData.invoices) {
+        for (const inv of backupData.invoices) {
+          delete inv.id;
+          const keys = Object.keys(inv);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(inv[k], k));
+          await pool.query(`INSERT INTO invoices (${cols}) VALUES (${placeholders})`, values).catch(() => {});
+        }
+      }
+
+      if (backupData.guarantees) {
+        for (const g of backupData.guarantees) {
+          delete g.id;
+          const keys = Object.keys(g);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(g[k], k));
+          await pool.query(`INSERT INTO guarantees (${cols}) VALUES (${placeholders})`, values).catch(() => {});
+        }
+      }
+
+      if (backupData.tenders) {
+        for (const t of backupData.tenders) {
+          delete t.id;
+          const keys = Object.keys(t);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(t[k], k));
+          await pool.query(`INSERT INTO tenders (${cols}) VALUES (${placeholders})`, values).catch(() => {});
+        }
+      }
+
+      if (backupData.vendor_ratings) {
+        for (const vr of backupData.vendor_ratings) {
+          delete vr.id;
+          const keys = Object.keys(vr);
+          const cols = keys.map(k => `"${k}"`).join(', ');
+          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+          const values = keys.map(k => sanitizeVal(vr[k], k));
+          await pool.query(`INSERT INTO vendor_ratings (${cols}) VALUES (${placeholders})`, values).catch(() => {});
+        }
+      }
+
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, message: `Veritabanı "${filename}" yedeğinden başarıyla geri yüklendi!` }));
+      return;
+    }
+
+    if (parts[0] === 'api' && parts[1] === 'backups' && parts[2] && method === 'DELETE') {
+      const filename = parts[2];
+      const filePath = path.join(BACKUP_DIR, filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: true }));
+      } else {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Yedek dosyası bulunamadı.' }));
       }
       return;
     }
@@ -292,8 +728,6 @@ const server = http.createServer(async (req, res) => {
     }
 
     // 2. Generic REST CRUD API
-    const parts = urlPath.split('/').filter(Boolean);
-
     // Document download / preview
     if (parts[0] === 'api' && parts[1] === 'documents' && parts[2] && (parts[3] === 'download' || parts[3] === 'preview') && method === 'GET') {
       const docId = parseInt(parts[2], 10);
@@ -345,7 +779,7 @@ const server = http.createServer(async (req, res) => {
 
     if (parts[0] === 'api' && parts.length >= 2 && urlPath !== '/api/data') {
       const table = parts[1];
-      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations', 'tenders', 'documents'];
+      const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations', 'tenders', 'documents', 'vendor_ratings', 'settings'];
       
       if (allowedTables.includes(table)) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -356,7 +790,6 @@ const server = http.createServer(async (req, res) => {
           if (!body) { res.writeHead(400); res.end(JSON.stringify({ error: 'Empty body' })); return; }
           const data = JSON.parse(body);
           
-          // Remove frontend-generated ID so Postgres generates it using SERIAL
           delete data.id;
 
           const keys = Object.keys(data);
@@ -443,7 +876,6 @@ const server = http.createServer(async (req, res) => {
       const { exec } = require('child_process');
       exec('git pull && pm2 reload satinalma', (err, stdout, stderr) => {
         if (err) {
-          // If git is not used or error occurs, log it cleanly
           console.error('Güncelleme hatası:', err.message);
           res.writeHead(500);
           res.end(JSON.stringify({ success: false, error: err.message }));
@@ -453,121 +885,6 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ success: true, output: stdout }));
         }
       });
-      return;
-    }
-
-    // Backup & Import Endpoints
-    const BACKUP_DIR = path.join(__dirname, 'backups');
-    if (!fs.existsSync(BACKUP_DIR)) {
-      fs.mkdirSync(BACKUP_DIR, { recursive: true });
-    }
-
-    if (urlPath === '/api/backups' && method === 'GET') {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const files = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json') || f.endsWith('.sql'));
-      const backupList = files.map(f => {
-        const stat = fs.statSync(path.join(BACKUP_DIR, f));
-        const sizeKB = (stat.size / 1024).toFixed(1) + ' KB';
-        const d = new Date(stat.mtime);
-        const pad = (n) => String(n).padStart(2, '0');
-        const dateStr = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        return { filename: f, createdAt: dateStr, size: sizeKB, mtime: stat.mtime };
-      });
-      backupList.sort((a, b) => b.mtime - a.mtime);
-      res.writeHead(200);
-      res.end(JSON.stringify(backupList));
-      return;
-    }
-
-    if ((urlPath === '/api/backups/create' || urlPath === '/api/backup-now') && method === 'POST') {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, documents] = await Promise.all([
-        getTableData('users'),
-        getTableData('requests'),
-        getTableData('contracts'),
-        getTableData('invoices'),
-        getTableData('guarantees'),
-        getTableData('logs'),
-        pool.query('SELECT id, name FROM units ORDER BY id ASC'),
-        pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
-        pool.query('SELECT * FROM rates'),
-        getTableData('documents')
-      ]);
-
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-      const filename = `backup_satinalma_${dateStr}.json`;
-      const backupPath = path.join(BACKUP_DIR, filename);
-
-      const backupData = {
-        timestamp: now.toISOString(),
-        users, requests, contracts, invoices, guarantees, logs,
-        units: units.rows,
-        regulations: regulations.rows,
-        rates: rates.rows,
-        documents: documents || []
-      };
-
-      fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2), 'utf8');
-      const stat = fs.statSync(backupPath);
-      const sizeKB = (stat.size / 1024).toFixed(1) + ' KB';
-
-      res.writeHead(200);
-      res.end(JSON.stringify({ success: true, filename, size: sizeKB }));
-      return;
-    }
-
-    if (urlPath.startsWith('/api/backups/download/') && method === 'GET') {
-      const filename = path.basename(urlPath.replace('/api/backups/download/', ''));
-      const filePath = path.join(BACKUP_DIR, filename);
-      if (fs.existsSync(filePath)) {
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.writeHead(200);
-        res.end(fs.readFileSync(filePath));
-      } else {
-        res.writeHead(404);
-        res.end('File not found');
-      }
-      return;
-    }
-
-    if (urlPath === '/api/import-excel-requests' && method === 'POST') {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const body = await readBody(req);
-      const items = JSON.parse(body || '[]');
-      if (!Array.isArray(items) || items.length === 0) {
-        res.writeHead(400); res.end(JSON.stringify({ error: 'No items provided' }));
-        return;
-      }
-
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        let addedCount = 0;
-        for (const item of items) {
-          delete item.id; // allow PostgreSQL SERIAL auto-increment
-          const keys = Object.keys(item);
-          const cols = keys.map(k => `"${k}"`).join(', ');
-          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-          const values = keys.map(k => sanitizeVal(item[k], k));
-
-          const query = `INSERT INTO requests (${cols}) VALUES (${placeholders})`;
-          await client.query(query, values);
-          addedCount++;
-        }
-        await client.query('COMMIT');
-        res.writeHead(200);
-        res.end(JSON.stringify({ success: true, addedCount }));
-      } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('Import excel error:', err);
-        res.writeHead(500);
-        res.end(JSON.stringify({ error: err.message }));
-      } finally {
-        client.release();
-      }
       return;
     }
 
@@ -726,6 +1043,26 @@ async function initDatabaseSchema() {
         "uploadedBy" VARCHAR(100),
         "uploadedAt" VARCHAR(100)
       );
+
+      CREATE TABLE IF NOT EXISTS vendor_ratings (
+        id SERIAL PRIMARY KEY,
+        "supplierName" VARCHAR(255) NOT NULL,
+        "speedScore" NUMERIC(3,1) DEFAULT 5.0,
+        "qualityScore" NUMERIC(3,1) DEFAULT 5.0,
+        "complianceScore" NUMERIC(3,1) DEFAULT 5.0,
+        "communicationScore" NUMERIC(3,1) DEFAULT 5.0,
+        "overallScore" NUMERIC(3,1) DEFAULT 5.0,
+        "reviewNotes" TEXT,
+        "ratedBy" VARCHAR(100),
+        "ratedAt" VARCHAR(100)
+      );
+
+      CREATE TABLE IF NOT EXISTS settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT
+      );
+
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
     `);
 
     // Check if database is empty (users table has 0 rows)

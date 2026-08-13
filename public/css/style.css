@@ -2924,6 +2924,55 @@ th.sticky-col-left, th.sticky-col-right {
   }
 }
 
+/* ============================================================
+   ⭐ STAR RATING & VENDOR SCORECARD STYLES
+   ============================================================ */
+.star-rating-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  user-select: none;
+}
+.star-rating-picker .star {
+  font-size: 1.35rem;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.star-rating-picker .star:hover {
+  transform: scale(1.25);
+}
+.star-rating-picker .star.selected,
+.star-rating-picker .star.hovered {
+  color: #f59e0b;
+}
+
+.score-badge-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #b45309;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+[data-theme="dark"] .score-badge-gold {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+/* Excel Drop Zone */
+#excel-drop-zone.drag-over {
+  border-color: var(--accent-primary) !important;
+  background: rgba(59, 130, 246, 0.12) !important;
+  transform: scale(1.01);
+}
+
+
 
 
 

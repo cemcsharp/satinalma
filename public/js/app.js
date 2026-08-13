@@ -31,6 +31,9 @@ const App = {
     matrixGroupBy: 'REG_FIRST',
     expandedMatrixGroups: new Set(),
     expandedMatrixSubGroups: new Set(),
+    vendorRatings: [],
+    smtpConfig: null,
+    parsedExcelData: [],
     charts: {}
   },
 
@@ -103,6 +106,8 @@ const App = {
         this.state.tenders = data.tenders || [];
         this.state.logs = data.logs || [];
         this.state.documents = data.documents || [];
+        this.state.vendorRatings = data.vendorRatings || [];
+        this.state.settings = data.settings || {};
         if (data.rates) this.state.rates = data.rates;
         this.state.dismissedNotifs = JSON.parse(localStorage.getItem('dismissedNotifs') || '[]');
 
@@ -749,17 +754,21 @@ const App = {
 
     // Modal Open & Action Buttons
     document.getElementById('btn-open-new-request')?.addEventListener('click', () => this.openNewRequestModal());
+    document.getElementById('btn-open-excel-import')?.addEventListener('click', () => this.openExcelImportModal());
     document.getElementById('btn-open-add-user')?.addEventListener('click', () => this.openUserModal());
     document.getElementById('btn-open-add-contract')?.addEventListener('click', () => this.openContractModal());
     document.getElementById('btn-open-add-guarantee')?.addEventListener('click', () => this.openGuaranteeModal());
     document.getElementById('btn-open-add-invoice')?.addEventListener('click', () => this.openInvoiceModal());
     document.getElementById('btn-open-add-tender')?.addEventListener('click', () => this.openTenderModal());
 
-    // Settings Action Buttons (Birim & Yönetmelik Maddesi & Backup & Excel Import)
+    // Settings Action Buttons (Birim & Yönetmelik Maddesi & Backup & Excel Import & SMTP)
     document.getElementById('btn-add-unit')?.addEventListener('click', () => this.handleAddUnit());
     document.getElementById('btn-add-regulation')?.addEventListener('click', () => this.handleAddRegulation());
-    document.getElementById('btn-trigger-backup-now')?.addEventListener('click', () => this.triggerBackupNow());
+    document.getElementById('btn-trigger-backup-now')?.addEventListener('click', () => this.triggerManualBackup());
     document.getElementById('btn-download-excel-template')?.addEventListener('click', () => this.downloadExcelTemplate());
+    document.getElementById('btn-modal-download-template')?.addEventListener('click', () => this.downloadExcelTemplate());
+    document.getElementById('btn-confirm-excel-import')?.addEventListener('click', () => this.confirmExcelImport());
+    document.getElementById('btn-test-smtp')?.addEventListener('click', () => this.testSmtpConnection());
     document.getElementById('btn-update-system')?.addEventListener('click', () => this.handleUpdateSystem());
     document.getElementById('btn-reimport-excel')?.addEventListener('click', () => {
       document.getElementById('input-excel-file')?.click();
@@ -788,6 +797,8 @@ const App = {
     document.getElementById('form-guarantee-manage')?.addEventListener('submit', (e) => this.handleSaveGuarantee(e));
     document.getElementById('form-invoice-manage')?.addEventListener('submit', (e) => this.handleSaveInvoice(e));
     document.getElementById('form-tender-manage')?.addEventListener('submit', (e) => this.handleSaveTender(e));
+    document.getElementById('form-smtp-settings')?.addEventListener('submit', (e) => this.saveSmtpSettings(e));
+    document.getElementById('form-vendor-rating')?.addEventListener('submit', (e) => this.saveVendorRating(e));
 
     // Notification Center Event Listeners
     document.getElementById('btn-mark-all-notifications-read')?.addEventListener('click', () => this.markAllNotificationsRead());
@@ -1281,6 +1292,7 @@ const App = {
 
     if (viewName === 'settings') {
       this.fetchBackups();
+      this.fetchSmtpSettings();
     }
 
     if (viewName === 'my-requests') {
@@ -4949,18 +4961,36 @@ const App = {
     const tbody = document.querySelector('#table-supplier-detailed tbody');
     if (tbody) {
       if (sortedSupp.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun tedarikçi bulunamadı.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun tedarikçi bulunamadı.</td></tr>`;
       } else {
         tbody.innerHTML = sortedSupp.map(([sName, s], i) => {
           const share = totalSpendAll > 0 ? ((s.spend / totalSpendAll) * 100).toFixed(1) : 0;
+          const score = this.getVendorScore(sName);
+          const safeName = sName.replace(/'/g, "\\'");
+          
+          let scoreBadgeHtml = `<span style="font-size:0.78rem; color:var(--text-muted);">Puanlanmadı</span>`;
+          if (score) {
+            scoreBadgeHtml = `
+              <span class="score-badge-gold" title="Hız: ${score.speed}★ | Kalite: ${score.quality}★ | Evrak: ${score.compliance}★ | İletişim: ${score.communication}★">
+                ⭐ ${score.overall} <small style="opacity:0.75; font-size:0.72rem;">(${score.count} oy)</small>
+              </span>
+            `;
+          }
+
           return `
             <tr>
-              <td>${i + 1}</td>
-              <td style="font-weight:700;">${sName}</td>
-              <td>${s.total}</td>
+              <td style="font-weight:700; color:var(--text-muted);">${i + 1}</td>
+              <td style="font-weight:700; color:var(--text-main);">🏢 ${sName}</td>
+              <td>${scoreBadgeHtml}</td>
+              <td style="font-weight:600;">${s.total}</td>
               <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${s.spend.toLocaleString('tr-TR')} ₺</td>
               <td><span class="badge status-completed">${s.completed}</span></td>
               <td style="font-weight:600;">%${share}</td>
+              <td style="text-align:center;">
+                <button class="btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.75rem; border-color:#f59e0b; color:#d97706; font-weight:700;" onclick="App.openVendorRateModal('${safeName}')">
+                  <span>⭐</span> Puanla
+                </button>
+              </td>
             </tr>
           `;
         }).join('');
@@ -6188,6 +6218,7 @@ const App = {
     this.renderUnitsSettings();
     this.renderRegulationsSettings();
     this.renderBackupsTableSettings();
+    this.fetchSmtpSettings();
   },
 
   syncRatesInputUI() {
@@ -6212,7 +6243,112 @@ const App = {
     }
   },
 
+  // ----------------------------------------------------
+  // 📧 SMTP SETTINGS & EMAIL CLIENT ENGINE
+  // ----------------------------------------------------
+  async fetchSmtpSettings() {
+    try {
+      const res = await fetch('/api/settings/smtp');
+      if (res.ok) {
+        const cfg = await res.json();
+        this.state.smtpConfig = cfg;
+        const hostEl = document.getElementById('smtp-host');
+        const portEl = document.getElementById('smtp-port');
+        const userEl = document.getElementById('smtp-user');
+        const passEl = document.getElementById('smtp-pass');
+        const fromNameEl = document.getElementById('smtp-from-name');
+        const fromEmailEl = document.getElementById('smtp-from-email');
+        const enabledEl = document.getElementById('smtp-is-enabled');
+        const secureEl = document.getElementById('smtp-secure');
+        const badgeEl = document.getElementById('smtp-status-badge');
+
+        if (hostEl) hostEl.value = cfg.host || '';
+        if (portEl) portEl.value = cfg.port || 587;
+        if (userEl) userEl.value = cfg.user || '';
+        if (passEl) passEl.value = cfg.pass || '';
+        if (fromNameEl) fromNameEl.value = cfg.fromName || 'Piri Reis Üni. Satınalma';
+        if (fromEmailEl) fromEmailEl.value = cfg.from || '';
+        if (enabledEl) enabledEl.checked = !!cfg.isEnabled;
+        if (secureEl) secureEl.checked = !!cfg.secure;
+
+        if (badgeEl) {
+          if (cfg.isEnabled && cfg.host) {
+            badgeEl.className = 'badge status-completed';
+            badgeEl.innerText = '🟢 Aktif';
+          } else {
+            badgeEl.className = 'badge status-open';
+            badgeEl.innerText = 'Pasif';
+          }
+        }
+      }
+    } catch (e) {
+      console.error('SMTP fetch error:', e);
+    }
+  },
+
+  async saveSmtpSettings(e) {
+    if (e) e.preventDefault();
+    const cfg = {
+      host: document.getElementById('smtp-host')?.value.trim() || '',
+      port: parseInt(document.getElementById('smtp-port')?.value, 10) || 587,
+      user: document.getElementById('smtp-user')?.value.trim() || '',
+      pass: document.getElementById('smtp-pass')?.value || '',
+      fromName: document.getElementById('smtp-from-name')?.value.trim() || 'Piri Reis Üni. Satınalma',
+      from: document.getElementById('smtp-from-email')?.value.trim() || '',
+      isEnabled: document.getElementById('smtp-is-enabled')?.checked || false,
+      secure: document.getElementById('smtp-secure')?.checked || false
+    };
+
+    try {
+      const res = await fetch('/api/settings/smtp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg)
+      });
+      if (res.ok) {
+        this.showToast('SMTP e-posta ayarları başarıyla kaydedildi!', 'success', '📧');
+        this.logAction('SMTP Ayarları Güncellendi', `Host: ${cfg.host}, Kullanıcı: ${cfg.user}, Durum: ${cfg.isEnabled ? 'Aktif' : 'Pasif'}`);
+        await this.fetchSmtpSettings();
+      } else {
+        this.showToast('SMTP ayarları kaydedilemedi.', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast('Sunucu hatası oluştu.', 'error');
+    }
+  },
+
+  async testSmtpConnection() {
+    const testTarget = prompt('Test e-postasının gönderileceği e-posta adresini giriniz:', this.state.currentUser?.email || document.getElementById('smtp-user')?.value || '');
+    if (!testTarget) return;
+
+    this.showToast(`"${testTarget}" adresine test e-postası gönderiliyor...`, 'info', '✉️');
+    try {
+      const res = await fetch('/api/email/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testEmail: testTarget })
+      });
+      const data = await res.json();
+      if (data.success) {
+        this.showToast(`🎉 Test e-postası başarıyla ulaştı: ${testTarget}`, 'success', '✅');
+      } else {
+        this.showToast(`SMTP Hatası: ${data.error}`, 'error', '❌');
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast('E-posta test isteği başarısız oldu.', 'error');
+    }
+  },
+
+  // ----------------------------------------------------
+  // 🗄️ BACKUP & RESTORE CLIENT MANAGEMENT
+  // ----------------------------------------------------
   async renderBackupsTableSettings() {
+    await this.fetchBackups();
+  },
+
+  async fetchBackups() {
     const tbody = document.getElementById('tbody-backups-list');
     if (!tbody) return;
     try {
@@ -6220,74 +6356,200 @@ const App = {
       if (res.ok) {
         const backups = await res.json();
         if (!Array.isArray(backups) || backups.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">Henüz alınmış veritabanı yedeği bulunmuyor.</td></tr>`;
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:1rem;">Henüz kayıtlı veritabanı yedeği bulunmuyor.</td></tr>';
           return;
         }
-        tbody.innerHTML = backups.map(b => `
-          <tr>
-            <td style="font-weight:600; font-family:var(--font-mono); font-size:0.82rem;">${b.filename}</td>
-            <td>${b.createdAt}</td>
-            <td>${b.size}</td>
-            <td style="text-align:center;">
-              <a href="/api/backups/download/${b.filename}" class="btn-icon" title="Yedek Dosyasını İndir" download>📥</a>
-            </td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = backups.map(b => {
+          const typeBadge = b.isAuto 
+            ? '<span class="badge status-open" style="font-size:0.75rem;">🤖 Otomatik (00:00)</span>' 
+            : '<span class="badge priority-orta" style="font-size:0.75rem;">👤 Manuel</span>';
+          const safeFile = b.filename.replace(/'/g, "\\'");
+          return `
+            <tr>
+              <td style="font-weight:600; font-family:var(--font-mono); font-size:0.8rem;">💾 ${b.filename}</td>
+              <td style="font-size:0.82rem;">${b.createdAt || '-'}</td>
+              <td><span class="badge" style="background:var(--bg-card); font-size:0.78rem;">${b.size}</span></td>
+              <td>${typeBadge}</td>
+              <td style="text-align:center; white-space:nowrap;">
+                <div class="action-btns" style="justify-content:center; gap:0.25rem;">
+                  <a href="/api/backups/download?filename=${encodeURIComponent(b.filename)}" class="btn-icon" title="Yedeği İndir (.json)" download style="text-decoration:none;">📥</a>
+                  <button class="btn-icon" onclick="App.restoreBackup('${safeFile}')" title="Bu Yedeğe Geri Yükle" style="color:var(--status-completed);">🔄</button>
+                  <button class="btn-icon" onclick="App.deleteBackup('${safeFile}')" title="Yedeği Sil" style="color:var(--status-rejected);">🗑️</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
       }
     } catch (err) {
       console.error(err);
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--status-rejected);">Yedek listesi alınamadı.</td></tr>`;
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--status-rejected);">Yedek listesi alınamadı.</td></tr>';
     }
   },
 
-  async triggerBackupNow() {
+  async triggerManualBackup() {
     try {
-      this.showToast("Veritabanı yedeği oluşturuluyor...", "info", "💾");
+      this.showToast("Veritabanı yedeği alınıyor...", "info", "💾");
       const res = await fetch('/api/backups/create', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        this.showToast(`Yedek oluşturuldu: ${data.filename} (${data.size})`, "success", "✅");
-        this.renderBackupsTableSettings();
+        this.showToast(`Veritabanı yedeği oluşturuldu (${data.backup?.filename || 'Yedek Alındı'})`, "success", "✅");
+        this.logAction('Manuel Veri Yedeği Alındı', `Yedek Dosyası: ${data.backup?.filename}`);
+        await this.fetchBackups();
       } else {
         this.showToast("Yedekleme başarısız oldu.", "error");
       }
     } catch (err) {
-      console.error(err);
-      this.showToast("Yedekleme sırasında hata oluştu.", "error");
+      console.error("Backup error:", err);
+      this.showToast("Yedek alınırken hata oluştu.", "error");
     }
   },
 
-  handleExcelFileSelect(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+  async restoreBackup(filename) {
+    this.showConfirm(
+      "Veritabanı Geri Yükleme",
+      `DİKKAT: Veritabanı "${filename}" anlık görüntüsüne geri yüklenecektir. Mevcut talepler, faturalar ve sözleşmeler yedekteki verilerle değiştirilecektir. Devam etmek istiyor musunuz?`,
+      async () => {
+        try {
+          this.showToast(`Veritabanı "${filename}" yedeğinden geri yükleniyor...`, 'info', '🔄');
+          const res = await fetch('/api/backups/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename })
+          });
+          const data = await res.json();
+          if (data.success) {
+            this.showToast(data.message || 'Veritabanı başarıyla geri yüklendi!', 'success', '🎉');
+            this.logAction('Veritabanı Geri Yüklendi', `Yedek Dosyası: ${filename}`);
+            await this.fetchInitialData();
+            this.render();
+          } else {
+            this.showToast(data.error || 'Geri yükleme başarısız oldu.', 'error');
+          }
+        } catch (e) {
+          console.error(e);
+          this.showToast('Geri yükleme işlemi sırasında hata oluştu.', 'error');
+        }
+      },
+      '⚠️'
+    );
+  },
 
+  async deleteBackup(filename) {
+    this.showConfirm(
+      "Yedek Dosyasını Sil",
+      `"${filename}" yedek dosyasını sunucu diskinden kalıcı olarak silmek istediğinizden emin misiniz?`,
+      async () => {
+        try {
+          const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+          if (res.ok) {
+            this.showToast(`"${filename}" yedek dosyası silindi.`, 'warning', '🗑️');
+            await this.fetchBackups();
+          } else {
+            this.showToast('Yedek silinemedi.', 'error');
+          }
+        } catch (e) {
+          console.error(e);
+          this.showToast('Yedek silinirken hata oluştu.', 'error');
+        }
+      },
+      '🗑️'
+    );
+  },
+
+  // ----------------------------------------------------
+  // 📥 EXCEL IMPORT MODAL & DRAG-DROP CLIENT ENGINE
+  // ----------------------------------------------------
+  openExcelImportModal() {
+    this.state.parsedExcelData = [];
+    const previewWrapper = document.getElementById('excel-preview-wrapper');
+    const confirmBtn = document.getElementById('btn-confirm-excel-import');
+    const statusEl = document.getElementById('excel-import-status');
+    const fileInput = document.getElementById('input-modal-excel-file');
+
+    if (previewWrapper) previewWrapper.style.display = 'none';
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span>🚀</span> Verileri Sisteme Aktar';
+    }
+    if (statusEl) statusEl.innerText = '';
+    if (fileInput) fileInput.value = '';
+
+    this.setupExcelDragDrop();
+    this.openModal('modal-excel-import');
+  },
+
+  setupExcelDragDrop() {
+    const dropZone = document.getElementById('excel-drop-zone');
+    const fileInput = document.getElementById('input-modal-excel-file');
+    const browseBtn = document.getElementById('btn-browse-excel-file');
+    if (!dropZone) return;
+
+    if (browseBtn) {
+      browseBtn.onclick = (e) => {
+        e.stopPropagation();
+        fileInput?.click();
+      };
+    }
+
+    dropZone.onclick = (e) => {
+      if (e.target !== browseBtn && !browseBtn?.contains(e.target)) {
+        fileInput?.click();
+      }
+    };
+
+    dropZone.ondragover = (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    };
+    dropZone.ondragleave = () => {
+      dropZone.classList.remove('drag-over');
+    };
+    dropZone.ondrop = (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const files = e.dataTransfer.files;
+      if (files && files[0]) {
+        this.parseModalExcelFile(files[0]);
+      }
+    };
+
+    if (fileInput) {
+      fileInput.onchange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+          this.parseModalExcelFile(e.target.files[0]);
+        }
+      };
+    }
+  },
+
+  parseModalExcelFile(file) {
+    if (!file) return;
     if (typeof XLSX === 'undefined') {
-      this.showToast("Excel okuma kütüphanesi yüklenemedi. Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.", "error");
+      this.showToast("Excel okuma kütüphanesi yüklenemedi. Lütfen sayfayı yenileyin.", "error");
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = async (evt) => {
+    reader.onload = (evt) => {
       try {
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonRows = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonRows = XLSX.utils.sheet_to_json(sheet);
 
         if (!jsonRows || jsonRows.length === 0) {
-          this.showToast("Seçilen Excel dosyasında okunabilir veri bulunamadı.", "warning");
+          this.showToast("Excel dosyasında okunabilir veri satırı bulunamadı.", "warning");
           return;
         }
 
-        // Map Excel columns to Request fields
-        const requestsToImport = jsonRows.map(r => {
+        const requestsToImport = jsonRows.map((r, i) => {
           return {
             requestBarcode: r['Barkod No'] || r['Barkod'] || r['Talep Barkod'] || r['Barkod No.'] || Math.floor(100000000 + Math.random() * 900000000),
-            subject: r['Talep Konusu'] || r['Konu'] || r['Açıklama'] || 'Excel İçe Aktarma',
+            subject: r['Talep Konusu'] || r['Konu'] || r['Açıklama'] || `İçe Aktarılan Talep #${i + 1}`,
             unit: r['Birim'] || r['Birim Adı'] || 'Genel Sekreterlik',
             arrivalDate: r['Geliş Tarihi'] || r['Tarih'] || new Date().toISOString().split('T')[0],
-            assignedTo: r['Atanan Personel'] || r['Personel'] || r['Sorumlu'] || 'Merih AVCI',
+            assignedTo: r['Atanan Personel'] || r['Personel'] || r['Sorumlu'] || 'Henüz Atanmadı',
             priority: r['Öncelik'] || 'Orta',
             status: r['Durum'] || 'Açık',
             estimatedAmount: parseFloat(r['Tahmini Bütçe (TL)'] || r['Tahmini Bütçe'] || r['Bütçe'] || 0),
@@ -6301,30 +6563,243 @@ const App = {
           };
         });
 
-        this.showToast(`Excel dosyasından ${requestsToImport.length} adet talep okundu, veritabanına yükleniyor...`, "info", "📊");
+        this.state.parsedExcelData = requestsToImport;
 
-        const res = await fetch('/api/import-excel-requests', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestsToImport)
-        });
+        // Render preview table
+        const previewWrapper = document.getElementById('excel-preview-wrapper');
+        const previewTbody = document.getElementById('tbody-excel-preview');
+        const statsEl = document.getElementById('excel-file-stats');
+        const badgeEl = document.getElementById('excel-record-count-badge');
+        const confirmBtn = document.getElementById('btn-confirm-excel-import');
 
-        if (res.ok) {
-          const result = await res.json();
-          this.showToast(`🎉 ${result.addedCount} adet talep veritabanına başarıyla yüklendi!`, "success", "✅");
-          await this.fetchInitialData();
-          this.render();
-        } else {
-          this.showToast("Excel verileri yüklenirken sunucu hatası oluştu.", "error");
+        if (previewWrapper) previewWrapper.style.display = 'block';
+        if (statsEl) statsEl.innerText = `Dosya: ${file.name} (${(file.size / 1024).toFixed(1)} KB) — Toplam ${requestsToImport.length} satır ayrıştırıldı.`;
+        if (badgeEl) badgeEl.innerText = `${requestsToImport.length} Kayıt Hazır`;
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.innerHTML = `<span>🚀</span> ${requestsToImport.length} Adet Talebi İçe Aktar`;
         }
+
+        const previewRows = requestsToImport.slice(0, 10);
+        if (previewTbody) {
+          previewTbody.innerHTML = previewRows.map((r, idx) => `
+            <tr>
+              <td>${idx + 1}</td>
+              <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">#${r.requestBarcode}</td>
+              <td style="font-weight:600;">${r.subject}</td>
+              <td>${r.unit}</td>
+              <td>${r.assignedTo}</td>
+              <td style="font-family:var(--font-mono);">${r.estimatedAmount ? r.estimatedAmount.toLocaleString('tr-TR') + ' ₺' : '-'}</td>
+              <td>${r.supplier || '-'}</td>
+              <td><span class="badge status-${r.status === 'Tamamlandı' ? 'completed' : 'open'}">${r.status}</span></td>
+            </tr>
+          `).join('');
+        }
+
+        this.showToast(`${requestsToImport.length} adet satır Excel'den ayrıştırıldı ve önizlendi.`, 'info', '📊');
       } catch (err) {
-        console.error("Excel okuma hatası:", err);
-        this.showToast("Excel dosyası okunamadı. Lütfen geçerli bir .xlsx veya .xls dosyası seçin.", "error");
-      } finally {
-        e.target.value = ''; // Reset input for re-selection
+        console.error("Excel parse error:", err);
+        this.showToast("Excel dosyası okunurken hata oluştu: " + err.message, "error");
       }
     };
     reader.readAsArrayBuffer(file);
+  },
+
+  async confirmExcelImport() {
+    const items = this.state.parsedExcelData;
+    if (!items || items.length === 0) {
+      this.showToast("İçe aktarılacak veri bulunamadı.", "warning");
+      return;
+    }
+
+    const confirmBtn = document.getElementById('btn-confirm-excel-import');
+    const statusEl = document.getElementById('excel-import-status');
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span>⌛</span> Veritabanına Yazılıyor...';
+    }
+    if (statusEl) statusEl.innerText = 'Veriler veritabanına aktarılıyor, lütfen bekleyiniz...';
+
+    try {
+      const res = await fetch('/api/demands/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+      });
+      const data = await res.json();
+      if (data.success) {
+        this.showToast(`🎉 ${data.count} adet talep veritabanına başarıyla yüklendi!`, 'success', '✅');
+        this.logAction('Toplu Excel İçe Aktarma', `${data.count} adet talep yüklendi.`);
+        this.closeModal('modal-excel-import');
+        await this.fetchInitialData();
+        this.render();
+      } else {
+        this.showToast(`İçe aktarma hatası: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast("Toplu yükleme sırasında hata oluştu.", "error");
+    } finally {
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<span>🚀</span> Verileri Sisteme Aktar';
+      }
+    }
+  },
+
+  // ----------------------------------------------------
+  // ⭐ VENDOR RATING CLIENT ENGINE
+  // ----------------------------------------------------
+  getVendorScore(supplierName) {
+    if (!supplierName) return null;
+    const clean = supplierName.trim().toLowerCase();
+    const ratings = (this.state.vendorRatings || []).filter(r => r.supplierName && r.supplierName.trim().toLowerCase() === clean);
+    if (ratings.length === 0) return null;
+    const avgOverall = ratings.reduce((sum, r) => sum + (parseFloat(r.overallScore) || 0), 0) / ratings.length;
+    const avgSpeed = ratings.reduce((sum, r) => sum + (parseFloat(r.speedScore) || 0), 0) / ratings.length;
+    const avgQuality = ratings.reduce((sum, r) => sum + (parseFloat(r.qualityScore) || 0), 0) / ratings.length;
+    const avgCompliance = ratings.reduce((sum, r) => sum + (parseFloat(r.complianceScore) || 0), 0) / ratings.length;
+    const avgCommunication = ratings.reduce((sum, r) => sum + (parseFloat(r.communicationScore) || 0), 0) / ratings.length;
+    return {
+      count: ratings.length,
+      overall: avgOverall.toFixed(1),
+      speed: avgSpeed.toFixed(1),
+      quality: avgQuality.toFixed(1),
+      compliance: avgCompliance.toFixed(1),
+      communication: avgCommunication.toFixed(1),
+      reviews: ratings
+    };
+  },
+
+  openVendorRateModal(supplierName) {
+    if (!supplierName) return;
+    document.getElementById('vr-supplier-name').value = supplierName;
+    document.getElementById('vr-supplier-title').innerText = `🏢 ${supplierName}`;
+    document.getElementById('vr-review-notes').value = '';
+
+    const scoreData = this.getVendorScore(supplierName);
+    const statsEl = document.getElementById('vr-supplier-stats');
+    const overallEl = document.getElementById('vr-overall-display');
+    const historySection = document.getElementById('vr-history-section');
+    const historyList = document.getElementById('vr-history-list');
+
+    if (scoreData) {
+      if (statsEl) statsEl.innerText = `${scoreData.count} adet değerlendirme yapıldı. (Hız: ${scoreData.speed} | Kalite: ${scoreData.quality} | Evrak: ${scoreData.compliance} | İletişim: ${scoreData.communication})`;
+      if (overallEl) overallEl.innerText = `${scoreData.overall} ⭐`;
+      if (historySection && historyList) {
+        historySection.style.display = 'block';
+        historyList.innerHTML = scoreData.reviews.map(r => `
+          <div style="background:var(--bg-card); border:1px solid var(--border-color); padding:0.5rem 0.75rem; border-radius:var(--radius-sm); font-size:0.8rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>👤 ${r.ratedBy || 'Yetkili'}</strong>
+              <span style="color:#f59e0b; font-weight:700;">${r.overallScore} ⭐</span>
+            </div>
+            ${r.reviewNotes ? `<div style="margin-top:0.25rem; color:var(--text-muted); font-size:0.76rem;">"${r.reviewNotes}"</div>` : ''}
+            <div style="font-size:0.7rem; color:var(--text-muted); text-align:right; margin-top:0.2rem;">${r.ratedAt || ''}</div>
+          </div>
+        `).join('');
+      }
+    } else {
+      if (statsEl) statsEl.innerText = 'Henüz bu tedarikçi için kayıtlı bir değerlendirme bulunmuyor.';
+      if (overallEl) overallEl.innerText = '5.0 ⭐';
+      if (historySection) historySection.style.display = 'none';
+    }
+
+    this.setupStarPickers();
+    this.openModal('modal-vendor-rate');
+  },
+
+  setupStarPickers() {
+    const pickers = document.querySelectorAll('.star-rating-picker');
+    pickers.forEach(picker => {
+      const stars = picker.querySelectorAll('.star');
+      const scoreText = picker.querySelector('.score-text');
+      let currentVal = parseInt(picker.getAttribute('data-score') || '5', 10);
+
+      const updateStars = (val) => {
+        stars.forEach(s => {
+          const sVal = parseInt(s.getAttribute('data-val'), 10);
+          if (sVal <= val) {
+            s.classList.add('selected');
+          } else {
+            s.classList.remove('selected');
+          }
+        });
+        if (scoreText) scoreText.innerText = `${val}.0`;
+      };
+
+      stars.forEach(s => {
+        s.onmouseenter = () => {
+          const sVal = parseInt(s.getAttribute('data-val'), 10);
+          stars.forEach(st => {
+            if (parseInt(st.getAttribute('data-val'), 10) <= sVal) st.classList.add('hovered');
+            else st.classList.remove('hovered');
+          });
+        };
+        s.onmouseleave = () => {
+          stars.forEach(st => st.classList.remove('hovered'));
+        };
+        s.onclick = () => {
+          currentVal = parseInt(s.getAttribute('data-val'), 10);
+          picker.setAttribute('data-score', currentVal);
+          updateStars(currentVal);
+          this.recalcOverallScoreModal();
+        };
+      });
+
+      updateStars(currentVal);
+    });
+  },
+
+  recalcOverallScoreModal() {
+    const pickers = document.querySelectorAll('.star-rating-picker');
+    let sum = 0;
+    pickers.forEach(p => {
+      sum += parseInt(p.getAttribute('data-score') || '5', 10);
+    });
+    const avg = pickers.length > 0 ? (sum / pickers.length).toFixed(1) : '5.0';
+    const overallEl = document.getElementById('vr-overall-display');
+    if (overallEl) overallEl.innerText = `${avg} ⭐`;
+  },
+
+  async saveVendorRating(e) {
+    if (e) e.preventDefault();
+    const supplierName = document.getElementById('vr-supplier-name')?.value;
+    if (!supplierName) return;
+
+    const speedScore = parseInt(document.querySelector('[data-criterion="speed"]')?.getAttribute('data-score') || '5', 10);
+    const qualityScore = parseInt(document.querySelector('[data-criterion="quality"]')?.getAttribute('data-score') || '5', 10);
+    const complianceScore = parseInt(document.querySelector('[data-criterion="compliance"]')?.getAttribute('data-score') || '5', 10);
+    const communicationScore = parseInt(document.querySelector('[data-criterion="communication"]')?.getAttribute('data-score') || '5', 10);
+    const overallScore = parseFloat(((speedScore + qualityScore + complianceScore + communicationScore) / 4).toFixed(1));
+    const reviewNotes = document.getElementById('vr-review-notes')?.value.trim() || '';
+
+    const newRating = {
+      supplierName,
+      speedScore,
+      qualityScore,
+      complianceScore,
+      communicationScore,
+      overallScore,
+      reviewNotes,
+      ratedBy: this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi',
+      ratedAt: new Date().toLocaleDateString('tr-TR') + ' ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    try {
+      const res = await this.apiSync('vendor_ratings', 'POST', newRating);
+      if (res) {
+        if (!this.state.vendorRatings) this.state.vendorRatings = [];
+        this.state.vendorRatings.push(res);
+        this.showToast(`"${supplierName}" firması için değerlendirmeniz kaydedildi! (${overallScore} ⭐)`, 'success', '⭐');
+        this.logAction('Tedarikçi Puanlandı', `Firma: ${supplierName}, Puan: ${overallScore} ⭐`);
+        this.closeModal('modal-vendor-rate');
+        this.renderSupplierAnalysis();
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast("Puanlama kaydedilemedi.", "error");
+    }
   },
 
   downloadExcelTemplate() {

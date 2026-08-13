@@ -536,8 +536,11 @@
           </select>
 
           <div class="export-btn-group">
+            <button class="btn-secondary" id="btn-open-excel-import" style="border-color: var(--accent-primary); color: var(--accent-primary); font-weight:700;">
+              <span>📥</span> Excel'den İçe Aktar
+            </button>
             <button class="btn-export-excel" id="btn-export-excel">
-              <span>📥</span> Excel
+              <span>📊</span> Excel İndir
             </button>
             <button class="btn-export-pdf" id="btn-export-requests-pdf">
               <span>🖨️</span> PDF / Yazdır
@@ -1422,10 +1425,12 @@
                 <tr>
                   <th>Sıra</th>
                   <th>Tedarikçi Adı</th>
+                  <th>⭐ Performans Karnesi</th>
                   <th>Talep Adedi</th>
                   <th>Toplam Harcama (TRY)</th>
-                  <th>Tamamlanan Talep</th>
+                  <th>Tamamlanan</th>
                   <th>Bütçe Payı %</th>
+                  <th style="text-align: center;">İşlem</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -2093,30 +2098,101 @@
             </div>
           </div>
 
+          <!-- 📧 SMTP E-Posta Bildirim Ayarları Card -->
           <div class="glass-card">
             <div class="card-header">
-              <h3>⚙️ Veri Yönetimi & Otomatik Yedekleme</h3>
-              <button class="btn-primary" id="btn-trigger-backup-now" style="padding:0.4rem 0.8rem; font-size:0.88rem;">
-                <span>💾</span> Şimdi Manuel Yedek Al
+              <h3>📧 Kurumsal E-Posta (SMTP) Bildirimleri</h3>
+              <span id="smtp-status-badge" class="badge status-open" style="font-size: 0.75rem;">Pasif</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Talep atamaları, vade/SLA gecikmeleri ve kritik bildirimleri personele otomatik e-posta olarak göndermek için kurumsal SMTP sunucunuzu yapılandırın.
+            </p>
+            <form id="form-smtp-settings">
+              <div class="form-grid" style="grid-template-columns: 2fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div class="form-group">
+                  <label>SMTP Sunucu Adresi (Host)</label>
+                  <input type="text" id="smtp-host" placeholder="ör: smtp.office365.com veya mail.pirireis.edu.tr">
+                </div>
+                <div class="form-group">
+                  <label>Port</label>
+                  <input type="number" id="smtp-port" placeholder="587" value="587">
+                </div>
+              </div>
+
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div class="form-group">
+                  <label>Kullanıcı Adı / E-Posta</label>
+                  <input type="email" id="smtp-user" placeholder="satinalma@pirireis.edu.tr">
+                </div>
+                <div class="form-group">
+                  <label>E-Posta Şifresi / App Password</label>
+                  <input type="password" id="smtp-pass" placeholder="••••••••">
+                </div>
+              </div>
+
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div class="form-group">
+                  <label>Gönderici Başlığı (From Name)</label>
+                  <input type="text" id="smtp-from-name" placeholder="Piri Reis Üni. Satınalma">
+                </div>
+                <div class="form-group">
+                  <label>Gönderici E-Postası (From)</label>
+                  <input type="email" id="smtp-from-email" placeholder="satinalma@pirireis.edu.tr">
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--text-main);">
+                  <input type="checkbox" id="smtp-is-enabled" style="accent-color: var(--accent-primary);">
+                  E-Posta Bildirimlerini Aktif Et
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; color: var(--text-muted);">
+                  <input type="checkbox" id="smtp-secure" style="accent-color: var(--accent-primary);">
+                  SSL/TLS (Port 465)
+                </label>
+              </div>
+
+              <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <button type="submit" class="btn-primary" id="btn-save-smtp">
+                  <span>💾</span> SMTP Ayarlarını Kaydet
+                </button>
+                <button type="button" class="btn-secondary" id="btn-test-smtp" style="border-color: var(--accent-primary);">
+                  <span>✉️</span> Test E-Postası Gönder
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- 🗄️ Veri Yönetimi & Otomatik Yedekleme Card -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div>
+                <h3>🗄️ Veritabanı Yedekleme & Geri Yükleme</h3>
+                <p style="font-size: 0.78rem; color: var(--status-completed); font-weight: 600; margin: 0.2rem 0 0 0;">
+                  🟢 Günlük Otomatik Yedekleme Aktif (00:00)
+                </p>
+              </div>
+              <button class="btn-primary" id="btn-trigger-backup-now" style="padding:0.4rem 0.8rem; font-size:0.85rem;">
+                <span>💾</span> Şimdi Anlık Yedek Al
               </button>
             </div>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Sistem veritabanı (<code>PostgreSQL / satinalma_db</code>) ilişkisel olarak korumalı saklanır ve REST API üzerinden güvenli şekilde yönetilir.
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Sistem veritabanı (<code>PostgreSQL</code>) tabloları JSON anlık görüntü olarak yedeklenir. İstediğiniz an tek tıkla geri yükleyebilir veya bilgisayarınıza indirebilirsiniz.
             </p>
-            <div style="margin-bottom: 1.25rem;">
-              <h4 style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-main);">📂 Son Alınan Veritabanı Yedekleri</h4>
-              <div class="table-container" style="max-height: 180px; overflow-y: auto;">
+            <div style="margin-bottom: 1rem;">
+              <div class="table-container" style="max-height: 220px; overflow-y: auto;">
                 <table class="custom-table" id="table-backups-list">
                   <thead>
                     <tr>
-                      <th>Yedek Dosya Adı</th>
-                      <th>Oluşturulma Tarihi</th>
+                      <th>Yedek Dosyası</th>
+                      <th>Tarih</th>
                       <th>Boyut</th>
-                      <th style="text-align: center;">İndir</th>
+                      <th>Tür</th>
+                      <th style="text-align: center;">İşlemler</th>
                     </tr>
                   </thead>
                   <tbody id="tbody-backups-list">
-                    <tr><td colspan="4" style="text-align:center;">Yedekler yükleniyor...</td></tr>
+                    <tr><td colspan="5" style="text-align:center;">Yedekler yükleniyor...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -2125,10 +2201,10 @@
             <input type="file" id="input-excel-file" accept=".xlsx, .xls" style="display: none;">
             <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
               <button class="btn-primary" id="btn-reimport-excel">
-                <span>📥</span> Bilgisayardan Excel Yükle
+                <span>📥</span> Excel'den İçe Aktar
               </button>
               <button class="btn-secondary" id="btn-download-excel-template">
-                <span>📄</span> Örnek Excel Şablonu İndir
+                <span>📄</span> Şablon İndir
               </button>
               <button class="btn-secondary" id="btn-update-system" style="margin-left: auto; border-color: var(--accent-primary);" title="Sunucudaki kodu son sürüme günceller">
                 <span>🚀</span> Canlı Sunucuyu Güncelle
@@ -3111,6 +3187,190 @@
         <button class="btn-secondary close-modal" id="btn-confirm-cancel" style="width: 50%;">Vazgeç</button>
         <button class="btn-primary" id="btn-confirm-ok" style="width: 50%; background: var(--status-rejected); border: none;">Evet, Devam Et</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 📥 MODAL: EXCEL'DEN TOPLU TALEP İÇE AKTARMA (EXCEL IMPORT) -->
+  <div id="modal-excel-import" class="modal-overlay">
+    <div class="modal-content" style="max-width: 840px;">
+      <div class="modal-header">
+        <div>
+          <h3>📥 Excel'den Toplu Talep İçe Aktarma</h3>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
+            .xlsx veya .xls formatındaki Excel dosyanızı yükleyin, önizleyin ve tek tıkla sisteme aktarın.
+          </p>
+        </div>
+        <button class="close-modal" id="btn-close-excel-modal">&times;</button>
+      </div>
+
+      <div style="margin-bottom: 1.25rem;">
+        <div id="excel-drop-zone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 2rem 1.5rem; text-align: center; background: rgba(30, 58, 138, 0.04); cursor: pointer; transition: all 0.2s ease;">
+          <div style="font-size: 2.8rem; margin-bottom: 0.5rem;">📊</div>
+          <h4 style="margin: 0 0 0.4rem 0; font-size: 1rem; color: var(--text-main);">Excel dosyanızı buraya sürükleyip bırakın</h4>
+          <p style="margin: 0 0 1rem 0; font-size: 0.82rem; color: var(--text-muted);">veya bilgisayarınızdan seçmek için tıklayın (.xlsx, .xls)</p>
+          <input type="file" id="input-modal-excel-file" accept=".xlsx, .xls" style="display: none;">
+          <div style="display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap;">
+            <button type="button" class="btn-primary" id="btn-browse-excel-file" style="padding: 0.45rem 1rem; font-size: 0.85rem;">
+              <span>📂</span> Dosya Seç
+            </button>
+            <button type="button" class="btn-secondary" id="btn-modal-download-template" style="padding: 0.45rem 1rem; font-size: 0.85rem;">
+              <span>📄</span> Örnek Excel Şablonu İndir
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview Section (Initially hidden until file selected) -->
+      <div id="excel-preview-wrapper" style="display: none; margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+          <div>
+            <h4 style="margin: 0; font-size: 0.9rem; color: var(--text-main);">📋 Yüklenecek Kayıtlar Önizleme (İlk 10 Satır)</h4>
+            <p id="excel-file-stats" style="margin: 0.2rem 0 0 0; font-size: 0.78rem; color: var(--text-muted);"></p>
+          </div>
+          <span id="excel-record-count-badge" class="badge status-completed" style="font-size: 0.8rem;">0 Kayıt Hazır</span>
+        </div>
+        <div class="table-container" style="max-height: 240px; overflow-y: auto;">
+          <table class="custom-table" id="table-excel-preview" style="font-size: 0.8rem;">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Barkod</th>
+                <th>Talep Konusu</th>
+                <th>Birim</th>
+                <th>Personel</th>
+                <th>Tutar</th>
+                <th>Tedarikçi</th>
+                <th>Durum</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-excel-preview"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="form-actions" style="margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <div id="excel-import-status" style="font-size: 0.85rem; font-weight: 600; color: var(--accent-primary);"></div>
+        <div style="display: flex; gap: 0.6rem;">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="button" class="btn-primary" id="btn-confirm-excel-import" disabled style="padding: 0.5rem 1.25rem;">
+            <span>🚀</span> Verileri Sisteme Aktar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⭐ MODAL: TEDARİKÇİ DEĞERLENDİRME & PERFORMANS PUANLAMA -->
+  <div id="modal-vendor-rate" class="modal-overlay">
+    <div class="modal-content" style="max-width: 620px;">
+      <div class="modal-header">
+        <div>
+          <h3>⭐ Tedarikçi Performans Değerlendirmesi</h3>
+          <p id="vendor-rate-modal-sub" style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
+            Tedarikçi firma için kalite, hız, evrak ve iletişim kriterlerini puanlayın.
+          </p>
+        </div>
+        <button class="close-modal" id="btn-close-vendor-rate-modal">&times;</button>
+      </div>
+
+      <form id="form-vendor-rating">
+        <input type="hidden" id="vr-supplier-name">
+
+        <!-- Score Summary Header Banner -->
+        <div style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.12), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h4 id="vr-supplier-title" style="margin: 0; font-size: 1.05rem; color: var(--text-main);">Firma Adı</h4>
+            <p id="vr-supplier-stats" style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);"></p>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 1.6rem; font-weight: 800; color: #f59e0b;" id="vr-overall-display">5.0 ⭐</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">GENEL ORTALAMA</div>
+          </div>
+        </div>
+
+        <!-- 4 Interactive Star Criteria -->
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem;">
+          <!-- Kriter 1: Hız -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+            <div>
+              <div style="font-weight: 700; font-size: 0.88rem; color: var(--text-main);">🚚 Teslimat Hızı & Süreç Uyumu</div>
+              <div style="font-size: 0.76rem; color: var(--text-muted);">Siparişin zamanında, aksamadan teslim edilmesi</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="speed" data-score="5">
+              <span class="star" data-val="1">★</span>
+              <span class="star" data-val="2">★</span>
+              <span class="star" data-val="3">★</span>
+              <span class="star" data-val="4">★</span>
+              <span class="star selected" data-val="5">★</span>
+              <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+            </div>
+          </div>
+
+          <!-- Kriter 2: Kalite -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+            <div>
+              <div style="font-weight: 700; font-size: 0.88rem; color: var(--text-main);">📦 Mal / Hizmet Kalitesi</div>
+              <div style="font-size: 0.76rem; color: var(--text-muted);">Şartname ve numune standartlarına birebir uygunluk</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="quality" data-score="5">
+              <span class="star" data-val="1">★</span>
+              <span class="star" data-val="2">★</span>
+              <span class="star" data-val="3">★</span>
+              <span class="star" data-val="4">★</span>
+              <span class="star selected" data-val="5">★</span>
+              <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+            </div>
+          </div>
+
+          <!-- Kriter 3: Evrak -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+            <div>
+              <div style="font-weight: 700; font-size: 0.88rem; color: var(--text-main);">🧾 Fatura & Evrak Doğruluğu</div>
+              <div style="font-size: 0.76rem; color: var(--text-muted);">İrsaliye, fatura, garanti belgesi ve resmi evrak intizamı</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="compliance" data-score="5">
+              <span class="star" data-val="1">★</span>
+              <span class="star" data-val="2">★</span>
+              <span class="star" data-val="3">★</span>
+              <span class="star" data-val="4">★</span>
+              <span class="star selected" data-val="5">★</span>
+              <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+            </div>
+          </div>
+
+          <!-- Kriter 4: İletişim -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+            <div>
+              <div style="font-weight: 700; font-size: 0.88rem; color: var(--text-main);">💬 İletişim & Satış Sonrası Destek</div>
+              <div style="font-size: 0.76rem; color: var(--text-muted);">Ulaşılabilirlik, çözüm odaklılık ve garanti desteği</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="communication" data-score="5">
+              <span class="star" data-val="1">★</span>
+              <span class="star" data-val="2">★</span>
+              <span class="star" data-val="3">★</span>
+              <span class="star" data-val="4">★</span>
+              <span class="star selected" data-val="5">★</span>
+              <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label>Değerlendirme Notu & Görüşler (Opsiyonel)</label>
+          <textarea id="vr-review-notes" rows="2" placeholder="Firma hakkında satınalma birimi içi tecrübeler, olumlu veya dikkat edilmesi gereken noktalar..."></textarea>
+        </div>
+
+        <!-- Past Reviews History in Modal -->
+        <div id="vr-history-section" style="margin-bottom: 1.25rem; display: none;">
+          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--text-main);">📜 Önceki Değerlendirmeler</h4>
+          <div id="vr-history-list" style="max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;"></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary">💾 Puanlamayı Kaydet</button>
+        </div>
+      </form>
     </div>
   </div>
 
