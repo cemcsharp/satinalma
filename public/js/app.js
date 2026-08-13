@@ -2473,15 +2473,15 @@ const App = {
     if (r.status === 'Tamamlandı') {
       let ratingBadge = '';
       if (r.supplier) {
+        // Her sipariş/talep SADECE KENDİSİNE AİT requestId ile 1-e-1 eşleştirilir
         const rating = (this.state.vendorRatings || []).find(v => 
-          (v.requestId && String(v.requestId) === String(r.id)) ||
-          (v.supplierName && v.supplierName.trim().toLowerCase() === r.supplier.trim().toLowerCase() && v.ratedBy && r.unit && v.ratedBy.toLowerCase().includes(r.unit.toLowerCase()))
+          v.requestId && (String(v.requestId) === String(r.id) || (r.requestBarcode && String(v.requestId) === String(r.requestBarcode)))
         );
 
         if (rating) {
           ratingBadge = `
             <div style="margin-top:0.25rem;">
-              <span class="score-badge-gold" style="font-size:0.68rem; padding:0.1rem 0.4rem; cursor:pointer;" onclick="App.openVendorProfile('${r.supplier.replace(/'/g, "\\'")}')" title="${rating.ratedBy} tarafından puanlandı (${rating.ratedAt})">
+              <span class="score-badge-gold" style="font-size:0.68rem; padding:0.1rem 0.4rem; cursor:pointer;" onclick="App.openVendorProfile('${r.supplier.replace(/'/g, "\\'")}')" title="${rating.ratedBy} tarafından bu talep için puanlandı (${rating.ratedAt})">
                 ⭐ ${rating.overallScore} (Puanlandı)
               </span>
             </div>
@@ -2489,7 +2489,7 @@ const App = {
         } else {
           ratingBadge = `
             <div style="margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem;">
-              <span class="badge" style="background:rgba(245,158,11,0.12); color:#d97706; border:1px solid rgba(245,158,11,0.35); font-size:0.68rem; padding:0.1rem 0.35rem;" title="Birimden tedarikçi değerlendirmesi bekleniyor">
+              <span class="badge" style="background:rgba(245,158,11,0.12); color:#d97706; border:1px solid rgba(245,158,11,0.35); font-size:0.68rem; padding:0.1rem 0.35rem;" title="Bu sipariş için birimden henüz puanlama yapılmadı">
                 ⏳ Puan Bekliyor
               </span>
               <button class="btn-icon" style="font-size:0.75rem; padding:0.1rem 0.3rem; border:1px solid rgba(245,158,11,0.4); background:rgba(245,158,11,0.08);" onclick="App.sendRatingReminder('${r.id}')" title="Birime Hatırlatma E-Postası Gönder">🔔</button>
@@ -7085,9 +7085,9 @@ const App = {
       } else {
         if (historyCountEl) historyCountEl.innerText = `${vendorRequests.length} adet işlem kaydı`;
         tbodyHistory.innerHTML = vendorRequests.map(r => {
-          // Find if there is a rating for this request or unit
+          // Find if there is a rating for this specific request
           const matchingRating = (scoreData?.reviews || []).find(rv => 
-            (rv.ratedBy && r.unit && rv.ratedBy.toLowerCase().includes(r.unit.toLowerCase()))
+            rv.requestId && (String(rv.requestId) === String(r.id) || (r.requestBarcode && String(rv.requestId) === String(r.requestBarcode)))
           );
 
           const isHizmet = (r.purchaseType || 'MAL') === 'HIZMET';
