@@ -239,26 +239,36 @@
       transform: scale(0.99);
     }
 
-    /* Success State */
-    .success-container {
+    /* Success & Already Rated Screen */
+    .status-screen {
       display: none;
       text-align: center;
-      padding: 3rem 1.5rem;
+      padding: 2.5rem 1.5rem;
     }
-    .success-icon {
+    .status-icon {
       font-size: 3.5rem;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
     }
-    .success-container h2 {
+    .status-screen h2 {
       font-size: 1.35rem;
-      color: var(--success);
       margin-bottom: 0.5rem;
       font-weight: 800;
     }
-    .success-container p {
+    .status-screen p {
       font-size: 0.9rem;
       color: var(--text-muted);
       line-height: 1.5;
+    }
+
+    .info-locked-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem auto;
+      max-width: 480px;
+      text-align: left;
+      font-size: 0.85rem;
     }
 
     .footer-note {
@@ -337,10 +347,50 @@
       </form>
     </div>
 
+    <!-- Already Rated / Locked Screen -->
+    <div class="status-screen" id="already-rated-section">
+      <div class="status-icon">🔒</div>
+      <h2 style="color: var(--primary);">Bu Alım İçin Değerlendirme Daha Önce Yapılmıştır</h2>
+      <p>
+        Bu talep için puanlama tek seferlik olarak sisteme kaydedilmiş olup mükerrer kayıt alınmamaktadır.
+      </p>
+
+      <div class="info-locked-box">
+        <div class="demand-info-row">
+          <span class="demand-info-label">Talep No:</span>
+          <span class="demand-info-val" id="ar-barcode">-</span>
+        </div>
+        <div class="demand-info-row">
+          <span class="demand-info-label">Tedarikçi:</span>
+          <span class="demand-info-val" id="ar-supplier">-</span>
+        </div>
+        <div class="demand-info-row">
+          <span class="demand-info-label">Değerlendiren:</span>
+          <span class="demand-info-val" id="ar-rated-by">-</span>
+        </div>
+        <div class="demand-info-row">
+          <span class="demand-info-label">İşlem Tarihi:</span>
+          <span class="demand-info-val" id="ar-rated-at">-</span>
+        </div>
+        <div class="demand-info-row" style="border-top: 1px dashed #cbd5e1; padding-top: 0.4rem; margin-top: 0.4rem;">
+          <span class="demand-info-label">Verilen Karne Puanı:</span>
+          <span class="demand-info-val" style="color: #f59e0b; font-size: 1.1rem;" id="ar-overall-score">5.0 ⭐</span>
+        </div>
+        <div class="demand-info-row" id="ar-notes-row" style="margin-top: 0.4rem;">
+          <span class="demand-info-label">Not:</span>
+          <span class="demand-info-val" style="font-style: italic; color: #475569;" id="ar-notes">-</span>
+        </div>
+      </div>
+
+      <p style="font-size: 0.82rem; color: #10b981; font-weight: 600;">
+        ✅ Değerlendirmeniz üniversitemiz satınalma kalite sisteminde aktif olarak kayıtlıdır.
+      </p>
+    </div>
+
     <!-- Success Screen -->
-    <div class="success-container" id="success-section">
-      <div class="success-icon">🎉</div>
-      <h2>Değerlendirmeniz Başarıyla Alındı!</h2>
+    <div class="status-screen" id="success-section">
+      <div class="status-icon">🎉</div>
+      <h2 style="color: var(--success);">Değerlendirmeniz Başarıyla Alındı!</h2>
       <p id="success-desc">
         Tedarikçi performans değerlendirmeniz kaydedildi ve üniversitemiz satınalma kalite sistemine işlendi.<br><br>
         Süreçlerimize katkınız ve değerli geri bildiriminiz için teşekkür ederiz.
@@ -377,6 +427,40 @@
       document.getElementById('type-badge-text').innerText = '📦 Alım Türü: Mal / Ürün Alımı';
       document.getElementById('type-badge-pill').innerText = 'Mal Alımı';
       document.getElementById('type-title-text').innerText = 'Mal Alımı Puanınız';
+    }
+
+    // Check if this demand is already rated (Single evaluation lock)
+    async function checkAlreadyRated() {
+      if (!reqId) return;
+      try {
+        const res = await fetch('/api/vendor_ratings/check?reqId=' + encodeURIComponent(reqId));
+        if (res.ok) {
+          const data = await res.json();
+          if (data.alreadyRated && data.rating) {
+            showAlreadyRatedScreen(data.rating);
+          }
+        }
+      } catch (e) {
+        console.error('Check already rated error:', e);
+      }
+    }
+
+    function showAlreadyRatedScreen(rating) {
+      document.getElementById('rating-form-section').style.display = 'none';
+      document.getElementById('success-section').style.display = 'none';
+      const sec = document.getElementById('already-rated-section');
+      sec.style.display = 'block';
+
+      document.getElementById('ar-barcode').innerText = barcode ? ('#' + barcode) : ('#' + reqId);
+      document.getElementById('ar-supplier').innerText = supplier || rating.supplierName || '-';
+      document.getElementById('ar-rated-by').innerText = rating.ratedBy || '-';
+      document.getElementById('ar-rated-at').innerText = rating.ratedAt || '-';
+      document.getElementById('ar-overall-score').innerText = (rating.overallScore || '5.0') + ' ⭐';
+      if (rating.reviewNotes) {
+        document.getElementById('ar-notes').innerText = '"' + rating.reviewNotes + '"';
+      } else {
+        document.getElementById('ar-notes-row').style.display = 'none';
+      }
     }
 
     function renderCriteria(type) {
@@ -536,6 +620,7 @@
       const overallScore = parseFloat(((qualityScore + speedScore + assemblyScore + complianceScore) / 4).toFixed(1));
 
       const payload = {
+        requestId: reqId ? parseInt(reqId, 10) : null,
         supplierName: supplier,
         purchaseType: currentType,
         qualityScore,
@@ -562,6 +647,9 @@
         if (res.ok) {
           document.getElementById('rating-form-section').style.display = 'none';
           document.getElementById('success-section').style.display = 'block';
+        } else if (res.status === 409) {
+          const resData = await res.json();
+          showAlreadyRatedScreen(resData.rating || payload);
         } else {
           alert('Değerlendirme kaydedilirken bir hata oluştu.');
           btn.disabled = false;
@@ -575,8 +663,9 @@
       }
     }
 
-    // Initialize with locked type
+    // Initialize with locked type and check if already rated
     renderCriteria(currentType);
+    checkAlreadyRated();
   </script>
 </body>
 </html>

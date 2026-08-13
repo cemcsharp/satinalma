@@ -2471,7 +2471,33 @@ const App = {
 
   getStatusBadge(r) {
     if (r.status === 'Tamamlandı') {
-      return `<span class="badge status-completed">✅ Tamamlandı</span>`;
+      let ratingBadge = '';
+      if (r.supplier) {
+        const rating = (this.state.vendorRatings || []).find(v => 
+          (v.requestId && String(v.requestId) === String(r.id)) ||
+          (v.supplierName && v.supplierName.trim().toLowerCase() === r.supplier.trim().toLowerCase() && v.ratedBy && r.unit && v.ratedBy.toLowerCase().includes(r.unit.toLowerCase()))
+        );
+
+        if (rating) {
+          ratingBadge = `
+            <div style="margin-top:0.25rem;">
+              <span class="score-badge-gold" style="font-size:0.68rem; padding:0.1rem 0.4rem; cursor:pointer;" onclick="App.openVendorProfile('${r.supplier.replace(/'/g, "\\'")}')" title="${rating.ratedBy} tarafından puanlandı (${rating.ratedAt})">
+                ⭐ ${rating.overallScore} (Puanlandı)
+              </span>
+            </div>
+          `;
+        } else {
+          ratingBadge = `
+            <div style="margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem;">
+              <span class="badge" style="background:rgba(245,158,11,0.12); color:#d97706; border:1px solid rgba(245,158,11,0.35); font-size:0.68rem; padding:0.1rem 0.35rem;" title="Birimden tedarikçi değerlendirmesi bekleniyor">
+                ⏳ Puan Bekliyor
+              </span>
+              <button class="btn-icon" style="font-size:0.75rem; padding:0.1rem 0.3rem; border:1px solid rgba(245,158,11,0.4); background:rgba(245,158,11,0.08);" onclick="App.sendRatingReminder('${r.id}')" title="Birime Hatırlatma E-Postası Gönder">🔔</button>
+            </div>
+          `;
+        }
+      }
+      return `<div><span class="badge status-completed">✅ Tamamlandı</span>${ratingBadge}</div>`;
     } else if (r.status === 'Reddedildi') {
       return `<span class="badge status-rejected">❌ Reddedildi</span>`;
     } else {
@@ -2484,6 +2510,26 @@ const App = {
       } else {
         return `<span class="badge status-open">🔵 Açık / Teklif Aşamasında</span>`;
       }
+    }
+  },
+
+  async sendRatingReminder(reqId) {
+    const req = (this.state.requests || []).find(r => String(r.id) === String(reqId));
+    if (!req) return;
+
+    this.showToast(`"${req.unit}" birimine puanlama hatırlatması gönderiliyor...`, 'info', '⏳');
+    try {
+      const res = await fetch(`/api/requests/${reqId}/remind-rating`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        this.showToast(`"${req.unit}" birimine puanlama hatırlatma e-postası başarıyla gönderildi!`, 'success', '🔔');
+        this.logAction('Puanlama Hatırlatması Gönderildi', `Talep #${req.requestBarcode || req.id} - ${req.unit}`);
+      } else {
+        this.showToast(data.error || 'Hatırlatma e-postası gönderilemedi.', 'error');
+      }
+    } catch (e) {
+      console.error('sendRatingReminder error:', e);
+      this.showToast('Sunucu hatası: ' + e.message, 'error');
     }
   },
 

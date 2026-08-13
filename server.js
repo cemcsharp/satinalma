@@ -359,6 +359,104 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
   }
 }
 
+async function sendRatingReminderEmail(demand) {
+  const cfg = await getSmtpConfig();
+  if (!cfg.isEnabled || !cfg.host) {
+    throw new Error('SMTP e-posta servisi aktif değil veya yapılandırılmamış.');
+  }
+
+  if (!demand || !demand.unit) {
+    throw new Error('Talep veya birim bilgisi eksik.');
+  }
+
+  const unitRes = await pool.query('SELECT email FROM units WHERE name = $1 LIMIT 1', [demand.unit]).catch(() => null);
+  const unitEmail = unitRes?.rows[0]?.email;
+  if (!unitEmail) {
+    throw new Error(`"${demand.unit}" birimine ait kayıtlı bir e-posta adresi bulunamadı.`);
+  }
+
+  const barcode = demand.requestBarcode || demand.id;
+  const pType = demand.purchaseType || 'MAL';
+  const typeLabel = pType === 'HIZMET' ? 'Hizmet' : 'Mal / Ürün';
+  const rateUrl = `http://localhost:3000/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
+
+  const dateStr = new Date().toLocaleDateString('tr-TR');
+  const subject = `🔔 Hatırlatma: ${demand.unit} — Tedarikçi Değerlendirmesi (#${barcode})`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+      <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 24px; color: #ffffff; text-align: left; border-bottom: 3px solid #f59e0b;">
+        <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; margin-bottom: 4px;">PİRİ REİS ÜNİVERSİTESİ</div>
+        <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em;">Satınalma Müdürlüğü — Kalite & Tedarikçi Yönetimi</div>
+      </div>
+      
+      <div style="padding: 24px 24px 16px 24px; color: #1e293b;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+          <h2 style="margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 700;">🔔 Tedarikçi Değerlendirme Hatırlatması</h2>
+          <span style="background: #f59e0b; color: #ffffff; padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; display: inline-block;">Geri Bildirim Bekleniyor</span>
+        </div>
+
+        <p style="font-size: 0.92rem; line-height: 1.6; color: #334155; margin-top: 0;">
+          Sayın <strong>${demand.unit}</strong> Yetkilisi,<br><br>
+          Satınalma süreci tamamlanan ve teslimatı gerçekleştirilen <strong>#${barcode}</strong> nolu alımınız için memnuniyet değerlendirmeniz henüz tarafımıza ulaşmamıştır.
+        </p>
+
+        <table style="width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.86rem; background: #f8fafc; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+          <tbody>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px 14px; font-weight: 600; color: #64748b; width: 36%;">Talep Barkod / No:</td>
+              <td style="padding: 10px 14px; font-weight: 700; color: #1e3a8a; font-family: monospace; font-size: 0.95rem;">#${barcode}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Talep Konusu:</td>
+              <td style="padding: 10px 14px; font-weight: 600; color: #0f172a;">${demand.subject || '-'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Tedarikçi Firma:</td>
+              <td style="padding: 10px 14px; font-weight: 700; color: #1e3a8a;">${demand.supplier || 'Belirtilmedi'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Alım Türü:</td>
+              <td style="padding: 10px 14px; color: #0f172a;">${typeLabel} Alımı</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top: 18px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1px solid #fde68a; border-radius: 8px; padding: 16px; text-align: center;">
+          <div style="font-size: 0.95rem; font-weight: 700; color: #b45309; margin-bottom: 4px;">
+            ⭐ 1 Dakikanızı Ayırarak Tedarikçiyi Puanlayın
+          </div>
+          <p style="font-size: 0.82rem; color: #92400e; margin: 0 0 12px 0; line-height: 1.45;">
+            Üniversitemizin tedarikçi kalite güvencesi ve sonraki alımlarda doğru firmaların seçilebilmesi için değerli görüşleriniz büyük önem taşımaktadır.
+          </p>
+          <a href="${rateUrl}" target="_blank" style="display: inline-block; background: #d97706; color: #ffffff; text-decoration: none; padding: 9px 22px; border-radius: 6px; font-weight: 700; font-size: 0.88rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            ⭐ Tedarikçiyi Şimdi Puanla (1 Tıkla)
+          </a>
+        </div>
+
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 0.78rem; color: #64748b; line-height: 1.5;">
+          💡 <em>Bu hatırlatma e-postası Piri Reis Üniversitesi Satınalma Takip Sistemi tarafından gönderilmiştir.</em>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const transporter = createSmtpTransporter(cfg);
+  await transporter.sendMail({
+    from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
+    to: unitEmail,
+    subject: subject,
+    html: html
+  });
+
+  await pool.query(
+    'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+    [dateStr, 'Sistem (E-Posta Servisi)', 'Puanlama Hatırlatma E-Postası', `Talep #${barcode} için "${demand.unit}" birimine (${unitEmail}) puanlama hatırlatma e-postası gönderildi.`]
+  ).catch(() => {});
+
+  console.log(`🔔 Puanlama Hatırlatma E-Postası Gönderildi -> ${demand.unit} (${unitEmail}) [#${barcode}]`);
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const urlPath = url.pathname;
@@ -951,6 +1049,49 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // Check if a request has already been rated
+    if (urlPath === '/api/vendor_ratings/check' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const reqId = url.searchParams.get('reqId');
+      if (!reqId) {
+        res.writeHead(200);
+        res.end(JSON.stringify({ alreadyRated: false }));
+        return;
+      }
+      const checkRes = await pool.query('SELECT * FROM vendor_ratings WHERE "requestId" = $1 ORDER BY id DESC LIMIT 1', [parseInt(reqId, 10)]).catch(() => null);
+      if (checkRes && checkRes.rows.length > 0) {
+        res.writeHead(200);
+        res.end(JSON.stringify({ alreadyRated: true, rating: checkRes.rows[0] }));
+      } else {
+        res.writeHead(200);
+        res.end(JSON.stringify({ alreadyRated: false }));
+      }
+      return;
+    }
+
+    // Remind unit to rate vendor
+    if (parts[0] === 'api' && (parts[1] === 'requests' || parts[1] === 'demands') && parts[2] && parts[3] === 'remind-rating' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const reqId = parseInt(parts[2], 10);
+      const reqRes = await pool.query('SELECT * FROM requests WHERE id = $1', [reqId]).catch(() => null);
+      const demand = reqRes?.rows[0];
+      if (!demand) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Talep bulunamadı.' }));
+        return;
+      }
+      try {
+        await sendRatingReminderEmail(demand);
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true, message: `"${demand.unit}" birimine puanlama hatırlatma e-postası başarıyla gönderildi!` }));
+      } catch (err) {
+        console.error('Hatırlatma e-posta hatası:', err.message);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+
     if (parts[0] === 'api' && parts.length >= 2 && urlPath !== '/api/data') {
       const table = parts[1];
       const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations', 'tenders', 'documents', 'vendor_ratings', 'settings'];
@@ -965,6 +1106,20 @@ const server = http.createServer(async (req, res) => {
           const data = JSON.parse(body);
           
           delete data.id;
+
+          // If rating a vendor for a specific request, ensure single evaluation lock
+          if (table === 'vendor_ratings' && data.requestId) {
+            const existingCheck = await pool.query('SELECT * FROM vendor_ratings WHERE "requestId" = $1 LIMIT 1', [parseInt(data.requestId, 10)]).catch(() => null);
+            if (existingCheck && existingCheck.rows.length > 0) {
+              res.writeHead(409);
+              res.end(JSON.stringify({
+                error: 'Bu talep için zaten bir değerlendirme yapılmıştır.',
+                alreadyRated: true,
+                rating: existingCheck.rows[0]
+              }));
+              return;
+            }
+          }
 
           const keys = Object.keys(data);
           const cols = keys.map(k => `"${k}"`).join(', ');
@@ -1256,6 +1411,7 @@ async function initDatabaseSchema() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE units ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE vendor_ratings ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
+      ALTER TABLE vendor_ratings ADD COLUMN IF NOT EXISTS "requestId" INTEGER;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
     `);
 
