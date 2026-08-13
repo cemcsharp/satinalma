@@ -6742,15 +6742,23 @@ const App = {
         historySection.style.display = 'block';
         historyList.innerHTML = scoreData.reviews.map(r => {
           const isService = (r.purchaseType || 'MAL') === 'HIZMET';
+          const isUnit = (r.ratedBy || '').includes('[Birim Değerlendirmesi]');
+          const cleanName = (r.ratedBy || 'Yetkili').replace('[Birim Değerlendirmesi]', '').trim();
+          
           const typeBadge = isService
             ? `<span class="badge" style="background:rgba(16,185,129,0.15); color:#059669; font-size:0.68rem; padding:0.1rem 0.4rem; border:1px solid rgba(16,185,129,0.3);">🛠️ Hizmet</span>`
             : `<span class="badge" style="background:rgba(59,130,246,0.15); color:#2563eb; font-size:0.68rem; padding:0.1rem 0.4rem; border:1px solid rgba(59,130,246,0.3);">📦 Mal</span>`;
 
+          const reviewerBadge = isUnit
+            ? `<span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-size:0.68rem; padding:0.1rem 0.4rem; border:1px solid rgba(245,158,11,0.3);">🏛️ Birim</span>`
+            : `<span class="badge" style="background:rgba(100,116,139,0.15); color:#475569; font-size:0.68rem; padding:0.1rem 0.4rem; border:1px solid rgba(100,116,139,0.3);">👤 Satınalma</span>`;
+
           return `
             <div style="background:var(--bg-card); border:1px solid var(--border-color); padding:0.5rem 0.75rem; border-radius:var(--radius-sm); font-size:0.8rem;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <strong>👤 ${r.ratedBy || 'Yetkili'}</strong>
+                <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                  <strong>${isUnit ? '🏛️' : '👤'} ${cleanName}</strong>
+                  ${reviewerBadge}
                   ${typeBadge}
                 </div>
                 <span style="color:#f59e0b; font-weight:700;">${r.overallScore} ⭐</span>

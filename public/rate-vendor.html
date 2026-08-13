@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tedarikçi & Malzeme Değerlendirmesi — Piri Reis Üniversitesi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-dark: #0f172a;
+      --accent: #3b82f6;
+      --gold: #f59e0b;
+      --success: #10b981;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --radius: 12px;
+      --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 620px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      padding: 1.75rem 1.5rem;
+      color: #ffffff;
+      border-bottom: 3px solid var(--gold);
+    }
+    .header-banner .uni-tag {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.85;
+      margin-bottom: 0.25rem;
+      font-weight: 600;
+    }
+    .header-banner h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+
+    .content-body {
+      padding: 1.5rem;
+    }
+
+    /* Demand Info Card */
+    .demand-info-card {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.86rem;
+    }
+    .demand-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+    .demand-info-row:last-child { margin-bottom: 0; }
+    .demand-info-label { color: var(--text-muted); font-weight: 500; }
+    .demand-info-val { font-weight: 700; color: var(--text-main); text-align: right; }
+
+    /* Purchase Type Switcher */
+    .type-switcher {
+      display: flex;
+      gap: 0.5rem;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 8px;
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--border);
+    }
+    .btn-type {
+      flex: 1;
+      padding: 0.6rem 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+    .btn-type.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+
+    /* Star Criteria */
+    .criteria-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+    .criterion-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: border-color 0.2s ease;
+    }
+    .criterion-card:hover {
+      border-color: #cbd5e1;
+    }
+    .criterion-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .criterion-desc {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 0.15rem;
+    }
+
+    /* Star Picker */
+    .star-rating-picker {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      user-select: none;
+    }
+    .star {
+      font-size: 1.4rem;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: transform 0.12s ease, color 0.12s ease;
+    }
+    .star:hover {
+      transform: scale(1.2);
+    }
+    .star.selected, .star.hovered {
+      color: var(--gold);
+    }
+    .score-badge {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--gold);
+      width: 28px;
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Score Summary */
+    .score-summary-bar {
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.08), rgba(59, 130, 246, 0.05));
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 8px;
+      padding: 0.85rem 1.25rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .overall-text {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--gold);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Form Fields */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+    .form-group label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .form-group input,
+    .form-group textarea {
+      padding: 0.65rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.86rem;
+      font-family: inherit;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.1s ease;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .btn-submit:hover {
+      background: #1e40af;
+    }
+    .btn-submit:active {
+      transform: scale(0.99);
+    }
+
+    /* Success State */
+    .success-container {
+      display: none;
+      text-align: center;
+      padding: 3rem 1.5rem;
+    }
+    .success-icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+    }
+    .success-container h2 {
+      font-size: 1.35rem;
+      color: var(--success);
+      margin-bottom: 0.5rem;
+      font-weight: 800;
+    }
+    .success-container p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header-banner">
+      <div class="uni-tag">PİRİ REİS ÜNİVERSİTESİ — SATINALMA MÜDÜRLÜĞÜ</div>
+      <h1>⭐ Tedarikçi & Malzeme Memnuniyet Değerlendirmesi</h1>
+    </div>
+
+    <!-- Rating Form View -->
+    <div class="content-body" id="rating-form-section">
+      <!-- Demand Info Box -->
+      <div class="demand-info-card">
+        <div class="demand-info-row">
+          <span class="demand-info-label">Talep No / Barkod:</span>
+          <span class="demand-info-val" id="disp-barcode">-</span>
+        </div>
+        <div class="demand-info-row">
+          <span class="demand-info-label">Talep Konusu:</span>
+          <span class="demand-info-val" id="disp-subject">-</span>
+        </div>
+        <div class="demand-info-row">
+          <span class="demand-info-label">İlgili Birim:</span>
+          <span class="demand-info-val" id="disp-unit">-</span>
+        </div>
+        <div class="demand-info-row" style="border-top: 1px dashed #cbd5e1; padding-top: 0.4rem; margin-top: 0.4rem;">
+          <span class="demand-info-label">Tedarikçi Firma:</span>
+          <span class="demand-info-val" style="color: var(--primary); font-size: 0.95rem;" id="disp-supplier">-</span>
+        </div>
+      </div>
+
+      <!-- Purchase Type Switcher -->
+      <div class="type-switcher">
+        <button type="button" class="btn-type active" id="btn-type-mal" onclick="setType('MAL')">
+          📦 Mal Alımı (Ürün / Cihaz / Mobilya)
+        </button>
+        <button type="button" class="btn-type" id="btn-type-hizmet" onclick="setType('HIZMET')">
+          🛠️ Hizmet Alımı (Bakım / Temizlik / Yazılım)
+        </button>
+      </div>
+
+      <!-- Score Summary Banner -->
+      <div class="score-summary-bar">
+        <div>
+          <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main);" id="type-title-text">Mal Alımı Puanınız</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">4 Kriterin Aritmetik Ortalaması</div>
+        </div>
+        <div class="overall-text" id="disp-overall-score">5.0 ⭐</div>
+      </div>
+
+      <form id="form-unit-rate" onsubmit="submitRating(event)">
+        <!-- Criteria Container -->
+        <div class="criteria-group" id="criteria-container"></div>
+
+        <div class="form-group">
+          <label>Değerlendiren Kişi / Göreviniz <span style="color:#ef4444;">*</span></label>
+          <input type="text" id="reviewer-name" required placeholder="ör: Prof. Dr. Ahmet Yılmaz / Bölüm Başkanı">
+        </div>
+
+        <div class="form-group">
+          <label>Değerlendirme Notu & Görüşleriniz (Opsiyonel)</label>
+          <textarea id="review-notes" rows="3" placeholder="Gelen malzeme veya hizmetin kalitesi, kurulum, teslimat süreci hakkında varsa notlarınız..."></textarea>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btn-submit-rating">
+          <span>💾</span> Değerlendirmeyi Gönder
+        </button>
+      </form>
+    </div>
+
+    <!-- Success Screen -->
+    <div class="success-container" id="success-section">
+      <div class="success-icon">🎉</div>
+      <h2>Değerlendirmeniz Başarıyla Alındı!</h2>
+      <p id="success-desc">
+        Tedarikçi performans değerlendirmeniz kaydedildi ve üniversitemiz satınalma kalite sistemine işlendi.<br><br>
+        Süreçlerimize katkınız ve değerli geri bildiriminiz için teşekkür ederiz.
+      </p>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Piri Reis Üniversitesi Satınalma Takip Sistemi &copy; 2026
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const reqId = urlParams.get('reqId');
+    const barcode = urlParams.get('barcode') || '-';
+    const supplier = urlParams.get('supplier') || '';
+    const unit = urlParams.get('unit') || '';
+    const subject = urlParams.get('subject') || '';
+    let currentType = (urlParams.get('type') || 'MAL').toUpperCase();
+
+    document.getElementById('disp-barcode').innerText = barcode ? ('#' + barcode) : '-';
+    document.getElementById('disp-subject').innerText = subject || '-';
+    document.getElementById('disp-unit').innerText = unit || '-';
+    document.getElementById('disp-supplier').innerText = supplier || 'Belirtilmedi';
+
+    function setType(type) {
+      currentType = type;
+      document.getElementById('btn-type-mal').classList.toggle('active', type === 'MAL');
+      document.getElementById('btn-type-hizmet').classList.toggle('active', type === 'HIZMET');
+      document.getElementById('type-title-text').innerText = type === 'MAL' ? 'Mal Alımı Puanınız' : 'Hizmet Alımı Puanınız';
+      renderCriteria(type);
+      recalcScore();
+    }
+
+    function renderCriteria(type) {
+      const container = document.getElementById('criteria-container');
+      if (type === 'MAL') {
+        container.innerHTML = `
+          <div class="criterion-card">
+            <div>
+              <div class="criterion-title">📦 Ürün Kalitesi & Şartname Uyumu</div>
+              <div class="criterion-desc">Talep edilen marka, model, teknik özellik ve numuneye uygunluk</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="quality" data-score="5">
+              <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+              <span class="score-badge">5.0</span>
+            </div>
+          </div>
+
+          <div class="criterion-card">
+            <div>
+              <div class="criterion-title">🚚 Teslimat Hızı & Hasarsız Ambalaj</div>
+              <div class="criterion-desc">Siparişin zamanında, hasarsız ve sıfır ambalajında kapıya teslimi</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="speed" data-score="5">
+              <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+              <span class="score-badge">5.0</span>
+            </div>
+          </div>
+
+          <div class="criterion-card">
+            <div>
+              <div class="criterion-title">🔧 Montaj, Kurulum ve İşçilik</div>
+              <div class="criterion-desc">Eksiksiz montaj, temiz işçilik ve çalışır teslim</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="assembly" data-score="5">
+              <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+              <span class="score-badge">5.0</span>
+            </div>
+          </div>
+
+          <div class="criterion-card">
+            <div>
+              <div class="criterion-title">🧾 Garanti Belgesi, Kılavuz & Aksesuarlar</div>
+              <div class="criterion-desc">Garanti evrakları, kullanım kılavuzu ve aksesuarların intizamı</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="compliance" data-score="5">
+              <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+              <span class="score-badge">5.0</span>
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="criterion-card">
+            <div>
+              <div class="criterion-title">🛠️ Hizmet Kalitesi & Kapsam Uyumu</div>
+              <div class="criterion-desc">Yapılan bakım/hizmetin şartnameye ve ihtiyaca tam uygunluğu</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="quality" data-score="5">
+              <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+              <span class="score-badge">5.0</span>
+            </div>
+          </div>
+
+          <div class="criterion-card">
+            <div>
+              <div class="criterion-title">⏱️ Müdahale Hızı & Çözüm Üretme</div>
+              <div class="criterion-desc">Arıza ve taleplere hızlı reaksiyon gösterme ve çözüm süresi</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="speed" data-score="5">
+              <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+              <span class="score-badge">5.0</span>
+            </div>
+          </div>
+
+          <div class="criterion-card">
+            <div>
+              <div class="criterion-title">👷‍♂️ Personel Yetkinliği & İSG / Kampüs Uyumu</div>
+              <div class="criterion-desc">Teknik personelin ehil olması, saygılı iletişimi ve güvenlik kurallarına uyumu</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="assembly" data-score="5">
+              <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+              <span class="score-badge">5.0</span>
+            </div>
+          </div>
+
+          <div class="criterion-card">
+            <div>
+              <div class="criterion-title">📋 Hizmet Sürekliliği & Servis Raporlaması</div>
+              <div class="criterion-desc">Hizmetin aksamaması, periyodik servis/bakım formlarının düzeni</div>
+            </div>
+            <div class="star-rating-picker" data-criterion="compliance" data-score="5">
+              <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+              <span class="score-badge">5.0</span>
+            </div>
+          </div>
+        `;
+      }
+      setupStars();
+    }
+
+    function setupStars() {
+      const pickers = document.querySelectorAll('.star-rating-picker');
+      pickers.forEach(picker => {
+        const stars = picker.querySelectorAll('.star');
+        const badge = picker.querySelector('.score-badge');
+        let currentVal = parseInt(picker.getAttribute('data-score') || '5', 10);
+
+        const updateVisuals = (val) => {
+          stars.forEach(s => {
+            const v = parseInt(s.getAttribute('data-val'), 10);
+            s.classList.toggle('selected', v <= val);
+          });
+          if (badge) badge.innerText = val + '.0';
+        };
+
+        stars.forEach(s => {
+          s.onmouseenter = () => {
+            const v = parseInt(s.getAttribute('data-val'), 10);
+            stars.forEach(st => st.classList.toggle('hovered', parseInt(st.getAttribute('data-val'), 10) <= v));
+          };
+          s.onmouseleave = () => {
+            stars.forEach(st => st.classList.remove('hovered'));
+          };
+          s.onclick = () => {
+            currentVal = parseInt(s.getAttribute('data-val'), 10);
+            picker.setAttribute('data-score', currentVal);
+            updateVisuals(currentVal);
+            recalcScore();
+          };
+        });
+
+        updateVisuals(currentVal);
+      });
+    }
+
+    function recalcScore() {
+      const pickers = document.querySelectorAll('.star-rating-picker');
+      let sum = 0;
+      pickers.forEach(p => sum += parseInt(p.getAttribute('data-score') || '5', 10));
+      const avg = pickers.length > 0 ? (sum / pickers.length).toFixed(1) : '5.0';
+      document.getElementById('disp-overall-score').innerText = avg + ' ⭐';
+    }
+
+    async function submitRating(e) {
+      e.preventDefault();
+      if (!supplier) {
+        alert('Tedarikçi bilgisi bulunamadı.');
+        return;
+      }
+
+      const reviewer = document.getElementById('reviewer-name').value.trim();
+      const notes = document.getElementById('review-notes').value.trim();
+      const qualityScore = parseInt(document.querySelector('[data-criterion="quality"]')?.getAttribute('data-score') || '5', 10);
+      const speedScore = parseInt(document.querySelector('[data-criterion="speed"]')?.getAttribute('data-score') || '5', 10);
+      const assemblyScore = parseInt(document.querySelector('[data-criterion="assembly"]')?.getAttribute('data-score') || '5', 10);
+      const complianceScore = parseInt(document.querySelector('[data-criterion="compliance"]')?.getAttribute('data-score') || '5', 10);
+      const overallScore = parseFloat(((qualityScore + speedScore + assemblyScore + complianceScore) / 4).toFixed(1));
+
+      const payload = {
+        supplierName: supplier,
+        purchaseType: currentType,
+        qualityScore,
+        speedScore,
+        complianceScore,
+        communicationScore: assemblyScore,
+        overallScore,
+        reviewNotes: notes,
+        ratedBy: (unit ? unit + ' (' + reviewer + ')' : reviewer) + ' [Birim Değerlendirmesi]',
+        ratedAt: new Date().toLocaleDateString('tr-TR') + ' ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+      };
+
+      const btn = document.getElementById('btn-submit-rating');
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> Kaydediliyor...';
+
+      try {
+        const res = await fetch('/api/vendor_ratings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          document.getElementById('rating-form-section').style.display = 'none';
+          document.getElementById('success-section').style.display = 'block';
+        } else {
+          alert('Değerlendirme kaydedilirken bir hata oluştu.');
+          btn.disabled = false;
+          btn.innerHTML = '<span>💾</span> Değerlendirmeyi Gönder';
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Sunucuya bağlanılamadı: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = '<span>💾</span> Değerlendirmeyi Gönder';
+      }
+    }
+
+    // Initialize with default type
+    setType(currentType);
+  </script>
+</body>
+</html>

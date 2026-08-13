@@ -264,6 +264,24 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
       </div>
     ` : '';
 
+    let ratingSection = '';
+    if (demand.status === 'Tamamlandı' && demand.supplier) {
+      const rateUrl = `http://localhost:3000/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}`;
+      ratingSection = `
+        <div style="margin-top: 18px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 8px; padding: 16px; text-align: center;">
+          <div style="font-size: 0.95rem; font-weight: 700; color: #166534; margin-bottom: 4px;">
+            ⭐ Teslim Alınan Malzeme / Hizmeti Değerlendirin
+          </div>
+          <p style="font-size: 0.82rem; color: #15803d; margin: 0 0 12px 0; line-height: 1.45;">
+            Sayın yetkili, <strong>${demand.supplier}</strong> firmasından teslim aldığınız ürün veya hizmetin kalitesini, teslimatını ve montajını puanlayarak üniversite tedarikçi karnesine katkıda bulunabilirsiniz.
+          </p>
+          <a href="${rateUrl}" target="_blank" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; padding: 9px 22px; border-radius: 6px; font-weight: 700; font-size: 0.88rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            ⭐ Tedarikçiyi Puanla (1 Tıkla)
+          </a>
+        </div>
+      `;
+    }
+
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
         <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 24px; color: #ffffff; text-align: left; border-bottom: 3px solid #f59e0b;">
@@ -310,9 +328,10 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
           </table>
 
           ${orderSection}
+          ${ratingSection}
 
           <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 0.78rem; color: #64748b; line-height: 1.5;">
-            💡 <em>Bu bilgilendirme e-postası Piri Reis Üniversitesi Satınalma Takip Sistemi tarafından otomatik olarak gönderilmiştir. Talebinizin durumunu kurum içi takip portalından inceleyebilirsiniz.</em>
+            💡 <em>Bu bilgilendirme e-postası Piri Reis Üniversitesi Satınalma Takip Sistemi tarafından otomatik olarak gönderilmiştir.</em>
           </div>
         </div>
       </div>
