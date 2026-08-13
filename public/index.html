@@ -1389,9 +1389,17 @@
 
       <!-- 8. SUPPLIER ANALYSIS VIEW -->
       <section id="view-supplier-analysis" class="view-section" style="display: none;">
+        <!-- Supplier Risk & Performance Alerts Container -->
+        <div id="supplier-risk-alerts-container" style="margin-bottom: 1.25rem;"></div>
+
         <div class="glass-card">
           <div class="card-header">
-            <h3>🏭 Tedarikçi Bazlı Harcama ve İş Hacmi</h3>
+            <div>
+              <h3>🏭 Tedarikçi Bazlı Harcama, İş Hacmi ve Segmentasyon</h3>
+              <p style="font-size:0.8rem; color:var(--text-muted); margin:0.2rem 0 0 0;">
+                Tedarikçi firmaların performans puanları, seviye rozetleri (Tier) ve kurumsal işlem hacimleri.
+              </p>
+            </div>
           </div>
 
           <!-- Filters Toolbar for Supplier Analysis -->
@@ -1405,9 +1413,18 @@
               <option value="ALL">Tüm Birimler</option>
             </select>
 
+            <select class="filter-select" id="filter-supplier-tier">
+              <option value="ALL">🌟 Tüm Seviyeler (Tier)</option>
+              <option value="GOLD">🌟 Stratejik / Gold Tier (4.5+)</option>
+              <option value="SILVER">🥈 Standart / Silver Tier (3.5 - 4.4)</option>
+              <option value="RISK">⚠️ Gözetim / Riskli (2.5 - 3.4)</option>
+              <option value="BLACKLIST">🚫 Kara Liste (<2.5)</option>
+            </select>
+
             <select class="filter-select" id="filter-supplier-sort">
               <option value="SPEND_DESC">💰 En Yüksek Harcama (TRY)</option>
               <option value="COUNT_DESC">📊 En Çok İş Hacmi (Talep Adedi)</option>
+              <option value="SCORE_DESC">⭐ En Yüksek Karne Puanı</option>
               <option value="NAME_ASC">🔤 Firma Adı (A-Z)</option>
             </select>
 
@@ -1425,12 +1442,158 @@
                 <tr>
                   <th>Sıra</th>
                   <th>Tedarikçi Adı</th>
+                  <th>🥇 Seviye / Segment</th>
                   <th>⭐ Performans Karnesi</th>
                   <th>Talep Adedi</th>
                   <th>Toplam Harcama (TRY)</th>
                   <th>Tamamlanan</th>
                   <th>Bütçe Payı %</th>
                   <th style="text-align: center;">İşlem</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8.5 360° DEDICATED VENDOR PROFILE & SCORECARD VIEW -->
+      <section id="view-vendor-profile" class="view-section" style="display: none;">
+        <!-- Header & Action Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <button class="btn-secondary" id="btn-back-to-suppliers" style="padding: 0.55rem 1.1rem; font-weight: 700; background: var(--bg-card); border-color: var(--accent-primary); color: var(--accent-primary);">
+              <span>⬅️</span> Tedarikçi Listesine Dön
+            </button>
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <h2 id="vp-header-name" style="margin: 0; font-size: 1.35rem; font-weight: 800; color: var(--text-main);">
+                  🏢 Firma Adı
+                </h2>
+                <span id="vp-tier-badge" class="tier-badge tier-gold">🌟 Stratejik Tedarikçi</span>
+              </div>
+              <p id="vp-header-sub" style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-muted);">
+                360° Tedarikçi Performans Karnesi, Radar Analizi ve Kurumsal Geçmiş
+              </p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+            <button class="btn-secondary" id="btn-vp-rate-now" style="border-color: #f59e0b; color: #d97706; font-weight: 700;">
+              <span>⭐</span> Firmayı Puanla
+            </button>
+            <button class="btn-primary" id="btn-print-vendor-scorecard">
+              <span>🖨️</span> Resmi Karne Yazdır / PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Top 4 KPI Cards -->
+        <div class="grid-4" style="margin-bottom: 1.5rem;">
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon yellow">⭐</div>
+            <div class="kpi-data">
+              <h3 id="vp-kpi-score">0.0 ★</h3>
+              <p>Genel Karne Puanı</p>
+              <div class="kpi-sub" id="vp-kpi-score-sub">0 Değerlendirme</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon purple">💰</div>
+            <div class="kpi-data">
+              <h3 id="vp-kpi-total-spend">0 ₺</h3>
+              <p>Toplam Ciro / Harcama</p>
+              <div class="kpi-sub" id="vp-kpi-total-spend-sub">Bütçe Payı: %0</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon blue">📦</div>
+            <div class="kpi-data">
+              <h3 id="vp-kpi-order-count">0 Adet</h3>
+              <p>Tamamlanan Sipariş / Talep</p>
+              <div class="kpi-sub" id="vp-kpi-order-count-sub">0 Aktif İşlem</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon green">⚡</div>
+            <div class="kpi-data">
+              <h3 id="vp-kpi-avg-days">0 Gün</h3>
+              <p>Ortalama Teslimat Süresi</p>
+              <div class="kpi-sub" id="vp-kpi-avg-days-sub">Sipariş ➔ Teslim</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main 2-Column Grid: Radar Chart + Unit Breakdown & Contracts -->
+        <div class="grid-2" style="margin-bottom: 1.5rem;">
+          <!-- Left: Spider/Radar Chart -->
+          <div class="glass-card">
+            <div class="card-header">
+              <h3>🕸️ 5 Boyutlu Performans Radar Analizi</h3>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">(1 — 5 Puan Skalası)</span>
+            </div>
+            <div style="height: 320px; position: relative; display: flex; align-items: center; justify-content: center;">
+              <canvas id="chart-vendor-radar"></canvas>
+            </div>
+            <div id="vp-radar-legend" style="display: flex; justify-content: space-around; font-size: 0.76rem; border-top: 1px dashed var(--border-color); padding-top: 0.75rem; margin-top: 0.5rem; text-align: center; flex-wrap: wrap; gap: 0.5rem;">
+            </div>
+          </div>
+
+          <!-- Right: Unit Breakdown & Contracts/Guarantees -->
+          <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <!-- Unit Breakdown -->
+            <div class="glass-card" style="flex: 1;">
+              <div class="card-header">
+                <h3>🏛️ Birim Bazlı Memnuniyet ve Harcama Dağılımı</h3>
+              </div>
+              <div class="table-container" style="max-height: 180px; overflow-y: auto;">
+                <table class="custom-table" id="table-vp-units" style="font-size: 0.82rem;">
+                  <thead>
+                    <tr>
+                      <th>Birim / Fakülte</th>
+                      <th>Sipariş</th>
+                      <th>Toplam Harcama</th>
+                      <th style="text-align: right;">Birim Memnuniyeti</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Contracts & Guarantees Link -->
+            <div class="glass-card">
+              <div class="card-header">
+                <h3>📜 Aktif Sözleşmeler & Teminat Mektupları</h3>
+              </div>
+              <div id="vp-contracts-guarantees-list" style="font-size: 0.82rem; display: flex; flex-direction: column; gap: 0.4rem;">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Past Orders & Detailed Review Notes Table -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h3>📋 Geçmiş Siparişler, Muayene Kabul ve Değerlendirme Notları</h3>
+            <div style="font-size: 0.78rem; color: var(--text-muted);" id="vp-history-count-text">0 adet kayıt</div>
+          </div>
+          <div class="table-container">
+            <table class="custom-table" id="table-vp-history">
+              <thead>
+                <tr>
+                  <th>Tarih</th>
+                  <th>Talep / Sipariş No</th>
+                  <th>Konu</th>
+                  <th>Birim</th>
+                  <th>Tutar (TRY)</th>
+                  <th>Alım Türü</th>
+                  <th>Puanlayan</th>
+                  <th>Karne Puanı</th>
+                  <th>Değerlendirme Notu</th>
                 </tr>
               </thead>
               <tbody></tbody>

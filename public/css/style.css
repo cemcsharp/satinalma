@@ -2984,6 +2984,74 @@ th.sticky-col-left, th.sticky-col-right {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
+/* 🥇 Vendor Tier Badges */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.tier-gold {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.15));
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #b45309;
+}
+[data-theme="dark"] .tier-gold {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.25);
+}
+.tier-silver {
+  background: rgba(100, 116, 139, 0.12);
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  color: #475569;
+}
+[data-theme="dark"] .tier-silver {
+  color: #cbd5e1;
+}
+.tier-risk {
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.45);
+  color: #c2410c;
+}
+[data-theme="dark"] .tier-risk {
+  color: #fb923c;
+}
+.tier-blacklist {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #b91c1c;
+}
+[data-theme="dark"] .tier-blacklist {
+  color: #f87171;
+}
+
+/* Print Styles for Official Scorecard PDF */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .sidebar, .top-bar, .modal-overlay, #toast-container,
+  #btn-back-to-suppliers, #btn-vp-rate-now, #btn-print-vendor-scorecard {
+    display: none !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  .glass-card {
+    border: 1px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}
+
 
 
 

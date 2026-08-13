@@ -927,11 +927,24 @@ const App = {
     document.getElementById('filter-log-search')?.addEventListener('input', () => this.renderActivityLogs());
 
     // Filters for Supplier Analysis
-    ['filter-supplier-search', 'filter-supplier-unit', 'filter-supplier-sort'].forEach(id => {
+    ['filter-supplier-search', 'filter-supplier-unit', 'filter-supplier-tier', 'filter-supplier-sort'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener('input', () => this.renderSupplierAnalysis());
         el.addEventListener('change', () => this.renderSupplierAnalysis());
+      }
+    });
+
+    // 🏢 360 Vendor Profile Actions
+    document.getElementById('btn-back-to-suppliers')?.addEventListener('click', () => {
+      this.switchView('supplier-analysis');
+    });
+    document.getElementById('btn-print-vendor-scorecard')?.addEventListener('click', () => {
+      this.printVendorReport();
+    });
+    document.getElementById('btn-vp-rate-now')?.addEventListener('click', () => {
+      if (this.state.currentVendorProfile) {
+        this.openVendorRateModal(this.state.currentVendorProfile);
       }
     });
 
@@ -1376,6 +1389,7 @@ const App = {
     else if (view === 'tenders') this.renderTenders();
     else if (view === 'unit-analysis') this.renderUnitAnalysis();
     else if (view === 'supplier-analysis') this.renderSupplierAnalysis();
+    else if (view === 'vendor-profile') this.renderVendorProfile();
     else if (view === 'yearly-report') this.renderYearlyReport();
     else if (view === 'activity-logs') this.renderActivityLogs();
     else if (view === 'settings') this.renderSettings();
@@ -4938,36 +4952,109 @@ const App = {
   // 8. SUPPLIER ANALYSIS RENDERER
   renderSupplierAnalysis() {
     const requests = this.getFilteredRequests();
-
-    const searchText = document.getElementById('filter-supplier-search')?.value.toLowerCase().trim() || '';
+    const searchVal = (document.getElementById('filter-supplier-search')?.value || '').toLowerCase().trim();
     const unitVal = document.getElementById('filter-supplier-unit')?.value || 'ALL';
+    const tierVal = document.getElementById('filter-supplier-tier')?.value || 'ALL';
     const sortVal = document.getElementById('filter-supplier-sort')?.value || 'SPEND_DESC';
+
+    // Populate units in filter if needed
+    const unitSelect = document.getElementById('filter-supplier-unit');
+    if (unitSelect && unitSelect.options.length <= 1) {
+      const units = new Set();
+      (this.state.requests || []).forEach(r => { if (r.unit) units.add(r.unit); });
+      Array.from(units).sort().forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u;
+        opt.innerText = u;
+        unitSelect.appendChild(opt);
+      });
+    }
 
     const suppMap = {};
     let totalSpendAll = 0;
 
     requests.forEach(r => {
-      if (r.supplier && r.supplier !== '-' && r.supplier.trim() !== '') {
-        if (unitVal !== 'ALL' && r.unit !== unitVal) return;
+      const sName = (r.supplier || '').trim();
+      if (!sName) return;
 
-        const sName = r.supplier.trim();
-        if (searchText && !sName.toLowerCase().includes(searchText)) return;
+      if (unitVal !== 'ALL' && r.unit !== unitVal) return;
 
-        if (!suppMap[sName]) suppMap[sName] = { total: 0, completed: 0, spend: 0 };
-        suppMap[sName].total++;
-        if (r.status === 'Tamamlandı') suppMap[sName].completed++;
-        const spend = (r.actualAmount || 0);
-        suppMap[sName].spend += spend;
-        totalSpendAll += spend;
+      if (!suppMap[sName]) {
+        suppMap[sName] = { total: 0, completed: 0, spend: 0 };
       }
+      suppMap[sName].total++;
+      if (r.status === 'Tamamlandı') suppMap[sName].completed++;
+      const spend = parseFloat(r.actualAmount) || 0;
+      suppMap[sName].spend += spend;
+      totalSpendAll += spend;
     });
 
     let sortedSupp = Object.entries(suppMap);
+
+    // Search filter
+    if (searchVal) {
+      sortedSupp = sortedSupp.filter(([sName]) => sName.toLowerCase().includes(searchVal));
+    }
+
+    // Tier filter
+    if (tierVal !== 'ALL') {
+      sortedSupp = sortedSupp.filter(([sName]) => {
+        const score = this.getVendorScore(sName);
+        const tier = this.getVendorTier(score?.overall, score?.count);
+        return tier.key === tierVal;
+      });
+    }
+
+    // Risk Alarms calculation
+    const riskAlertsContainer = document.getElementById('supplier-risk-alerts-container');
+    if (riskAlertsContainer) {
+      const riskSuppliers = [];
+      Object.keys(suppMap).forEach(sName => {
+        const score = this.getVendorScore(sName);
+        if (score) {
+          const tier = this.getVendorTier(score.overall, score.count);
+          if (tier.key === 'BLACKLIST' || tier.key === 'RISK') {
+            riskSuppliers.push({ name: sName, overall: score.overall, count: score.count, tier });
+          }
+        }
+      });
+
+      if (riskSuppliers.length > 0) {
+        riskAlertsContainer.innerHTML = `
+          <div style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(249, 115, 22, 0.08)); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: var(--radius-md); padding: 0.85rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span style="font-size: 1.5rem;">🚨</span>
+              <div>
+                <strong style="color: #b91c1c; font-size: 0.92rem;">Tedarikçi Risk & Performans Uyarıları (${riskSuppliers.length} Firma)</strong>
+                <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">
+                  Aşağıdaki firmalar düşük performans veya teslimat aksamaları nedeniyle gözetim altındadır:
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+              ${riskSuppliers.map(rs => `
+                <span class="tier-badge ${rs.tier.badgeClass}" style="cursor: pointer;" onclick="App.openVendorProfile('${rs.name.replace(/'/g, "\\'")}')" title="360° Karnesini Aç">
+                  ${rs.tier.icon} ${rs.name} (${rs.overall} ★)
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        riskAlertsContainer.innerHTML = '';
+      }
+    }
 
     if (sortVal === 'COUNT_DESC') {
       sortedSupp.sort((a, b) => b[1].total - a[1].total);
     } else if (sortVal === 'NAME_ASC') {
       sortedSupp.sort((a, b) => a[0].localeCompare(b[0], 'tr'));
+    } else if (sortVal === 'SCORE_DESC') {
+      sortedSupp.sort((a, b) => {
+        const scoreA = parseFloat(this.getVendorScore(a[0])?.overall || 0);
+        const scoreB = parseFloat(this.getVendorScore(b[0])?.overall || 0);
+        return scoreB - scoreA;
+      });
     } else {
       // SPEND_DESC
       sortedSupp.sort((a, b) => b[1].spend - a[1].spend);
@@ -4976,18 +5063,19 @@ const App = {
     const tbody = document.querySelector('#table-supplier-detailed tbody');
     if (tbody) {
       if (sortedSupp.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun tedarikçi bulunamadı.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun tedarikçi bulunamadı.</td></tr>`;
       } else {
         tbody.innerHTML = sortedSupp.map(([sName, s], i) => {
           const share = totalSpendAll > 0 ? ((s.spend / totalSpendAll) * 100).toFixed(1) : 0;
           const score = this.getVendorScore(sName);
+          const tier = this.getVendorTier(score?.overall, score?.count);
           const safeName = sName.replace(/'/g, "\\'");
           
           let scoreBadgeHtml = `<span style="font-size:0.75rem; color:var(--text-muted);">Puanlanmadı</span>`;
           if (score) {
             scoreBadgeHtml = `
               <div style="display:flex; flex-direction:column; gap:0.25rem;">
-                <span class="score-badge-gold" style="width:fit-content;">
+                <span class="score-badge-gold" style="width:fit-content; cursor:pointer;" onclick="App.openVendorProfile('${safeName}')" title="360° Karnesini Aç">
                   ⭐ ${score.overall} <small style="opacity:0.75; font-size:0.7rem;">(${score.count} Değerlendirme)</small>
                 </span>
                 <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
@@ -5001,16 +5089,26 @@ const App = {
           return `
             <tr>
               <td style="font-weight:700; color:var(--text-muted);">${i + 1}</td>
-              <td style="font-weight:700; color:var(--text-main);">🏢 ${sName}</td>
+              <td style="font-weight:700;">
+                <a href="javascript:void(0)" onclick="App.openVendorProfile('${safeName}')" style="color:var(--text-main); text-decoration:underline; text-decoration-color:var(--accent-primary);" title="360° Karnesini Aç">
+                  🏢 ${sName}
+                </a>
+              </td>
+              <td><span class="tier-badge ${tier.badgeClass}">${tier.label}</span></td>
               <td>${scoreBadgeHtml}</td>
               <td style="font-weight:600;">${s.total}</td>
               <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${s.spend.toLocaleString('tr-TR')} ₺</td>
               <td><span class="badge status-completed">${s.completed}</span></td>
               <td style="font-weight:600;">%${share}</td>
               <td style="text-align:center;">
-                <button class="btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.75rem; border-color:#f59e0b; color:#d97706; font-weight:700;" onclick="App.openVendorRateModal('${safeName}')">
-                  <span>⭐</span> Puanla
-                </button>
+                <div style="display:flex; gap:0.35rem; justify-content:center;">
+                  <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--accent-primary); color:var(--accent-primary); font-weight:700;" onclick="App.openVendorProfile('${safeName}')" title="360° Firma Profili & Radar Karnesi">
+                    <span>🔍</span> Profil
+                  </button>
+                  <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:#f59e0b; color:#d97706; font-weight:700;" onclick="App.openVendorRateModal('${safeName}')" title="Puan Ver">
+                    <span>⭐</span> Puanla
+                  </button>
+                </div>
               </td>
             </tr>
           `;
@@ -6704,6 +6802,12 @@ const App = {
       ? (serviceRatings.reduce((sum, r) => sum + (parseFloat(r.overallScore) || 0), 0) / serviceRatings.length).toFixed(1)
       : null;
 
+    const avgQuality = (ratings.reduce((sum, r) => sum + (parseFloat(r.qualityScore) || 5), 0) / ratings.length).toFixed(1);
+    const avgSpeed = (ratings.reduce((sum, r) => sum + (parseFloat(r.speedScore) || 5), 0) / ratings.length).toFixed(1);
+    const avgAssembly = (ratings.reduce((sum, r) => sum + (parseFloat(r.communicationScore) || 5), 0) / ratings.length).toFixed(1);
+    const avgCompliance = (ratings.reduce((sum, r) => sum + (parseFloat(r.complianceScore) || 5), 0) / ratings.length).toFixed(1);
+    const avgCommunication = (ratings.reduce((sum, r) => sum + (parseFloat(r.communicationScore) || 5), 0) / ratings.length).toFixed(1);
+
     return {
       count: ratings.length,
       overall: avgOverall,
@@ -6711,8 +6815,353 @@ const App = {
       goodsAvg: avgGoods,
       serviceCount: serviceRatings.length,
       serviceAvg: avgService,
+      quality: avgQuality,
+      speed: avgSpeed,
+      assembly: avgAssembly,
+      compliance: avgCompliance,
+      communication: avgCommunication,
       reviews: ratings
     };
+  },
+
+  getVendorTier(score, ratingCount) {
+    if (!ratingCount || ratingCount === 0 || !score) {
+      return {
+        key: 'UNRATED',
+        label: '⚪ Puanlanmadı',
+        badgeClass: 'tier-silver',
+        icon: '⚪',
+        desc: 'Bu firma için henüz tamamlanmış bir değerlendirme bulunmuyor.'
+      };
+    }
+    const val = parseFloat(score);
+    if (val < 2.5) {
+      return {
+        key: 'BLACKLIST',
+        label: '🚫 Kara Liste',
+        badgeClass: 'tier-blacklist',
+        icon: '🚫',
+        desc: 'Kritik teslimat veya kalite ihlalleri nedeniyle askıya alınmış riskli tedarikçi.'
+      };
+    }
+    if (val < 3.5) {
+      return {
+        key: 'RISK',
+        label: '⚠️ Gözetim / Riskli',
+        badgeClass: 'tier-risk',
+        icon: '⚠️',
+        desc: 'Teslimat veya evrak süreçlerinde aksamalar yaşanan tedarikçi.'
+      };
+    }
+    if (val < 4.5) {
+      return {
+        key: 'SILVER',
+        label: '🥈 Standart Tedarikçi',
+        badgeClass: 'tier-silver',
+        icon: '🥈',
+        desc: 'Süreçleri genel olarak standartlara uygun devam eden onaylı firma.'
+      };
+    }
+    return {
+      key: 'GOLD',
+      label: '🌟 Stratejik Tedarikçi (Gold)',
+      badgeClass: 'tier-gold',
+      icon: '🌟',
+      desc: 'Mükemmel kalite, hız ve yüksek birim memnuniyetine sahip öncelikli tedarikçi.'
+    };
+  },
+
+  openVendorProfile(vendorName) {
+    if (!vendorName) return;
+    this.state.currentVendorProfile = vendorName;
+    this.switchView('vendor-profile');
+    this.renderVendorProfile();
+  },
+
+  renderVendorProfile() {
+    const vendorName = this.state.currentVendorProfile;
+    if (!vendorName) return;
+
+    const safeClean = vendorName.trim().toLowerCase();
+    const vendorRequests = (this.state.requests || []).filter(r => r.supplier && r.supplier.trim().toLowerCase() === safeClean);
+    const vendorContracts = (this.state.contracts || []).filter(c => c.supplier && c.supplier.trim().toLowerCase() === safeClean);
+    const vendorGuarantees = (this.state.guarantees || []).filter(g => g.supplier && g.supplier.trim().toLowerCase() === safeClean);
+
+    const totalSpend = vendorRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
+    const totalRequestsCount = vendorRequests.length;
+    const completedRequests = vendorRequests.filter(r => r.status === 'Tamamlandı');
+    const completedCount = completedRequests.length;
+
+    // Average Delivery Days
+    let totalWaitDays = 0;
+    let daysCount = 0;
+    vendorRequests.forEach(r => {
+      const dOrder = r.orderDate || r.requestDate;
+      const dArrival = r.arrivalDate;
+      if (dOrder && dArrival) {
+        const dt1 = new Date(dOrder);
+        const dt2 = new Date(dArrival);
+        const diff = Math.ceil(Math.abs(dt2 - dt1) / (1000 * 60 * 60 * 24));
+        if (!isNaN(diff) && diff < 180) {
+          totalWaitDays += diff;
+          daysCount++;
+        }
+      }
+    });
+    const avgDays = daysCount > 0 ? Math.round(totalWaitDays / daysCount) : 0;
+
+    // Total Spend across all suppliers for budget share
+    const allSpend = (this.state.requests || []).reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
+    const budgetSharePct = allSpend > 0 ? ((totalSpend / allSpend) * 100).toFixed(1) : 0;
+
+    // Score & Tier
+    const scoreData = this.getVendorScore(vendorName);
+    const tier = this.getVendorTier(scoreData?.overall, scoreData?.count);
+
+    // Update Header
+    const nameEl = document.getElementById('vp-header-name');
+    const badgeEl = document.getElementById('vp-tier-badge');
+    const subEl = document.getElementById('vp-header-sub');
+    if (nameEl) nameEl.innerText = `🏢 ${vendorName}`;
+    if (badgeEl) {
+      badgeEl.className = `tier-badge ${tier.badgeClass}`;
+      badgeEl.innerText = tier.label;
+    }
+    if (subEl) subEl.innerText = tier.desc;
+
+    // Update KPI Cards
+    const kpiScore = document.getElementById('vp-kpi-score');
+    const kpiScoreSub = document.getElementById('vp-kpi-score-sub');
+    if (kpiScore) kpiScore.innerText = scoreData ? `${scoreData.overall} ★` : '5.0 ★';
+    if (kpiScoreSub) kpiScoreSub.innerText = scoreData ? `${scoreData.count} Değerlendirme [📦 Mal: ${scoreData.goodsCount || 0} | 🛠️ Hizmet: ${scoreData.serviceCount || 0}]` : 'Henüz puanlanmadı';
+
+    const kpiSpend = document.getElementById('vp-kpi-total-spend');
+    const kpiSpendSub = document.getElementById('vp-kpi-total-spend-sub');
+    if (kpiSpend) kpiSpend.innerText = `${totalSpend.toLocaleString('tr-TR')} ₺`;
+    if (kpiSpendSub) kpiSpendSub.innerText = `Toplam Bütçe Payı: %${budgetSharePct}`;
+
+    const kpiOrder = document.getElementById('vp-kpi-order-count');
+    const kpiOrderSub = document.getElementById('vp-kpi-order-count-sub');
+    if (kpiOrder) kpiOrder.innerText = `${completedCount} Adet`;
+    if (kpiOrderSub) kpiOrderSub.innerText = `${totalRequestsCount} Toplam Talep (${totalRequestsCount - completedCount} Açık/İşlemde)`;
+
+    const kpiDays = document.getElementById('vp-kpi-avg-days');
+    const kpiDaysSub = document.getElementById('vp-kpi-avg-days-sub');
+    if (kpiDays) kpiDays.innerText = daysCount > 0 ? `${avgDays} Gün` : '-';
+    if (kpiDaysSub) kpiDaysSub.innerText = daysCount > 0 ? `${daysCount} teslimat ortalaması` : 'Teslimat kaydı yok';
+
+    // Render Radar Chart
+    this.renderVendorRadarChart(scoreData);
+
+    // Render Unit Breakdown Table
+    const unitMap = {};
+    vendorRequests.forEach(r => {
+      const u = r.unit || 'Belirtilmemiş';
+      if (!unitMap[u]) {
+        unitMap[u] = { count: 0, spend: 0, ratings: [] };
+      }
+      unitMap[u].count++;
+      unitMap[u].spend += (parseFloat(r.actualAmount) || 0);
+    });
+
+    // Match unit ratings
+    (scoreData?.reviews || []).forEach(rv => {
+      Object.keys(unitMap).forEach(u => {
+        if ((rv.ratedBy || '').toLowerCase().includes(u.toLowerCase())) {
+          unitMap[u].ratings.push(parseFloat(rv.overallScore) || 5);
+        }
+      });
+    });
+
+    const tbodyUnits = document.querySelector('#table-vp-units tbody');
+    if (tbodyUnits) {
+      const unitEntries = Object.entries(unitMap);
+      if (unitEntries.length === 0) {
+        tbodyUnits.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">Bu firma için henüz birim işlem kaydı bulunmuyor.</td></tr>`;
+      } else {
+        tbodyUnits.innerHTML = unitEntries.map(([uName, uData]) => {
+          const avgUnitScore = uData.ratings.length > 0
+            ? (uData.ratings.reduce((a, b) => a + b, 0) / uData.ratings.length).toFixed(1) + ' ⭐'
+            : '<span style="color:var(--text-muted); font-size:0.75rem;">Değerlendirme yok</span>';
+
+          return `
+            <tr>
+              <td style="font-weight:700; color:var(--text-main);">🏛️ ${uName}</td>
+              <td style="font-weight:600;">${uData.count}</td>
+              <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${uData.spend.toLocaleString('tr-TR')} ₺</td>
+              <td style="text-align:right; font-weight:700; color:#f59e0b;">${avgUnitScore}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    // Render Contracts & Guarantees List
+    const contractsListEl = document.getElementById('vp-contracts-guarantees-list');
+    if (contractsListEl) {
+      let itemsHtml = '';
+      if (vendorContracts.length > 0) {
+        itemsHtml += vendorContracts.map(c => `
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-card); border:1px solid var(--border-color); padding:0.5rem 0.75rem; border-radius:var(--radius-sm);">
+            <div>
+              <strong>📑 Sözleşme: ${c.title || c.contractNo || 'Sözleşme'}</strong>
+              <div style="font-size:0.72rem; color:var(--text-muted);">Vade: ${c.startDate || '-'} ➔ ${c.endDate || '-'}</div>
+            </div>
+            <span class="badge status-completed">${Number(c.totalAmount || 0).toLocaleString('tr-TR')} ${c.currency || 'TRY'}</span>
+          </div>
+        `).join('');
+      }
+      if (vendorGuarantees.length > 0) {
+        itemsHtml += vendorGuarantees.map(g => `
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-card); border:1px solid var(--border-color); padding:0.5rem 0.75rem; border-radius:var(--radius-sm);">
+            <div>
+              <strong>🛡️ Teminat Mektubu: ${g.bank || 'Banka'} (#${g.letterNo || '-'})</strong>
+              <div style="font-size:0.72rem; color:var(--text-muted);">Geçerlilik: ${g.expiryDate || '-'} (${g.status || 'Aktif'})</div>
+            </div>
+            <span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:700;">${Number(g.guaranteeAmount || 0).toLocaleString('tr-TR')} ${g.currency || 'TRY'}</span>
+          </div>
+        `).join('');
+      }
+
+      if (!itemsHtml) {
+        itemsHtml = `<div style="color:var(--text-muted); font-size:0.8rem; padding:0.5rem 0;">Bu firma adına kayıtlı aktif sözleşme veya teminat mektubu bulunmuyor.</div>`;
+      }
+      contractsListEl.innerHTML = itemsHtml;
+    }
+
+    // Render Past History Table
+    const tbodyHistory = document.querySelector('#table-vp-history tbody');
+    const historyCountEl = document.getElementById('vp-history-count-text');
+    if (tbodyHistory) {
+      if (vendorRequests.length === 0) {
+        tbodyHistory.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:2rem;">Bu firmaya ait kayıtlı sipariş veya talep bulunamadı.</td></tr>`;
+        if (historyCountEl) historyCountEl.innerText = '0 kayıt';
+      } else {
+        if (historyCountEl) historyCountEl.innerText = `${vendorRequests.length} adet işlem kaydı`;
+        tbodyHistory.innerHTML = vendorRequests.map(r => {
+          // Find if there is a rating for this request or unit
+          const matchingRating = (scoreData?.reviews || []).find(rv => 
+            (rv.ratedBy && r.unit && rv.ratedBy.toLowerCase().includes(r.unit.toLowerCase()))
+          );
+
+          const isHizmet = (r.purchaseType || 'MAL') === 'HIZMET';
+          const typeBadge = isHizmet
+            ? `<span class="badge" style="background:rgba(16,185,129,0.12); color:#059669; font-size:0.7rem; padding:0.15rem 0.4rem;">🛠️ Hizmet</span>`
+            : `<span class="badge" style="background:rgba(59,130,246,0.12); color:#2563eb; font-size:0.7rem; padding:0.15rem 0.4rem;">📦 Mal</span>`;
+
+          const scoreBadge = matchingRating
+            ? `<span class="score-badge-gold" style="font-size:0.75rem;">⭐ ${matchingRating.overallScore}</span>`
+            : `<span style="font-size:0.75rem; color:var(--text-muted);">-</span>`;
+
+          const reviewNotes = matchingRating?.reviewNotes ? `"${matchingRating.reviewNotes}"` : (r.description || '-');
+          const rater = matchingRating ? matchingRating.ratedBy.replace('[Birim Değerlendirmesi]', '🏛️ Birim') : (r.assignedTo || '-');
+
+          return `
+            <tr>
+              <td style="font-size:0.8rem; color:var(--text-muted);">${r.arrivalDate || r.orderDate || '-'}</td>
+              <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-primary);">#${r.requestBarcode || r.id}</td>
+              <td style="font-weight:600; color:var(--text-main);">${r.subject || '-'}</td>
+              <td>${r.unit || '-'}</td>
+              <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${(parseFloat(r.actualAmount) || 0).toLocaleString('tr-TR')} ₺</td>
+              <td>${typeBadge}</td>
+              <td style="font-size:0.78rem;">${rater}</td>
+              <td>${scoreBadge}</td>
+              <td style="font-size:0.76rem; color:var(--text-muted); max-width:200px;">${reviewNotes}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+  },
+
+  renderVendorRadarChart(scoreData) {
+    const canvas = document.getElementById('chart-vendor-radar');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    if (this.vendorRadarChart) {
+      this.vendorRadarChart.destroy();
+      this.vendorRadarChart = null;
+    }
+
+    const quality = parseFloat(scoreData?.quality || 5.0);
+    const speed = parseFloat(scoreData?.speed || 5.0);
+    const assembly = parseFloat(scoreData?.assembly || 5.0);
+    const compliance = parseFloat(scoreData?.compliance || 5.0);
+    const communication = parseFloat(scoreData?.communication || 5.0);
+
+    const ctx = canvas.getContext('2d');
+    this.vendorRadarChart = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: [
+          '📦 Ürün Kalitesi',
+          '🚚 Teslimat Hızı',
+          '🔧 Montaj / İşçilik',
+          '🧾 Garanti & Evrak',
+          '💬 İletişim & Destek'
+        ],
+        datasets: [{
+          label: 'Performans Puanı',
+          data: [quality, speed, assembly, compliance, communication],
+          backgroundColor: 'rgba(30, 58, 138, 0.25)',
+          borderColor: '#3b82f6',
+          borderWidth: 2.5,
+          pointBackgroundColor: '#f59e0b',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            min: 0,
+            max: 5,
+            ticks: {
+              stepSize: 1,
+              font: { size: 10, weight: '700' },
+              backdropColor: 'transparent'
+            },
+            pointLabels: {
+              font: { size: 11, weight: '700' },
+              color: '#0f172a'
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.25)'
+            },
+            angleLines: {
+              color: 'rgba(148, 163, 184, 0.25)'
+            }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` Puan: ${ctx.raw} / 5.0 ★`
+            }
+          }
+        }
+      }
+    });
+
+    const legendEl = document.getElementById('vp-radar-legend');
+    if (legendEl) {
+      legendEl.innerHTML = `
+        <div><strong>📦 Kalite:</strong> <span style="color:#f59e0b; font-weight:700;">${quality} ★</span></div>
+        <div><strong>🚚 Hız:</strong> <span style="color:#f59e0b; font-weight:700;">${speed} ★</span></div>
+        <div><strong>🔧 Montaj:</strong> <span style="color:#f59e0b; font-weight:700;">${assembly} ★</span></div>
+        <div><strong>🧾 Evrak:</strong> <span style="color:#f59e0b; font-weight:700;">${compliance} ★</span></div>
+        <div><strong>💬 İletişim:</strong> <span style="color:#f59e0b; font-weight:700;">${communication} ★</span></div>
+      `;
+    }
+  },
+
+  printVendorReport() {
+    window.print();
   },
 
   openVendorRateModal(supplierName) {
