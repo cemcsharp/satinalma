@@ -2448,6 +2448,14 @@
           </div>
 
           <div class="form-group">
+            <label>Alım Türü (Mal / Hizmet) <span class="required">*</span></label>
+            <select id="nr-purchase-type" required>
+              <option value="MAL" selected>📦 Mal Alımı (Ürün / Cihaz / Mobilya / Sarf)</option>
+              <option value="HIZMET">🛠️ Hizmet Alımı (Bakım / Temizlik / Yazılım)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
             <label>Tahmini / Bütçe Tutarı</label>
             <input type="text" inputmode="decimal" id="nr-estimated-amount" placeholder="ör: 100.000,00" oninput="App.onAmountInput(this, 'nr-currency')">
             <div id="nr-estimated-amount-preview" class="amount-live-preview"></div>
@@ -2501,6 +2509,14 @@
           <div class="form-group full-width">
             <label>Talep Konusu <span class="required">*</span></label>
             <input type="text" id="er-subject" placeholder="ör: Bilgisayar Malzemeleri Alımı Hk" required>
+          </div>
+
+          <div class="form-group">
+            <label>Alım Türü (Mal / Hizmet)</label>
+            <select id="er-purchase-type">
+              <option value="MAL" selected>📦 Mal Alımı (Ürün / Cihaz / Mobilya / Sarf)</option>
+              <option value="HIZMET">🛠️ Hizmet Alımı (Bakım / Temizlik / Yazılım)</option>
+            </select>
           </div>
 
           <div class="form-group">

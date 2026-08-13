@@ -7535,6 +7535,7 @@ const App = {
     const unit = document.getElementById('nr-unit').value;
     const assigned = document.getElementById('nr-assigned-to').value || 'Henüz Atanmadı';
     const priority = document.getElementById('nr-priority').value;
+    const purchaseType = document.getElementById('nr-purchase-type')?.value || 'MAL';
     const reg = document.getElementById('nr-regulation').value;
     const estAmt = this.parseMoney(document.getElementById('nr-estimated-amount')?.value);
     const currency = document.getElementById('nr-currency')?.value || 'TRY';
@@ -7550,6 +7551,7 @@ const App = {
       unit: unit,
       assignedTo: assigned,
       priority: priority,
+      purchaseType: purchaseType,
       regulation: reg,
       status: 'Açık',
       estimatedAmount: estAmt,
@@ -7583,6 +7585,9 @@ const App = {
 
     const prioritySelect = document.getElementById('nr-priority');
     if (prioritySelect) prioritySelect.value = 'Orta';
+
+    const pTypeSelect = document.getElementById('nr-purchase-type');
+    if (pTypeSelect) pTypeSelect.value = 'MAL';
 
     const currSelect = document.getElementById('nr-currency');
     if (currSelect) currSelect.value = 'TRY';
@@ -7638,10 +7643,94 @@ const App = {
       document.getElementById('er-subject').value = req.subject || '';
     }
 
+    if (document.getElementById('er-purchase-type')) {
+      document.getElementById('er-purchase-type').value = req.purchaseType || 'MAL';
+    }
+
     document.getElementById('er-status').value = req.status || 'Açık';
 
     if (document.getElementById('er-priority')) {
       document.getElementById('er-priority').value = req.priority || 'Orta';
+    }
+
+    if (document.getElementById('er-unit')) document.getElementById('er-unit').value = req.unit || '';
+    if (document.getElementById('er-assigned-to')) document.getElementById('er-assigned-to').value = req.assignedTo || '';
+    document.getElementById('er-order-barcode').value = req.orderBarcode || '';
+    
+    let orderDateVal = req.orderDate || '';
+    if (orderDateVal) {
+      const dParts = String(orderDateVal).trim().split(/[./-]/);
+      if (dParts.length === 3) {
+        if (dParts[0].length <= 2 && dParts[2].length >= 4) {
+          const day = dParts[0].padStart(2, '0');
+          const month = dParts[1].padStart(2, '0');
+          let year = dParts[2].trim();
+          if (year.length > 4) year = year.slice(0, 4);
+          orderDateVal = `${year}-${month}-${day}`;
+        } else if (dParts[0].length >= 4) {
+          let year = dParts[0].trim();
+          if (year.length > 4) year = year.slice(0, 4);
+          const month = dParts[1].padStart(2, '0');
+          const day = dParts[2].padStart(2, '0');
+          orderDateVal = `${year}-${month}-${day}`;
+        }
+      }
+    }
+    document.getElementById('er-order-date').value = orderDateVal;
+    document.getElementById('er-supplier').value = req.supplier || '';
+    document.getElementById('er-currency').value = req.currency || 'TRY';
+
+    const estInput = document.getElementById('er-estimated-amount');
+    if (estInput) {
+      const val = req.estimatedAmount || req.budgetAmount;
+      estInput.value = val ? val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      this.onAmountInput(estInput, 'er-currency');
+    }
+
+    const actInput = document.getElementById('er-actual-amount');
+    if (actInput) {
+      actInput.value = req.actualAmount ? req.actualAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      this.onAmountInput(actInput, 'er-currency', true);
+    }
+    
+    const regSelect = document.getElementById('er-regulation');
+    if (regSelect) {
+      let regVal = req.regulation || '';
+      if (regVal.startsWith('Madde ')) regVal = regVal.replace('Madde ', '');
+      regSelect.value = regVal;
+    }
+
+    document.getElementById('er-description').value = req.description || '';
+
+    const titleEl = document.getElementById('edit-modal-title');
+    if (titleEl) titleEl.innerText = `✏️ Talep #${req.requestBarcode || req.id} Düzenle`;
+
+    this.openModal('modal-edit-request');
+  },
+
+  async handleEditRequest(e) {
+    e.preventDefault();
+    const id = parseInt(document.getElementById('er-id').value);
+    const req = this.state.requests.find(r => r.id === id);
+    if (!req) return;
+
+    if (document.getElementById('er-request-barcode')) {
+      req.requestBarcode = document.getElementById('er-request-barcode').value.trim();
+    }
+    if (document.getElementById('er-arrival-date')) {
+      const arrDate = document.getElementById('er-arrival-date').value;
+      req.arrivalDate = arrDate;
+      req.requestDate = arrDate;
+      req.academicYear = this.getAcademicYear(arrDate);
+    }
+    if (document.getElementById('er-subject')) {
+      req.subject = document.getElementById('er-subject').value.trim();
+    }
+    if (document.getElementById('er-purchase-type')) {
+      req.purchaseType = document.getElementById('er-purchase-type').value || 'MAL';
+    }
+    if (document.getElementById('er-priority')) {
+      req.priority = document.getElementById('er-priority').value;
     }
 
     if (document.getElementById('er-unit')) document.getElementById('er-unit').value = req.unit || '';

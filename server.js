@@ -266,14 +266,16 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
 
     let ratingSection = '';
     if (demand.status === 'Tamamlandı' && demand.supplier) {
-      const rateUrl = `http://localhost:3000/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}`;
+      const pType = demand.purchaseType || 'MAL';
+      const typeLabel = pType === 'HIZMET' ? 'Hizmet' : 'Mal / Ürün';
+      const rateUrl = `http://localhost:3000/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
       ratingSection = `
         <div style="margin-top: 18px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 8px; padding: 16px; text-align: center;">
           <div style="font-size: 0.95rem; font-weight: 700; color: #166534; margin-bottom: 4px;">
-            ⭐ Teslim Alınan Malzeme / Hizmeti Değerlendirin
+            ⭐ Teslim Alınan ${typeLabel} Alımını Değerlendirin
           </div>
           <p style="font-size: 0.82rem; color: #15803d; margin: 0 0 12px 0; line-height: 1.45;">
-            Sayın yetkili, <strong>${demand.supplier}</strong> firmasından teslim aldığınız ürün veya hizmetin kalitesini, teslimatını ve montajını puanlayarak üniversite tedarikçi karnesine katkıda bulunabilirsiniz.
+            Sayın yetkili, <strong>${demand.supplier}</strong> firmasından teslim aldığınız ${typeLabel.toLowerCase()} sürecinin kalitesini ve teslimatını 1 tıkla puanlayarak üniversite tedarikçi karnesine katkıda bulunabilirsiniz.
           </p>
           <a href="${rateUrl}" target="_blank" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; padding: 9px 22px; border-radius: 6px; font-weight: 700; font-size: 0.88rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             ⭐ Tedarikçiyi Puanla (1 Tıkla)
@@ -1254,6 +1256,7 @@ async function initDatabaseSchema() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE units ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE vendor_ratings ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
     `);
 
     // Check if database is empty (users table has 0 rows)

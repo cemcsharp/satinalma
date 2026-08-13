@@ -62,7 +62,7 @@
       font-weight: 600;
     }
     .header-banner h1 {
-      font-size: 1.25rem;
+      font-size: 1.22rem;
       font-weight: 800;
       letter-spacing: -0.01em;
     }
@@ -89,33 +89,25 @@
     .demand-info-label { color: var(--text-muted); font-weight: 500; }
     .demand-info-val { font-weight: 700; color: var(--text-main); text-align: right; }
 
-    /* Purchase Type Switcher */
-    .type-switcher {
+    /* Locked Purchase Type Badge Banner */
+    .type-badge-banner {
       display: flex;
-      gap: 0.5rem;
-      background: #f1f5f9;
-      padding: 4px;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(30, 58, 138, 0.06);
+      border: 1px solid rgba(59, 130, 246, 0.25);
       border-radius: 8px;
+      padding: 0.75rem 1rem;
       margin-bottom: 1.25rem;
-      border: 1px solid var(--border);
     }
-    .btn-type {
-      flex: 1;
-      padding: 0.6rem 0.5rem;
-      font-size: 0.85rem;
+    .type-badge-title {
+      font-size: 0.88rem;
       font-weight: 700;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background: transparent;
-      color: var(--text-muted);
-      transition: all 0.2s ease;
-      font-family: inherit;
-    }
-    .btn-type.active {
-      background: #ffffff;
       color: var(--primary);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+    .type-badge-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
     }
 
     /* Star Criteria */
@@ -282,7 +274,7 @@
   <div class="container">
     <div class="header-banner">
       <div class="uni-tag">PİRİ REİS ÜNİVERSİTESİ — SATINALMA MÜDÜRLÜĞÜ</div>
-      <h1>⭐ Tedarikçi & Malzeme Memnuniyet Değerlendirmesi</h1>
+      <h1 id="page-main-title">⭐ Tedarikçi Memnuniyet Değerlendirmesi</h1>
     </div>
 
     <!-- Rating Form View -->
@@ -307,14 +299,13 @@
         </div>
       </div>
 
-      <!-- Purchase Type Switcher -->
-      <div class="type-switcher">
-        <button type="button" class="btn-type active" id="btn-type-mal" onclick="setType('MAL')">
-          📦 Mal Alımı (Ürün / Cihaz / Mobilya)
-        </button>
-        <button type="button" class="btn-type" id="btn-type-hizmet" onclick="setType('HIZMET')">
-          🛠️ Hizmet Alımı (Bakım / Temizlik / Yazılım)
-        </button>
+      <!-- Auto-Locked Purchase Type Header Badge -->
+      <div class="type-badge-banner">
+        <div>
+          <div class="type-badge-title" id="type-badge-text">📦 Alım Türü: Mal Alımı</div>
+          <div class="type-badge-sub">Bu talep için belirlenen kriter seti aşağıda listelenmiştir.</div>
+        </div>
+        <span class="badge" style="background:var(--primary); color:#ffffff; padding:0.25rem 0.6rem; border-radius:20px; font-size:0.75rem; font-weight:700;" id="type-badge-pill">Mal Alımı</span>
       </div>
 
       <!-- Score Summary Banner -->
@@ -368,20 +359,24 @@
     const supplier = urlParams.get('supplier') || '';
     const unit = urlParams.get('unit') || '';
     const subject = urlParams.get('subject') || '';
-    let currentType = (urlParams.get('type') || 'MAL').toUpperCase();
+    const currentType = (urlParams.get('type') || 'MAL').toUpperCase() === 'HIZMET' ? 'HIZMET' : 'MAL';
 
     document.getElementById('disp-barcode').innerText = barcode ? ('#' + barcode) : '-';
     document.getElementById('disp-subject').innerText = subject || '-';
     document.getElementById('disp-unit').innerText = unit || '-';
     document.getElementById('disp-supplier').innerText = supplier || 'Belirtilmedi';
 
-    function setType(type) {
-      currentType = type;
-      document.getElementById('btn-type-mal').classList.toggle('active', type === 'MAL');
-      document.getElementById('btn-type-hizmet').classList.toggle('active', type === 'HIZMET');
-      document.getElementById('type-title-text').innerText = type === 'MAL' ? 'Mal Alımı Puanınız' : 'Hizmet Alımı Puanınız';
-      renderCriteria(type);
-      recalcScore();
+    // Set locked headers
+    if (currentType === 'HIZMET') {
+      document.getElementById('page-main-title').innerText = '🛠️ Hizmet Alımı Memnuniyet Değerlendirmesi';
+      document.getElementById('type-badge-text').innerText = '🛠️ Alım Türü: Hizmet Alımı';
+      document.getElementById('type-badge-pill').innerText = 'Hizmet Alımı';
+      document.getElementById('type-title-text').innerText = 'Hizmet Alımı Puanınız';
+    } else {
+      document.getElementById('page-main-title').innerText = '📦 Mal Alımı Memnuniyet Değerlendirmesi';
+      document.getElementById('type-badge-text').innerText = '📦 Alım Türü: Mal / Ürün Alımı';
+      document.getElementById('type-badge-pill').innerText = 'Mal Alımı';
+      document.getElementById('type-title-text').innerText = 'Mal Alımı Puanınız';
     }
 
     function renderCriteria(type) {
@@ -580,8 +575,8 @@
       }
     }
 
-    // Initialize with default type
-    setType(currentType);
+    // Initialize with locked type
+    renderCriteria(currentType);
   </script>
 </body>
 </html>
