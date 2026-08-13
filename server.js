@@ -195,6 +195,149 @@ function createSmtpTransporter(config) {
   });
 }
 
+// ----------------------------------------------------
+// 📧 BİRİM OTOMATİK TALEP SÜREÇ BİLDİRİM FONKSİYONU
+// ----------------------------------------------------
+async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
+  if (!demand || !demand.unit) return;
+  try {
+    const cfg = await getSmtpConfig();
+    if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) return;
+
+    // Look up unit email
+    const unitRes = await pool.query('SELECT email FROM units WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [demand.unit]);
+    const unitEmail = unitRes.rows[0]?.email;
+    if (!unitEmail || !unitEmail.includes('@')) {
+      console.log(`ℹ️ "${demand.unit}" birimi için kayıtlı geçerli bir e-posta bulunamadı, bildirim gönderilmedi.`);
+      return;
+    }
+
+    // Look up assigned expert email/phone if any
+    let expertInfo = demand.assignedTo || 'Satınalma Uzmanı';
+    if (demand.assignedTo && demand.assignedTo !== 'Henüz Atanmadı') {
+      const userRes = await pool.query('SELECT name, title, email, phone FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [demand.assignedTo]);
+      if (userRes.rowCount > 0) {
+        const u = userRes.rows[0];
+        expertInfo = `${u.name} (${u.title || 'Satınalma Uzmanı'}${u.phone ? ` - Dahili: ${u.phone}` : ''}${u.email ? ` - E-posta: ${u.email}` : ''})`;
+      }
+    }
+
+    const barcode = demand.requestBarcode || demand.id;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    let subject = '';
+    let headerTitle = '';
+    let badgeColor = '#3b82f6';
+    let messageText = '';
+
+    if (eventType === 'CREATED') {
+      subject = `📋 Talebiniz Alındı — #${barcode} (${demand.subject || 'Satınalma Talebi'})`;
+      headerTitle = 'Talebiniz Satınalma Müdürlüğü\'ne Ulaştı';
+      badgeColor = '#3b82f6';
+      messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına oluşturulan <strong>#${barcode}</strong> numaralı satınalma talebiniz sistemimize başarıyla kaydedilmiş ve işleme alınmıştır. Talebinizin süreç adımları uzmanımız tarafından takip edilmektedir.`;
+    } else if (eventType === 'STATUS_CHANGED') {
+      const status = demand.status || 'İşlemde';
+      if (status === 'Tamamlandı') badgeColor = '#10b981';
+      else if (status === 'Reddedildi' || status === 'İptal') badgeColor = '#ef4444';
+      else if (status === 'Sipariş Verildi' || demand.orderBarcode) badgeColor = '#8b5cf6';
+      else badgeColor = '#f59e0b';
+
+      subject = `🔄 Talep Durumu Güncellendi: [${status}] — #${barcode} (${demand.subject || ''})`;
+      headerTitle = `Talep Durumu: ${status}`;
+      messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin süreci güncellenmiştir.<br><br>
+      Önceki Durum: <strong>${oldStatus || 'Açık'}</strong> ➔ Güncel Durum: <strong style="color:${badgeColor}; font-size:1.05rem;">${status}</strong>`;
+    } else {
+      return;
+    }
+
+    const orderSection = demand.orderBarcode ? `
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-top:14px;">
+        <div style="font-weight:700; color:#1e293b; margin-bottom:6px; font-size:0.9rem;">📦 Sipariş Bilgileri:</div>
+        <div style="font-size:0.85rem; color:#475569; line-height:1.6;">
+          <div>• <strong>Sipariş No / Barkod:</strong> #${demand.orderBarcode}</div>
+          ${demand.orderDate ? `<div>• <strong>Sipariş Tarihi:</strong> ${demand.orderDate}</div>` : ''}
+          ${demand.supplier ? `<div>• <strong>Tedarikçi Firma:</strong> ${demand.supplier}</div>` : ''}
+          ${demand.actualAmount ? `<div>• <strong>Tutar:</strong> ${Number(demand.actualAmount).toLocaleString('tr-TR')} ${demand.currency || 'TRY'}</div>` : ''}
+        </div>
+      </div>
+    ` : '';
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 24px; color: #ffffff; text-align: left; border-bottom: 3px solid #f59e0b;">
+          <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; margin-bottom: 4px;">PİRİ REİS ÜNİVERSİTESİ</div>
+          <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em;">Satınalma Müdürlüğü</div>
+        </div>
+        
+        <div style="padding: 24px 24px 16px 24px; color: #1e293b;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+            <h2 style="margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 700;">${headerTitle}</h2>
+            <span style="background: ${badgeColor}; color: #ffffff; padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; display: inline-block;">${demand.status || 'Açık'}</span>
+          </div>
+
+          <p style="font-size: 0.92rem; line-height: 1.6; color: #334155; margin-top: 0;">${messageText}</p>
+
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.86rem; background: #f8fafc; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+            <tbody>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b; width: 36%;">Talep Barkod / No:</td>
+                <td style="padding: 10px 14px; font-weight: 700; color: #1e3a8a; font-family: monospace; font-size: 0.95rem;">#${barcode}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Talep Konusu:</td>
+                <td style="padding: 10px 14px; font-weight: 600; color: #0f172a;">${demand.subject || '-'}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">İlgili Birim:</td>
+                <td style="padding: 10px 14px; color: #0f172a;">${demand.unit}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Geliş / Talep Tarihi:</td>
+                <td style="padding: 10px 14px; color: #0f172a;">${demand.arrivalDate || demand.requestDate || dateStr}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Sorumlu Uzman:</td>
+                <td style="padding: 10px 14px; color: #1e3a8a; font-weight: 600;">${expertInfo}</td>
+              </tr>
+              ${demand.description ? `
+              <tr>
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Açıklama / Not:</td>
+                <td style="padding: 10px 14px; color: #334155;">${demand.description}</td>
+              </tr>` : ''}
+            </tbody>
+          </table>
+
+          ${orderSection}
+
+          <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 0.78rem; color: #64748b; line-height: 1.5;">
+            💡 <em>Bu bilgilendirme e-postası Piri Reis Üniversitesi Satınalma Takip Sistemi tarafından otomatik olarak gönderilmiştir. Talebinizin durumunu kurum içi takip portalından inceleyebilirsiniz.</em>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const transporter = createSmtpTransporter(cfg);
+    await transporter.sendMail({
+      from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
+      to: unitEmail,
+      subject: subject,
+      html: html
+    });
+
+    // Add log
+    await pool.query(
+      'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+      [dateStr, 'Sistem (E-Posta Servisi)', 'Birim Bilgilendirme E-Postası', `Talep #${barcode} için "${demand.unit}" birimine (${unitEmail}) e-posta gönderildi. [${eventType}]`]
+    ).catch(() => {});
+
+    console.log(`✉️ Birim E-Postası Gönderildi -> ${demand.unit} (${unitEmail}) [${eventType} - #${barcode}]`);
+  } catch (err) {
+    console.error('Birim bilgilendirme e-posta hatası:', err.message);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const urlPath = url.pathname;
@@ -233,7 +376,7 @@ const server = http.createServer(async (req, res) => {
         getTableData('invoices'),
         getTableData('guarantees'),
         getTableData('logs'),
-        pool.query('SELECT id, name FROM units ORDER BY name ASC'),
+        pool.query('SELECT id, name, email FROM units ORDER BY name ASC'),
         pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
         pool.query('SELECT * FROM rates'),
         getTableData('tenders').catch(() => []),
@@ -802,6 +945,11 @@ const server = http.createServer(async (req, res) => {
           
           res.writeHead(201);
           res.end(JSON.stringify(result.rows[0]));
+
+          // Trigger automated unit email on demand creation
+          if (table === 'requests' && result.rows[0]) {
+            notifyUnitOnDemandEvent(result.rows[0], 'CREATED').catch(e => console.error('Birim e-posta tetikleme hatası:', e.message));
+          }
           return;
         }
         
@@ -813,6 +961,13 @@ const server = http.createServer(async (req, res) => {
           const data = JSON.parse(body);
           delete data.id; // never update id
           
+          // If updating request, fetch previous status to detect change
+          let oldStatus = null;
+          if (table === 'requests') {
+            const prevRes = await pool.query('SELECT status FROM requests WHERE id = $1', [id]).catch(() => null);
+            oldStatus = prevRes?.rows[0]?.status;
+          }
+
           const keys = Object.keys(data);
           const updates = keys.map((k, i) => `"${k}" = $${i + 1}`).join(', ');
           const values = keys.map(k => sanitizeVal(data[k], k));
@@ -825,6 +980,11 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' }));
           } else {
             res.writeHead(200); res.end(JSON.stringify(result.rows[0]));
+
+            // Trigger automated unit email on demand status update
+            if (table === 'requests' && result.rows[0] && oldStatus && result.rows[0].status !== oldStatus) {
+              notifyUnitOnDemandEvent(result.rows[0], 'STATUS_CHANGED', oldStatus).catch(e => console.error('Birim e-posta güncelleme hatası:', e.message));
+            }
           }
           return;
         }
@@ -1063,6 +1223,7 @@ async function initDatabaseSchema() {
       );
 
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+      ALTER TABLE units ADD COLUMN IF NOT EXISTS email VARCHAR(255);
     `);
 
     // Check if database is empty (users table has 0 rows)

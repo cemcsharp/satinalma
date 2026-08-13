@@ -779,6 +779,9 @@ const App = {
     document.getElementById('input-new-unit-name')?.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); this.handleAddUnit(); }
     });
+    document.getElementById('input-new-unit-email')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); this.handleAddUnit(); }
+    });
     document.getElementById('input-new-regulation-name')?.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); this.handleAddRegulation(); }
     });
@@ -793,6 +796,7 @@ const App = {
     document.getElementById('form-new-request')?.addEventListener('submit', (e) => this.handleNewRequest(e));
     document.getElementById('form-edit-request')?.addEventListener('submit', (e) => this.handleEditRequest(e));
     document.getElementById('form-user-manage')?.addEventListener('submit', (e) => this.handleSaveUser(e));
+    document.getElementById('form-unit-edit')?.addEventListener('submit', (e) => this.handleSaveEditUnit(e));
     document.getElementById('form-contract-manage')?.addEventListener('submit', (e) => this.handleSaveContract(e));
     document.getElementById('form-guarantee-manage')?.addEventListener('submit', (e) => this.handleSaveGuarantee(e));
     document.getElementById('form-invoice-manage')?.addEventListener('submit', (e) => this.handleSaveInvoice(e));
@@ -6872,39 +6876,26 @@ const App = {
     const tbody = document.getElementById('tbody-units-settings');
     if (!tbody) return;
     if (!this.state.units || this.state.units.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:var(--text-muted); padding:1rem;">Tanımlı birim bulunamadı.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding:1rem;">Tanımlı birim bulunamadı.</td></tr>`;
       return;
     }
     tbody.innerHTML = this.state.units.map(u => {
       const id = typeof u === 'object' ? u.id : u;
       const name = typeof u === 'object' ? u.name : u;
-      return `
-        <tr>
-          <td style="font-weight:600;">${name}</td>
-          <td style="text-align:center;">
-            <button class="btn-icon" onclick="App.handleEditUnit(${id}, '${name.replace(/'/g, "\\'")}')" title="Birim Adını Düzenle">✏️</button>
-            <button class="btn-icon" onclick="App.handleDeleteUnit(${id}, '${name.replace(/'/g, "\\'")}')" title="Birimi Sil">🗑️</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  },
+      const email = typeof u === 'object' ? (u.email || '') : '';
+      const emailBadge = email
+        ? `<span class="badge status-open" style="font-family:var(--font-mono); font-size:0.78rem;">📧 ${email}</span>`
+        : `<span style="font-size:0.75rem; color:var(--text-muted); opacity:0.7;">E-Posta Yok</span>`;
 
-  renderRegulationsSettings() {
-    const tbody = document.getElementById('tbody-regulations-settings');
-    if (!tbody) return;
-    if (!this.state.regulations || this.state.regulations.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:var(--text-muted); padding:1rem;">Tanımlı yönetmelik maddesi bulunamadı.</td></tr>`;
-      return;
-    }
-    tbody.innerHTML = this.state.regulations.map(r => {
-      const id = typeof r === 'object' ? r.id : r;
-      const name = typeof r === 'object' ? r.name : r;
       return `
         <tr>
-          <td style="font-weight:600;">Madde ${name}</td>
+          <td style="font-weight:600; color:var(--text-main);">🏢 ${name}</td>
+          <td>${emailBadge}</td>
           <td style="text-align:center;">
-            <button class="btn-icon" onclick="App.handleDeleteRegulation(${id}, '${name.replace(/'/g, "\\'")}')" title="Maddeyi Sil">🗑️</button>
+            <div class="action-btns" style="justify-content:center; gap:0.25rem;">
+              <button class="btn-icon" onclick="App.openEditUnitModal(${id})" title="Birim Bilgilerini ve E-Postasını Düzenle">✏️</button>
+              <button class="btn-icon" onclick="App.handleDeleteUnit(${id}, '${name.replace(/'/g, "\\'")}')" title="Birimi Sil">🗑️</button>
+            </div>
           </td>
         </tr>
       `;
@@ -6912,20 +6903,26 @@ const App = {
   },
 
   async handleAddUnit() {
-    const input = document.getElementById('input-new-unit-name');
-    const name = input?.value.trim();
+    const nameInput = document.getElementById('input-new-unit-name');
+    const emailInput = document.getElementById('input-new-unit-email');
+    const name = nameInput?.value.trim();
+    const email = emailInput?.value.trim() || '';
+
     if (!name) {
       this.showToast("Lütfen eklenecek birim adını girin.", "warning");
       return;
     }
+
     try {
-      const res = await this.apiSync('units', 'POST', { name });
+      const res = await this.apiSync('units', 'POST', { name, email });
       if (res) {
         this.state.units.push(res);
-        input.value = '';
+        if (nameInput) nameInput.value = '';
+        if (emailInput) emailInput.value = '';
         this.renderUnitsSettings();
         this.populateDropdowns();
         this.showToast(`"${name}" birimi başarıyla eklendi.`, "success", "🏢");
+        this.logAction('Yeni Birim Eklendi', `Birim: ${name}${email ? ` (${email})` : ''}`);
       }
     } catch (err) {
       console.error(err);
@@ -6933,24 +6930,63 @@ const App = {
     }
   },
 
-  async handleEditUnit(id, oldName) {
-    const newName = prompt("Birim Adını Düzenleyin:", oldName);
-    if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
-    const cleanName = newName.trim();
-    try {
-      await this.apiSync('units', 'PUT', { name: cleanName }, id);
-      const unitObj = this.state.units.find(u => (typeof u === 'object' ? u.id : u) === id);
-      if (unitObj && typeof unitObj === 'object') unitObj.name = cleanName;
-      
-      // Update unit name across all loaded requests in memory
-      this.state.requests.forEach(r => {
-        if (r.unit === oldName) r.unit = cleanName;
-      });
+  openEditUnitModal(unitId) {
+    const unitObj = this.state.units.find(u => (typeof u === 'object' ? u.id : u) === unitId);
+    if (!unitObj) return;
 
-      this.renderUnitsSettings();
-      this.populateDropdowns();
-      this.render();
-      this.showToast(`Birim adı "${cleanName}" olarak güncellendi.`, "success", "✏️");
+    const id = typeof unitObj === 'object' ? unitObj.id : unitObj;
+    const name = typeof unitObj === 'object' ? unitObj.name : unitObj;
+    const email = typeof unitObj === 'object' ? (unitObj.email || '') : '';
+
+    const idEl = document.getElementById('ue-id');
+    const nameEl = document.getElementById('ue-name');
+    const emailEl = document.getElementById('ue-email');
+    const titleEl = document.getElementById('unit-edit-modal-title');
+
+    if (idEl) idEl.value = id;
+    if (nameEl) nameEl.value = name;
+    if (emailEl) emailEl.value = email;
+    if (titleEl) titleEl.innerText = `🏢 ${name} — Bilgileri Düzenle`;
+
+    this.openModal('modal-unit-edit');
+  },
+
+  async handleSaveEditUnit(e) {
+    if (e) e.preventDefault();
+    const id = parseInt(document.getElementById('ue-id')?.value, 10);
+    const newName = document.getElementById('ue-name')?.value.trim();
+    const newEmail = document.getElementById('ue-email')?.value.trim() || '';
+
+    if (!id || !newName) {
+      this.showToast("Lütfen birim adını eksiksiz giriniz.", "warning");
+      return;
+    }
+
+    const unitObj = this.state.units.find(u => (typeof u === 'object' ? u.id : u) === id);
+    const oldName = typeof unitObj === 'object' ? unitObj.name : unitObj;
+
+    try {
+      const updated = await this.apiSync('units', 'PUT', { name: newName, email: newEmail }, id);
+      if (updated) {
+        if (unitObj && typeof unitObj === 'object') {
+          unitObj.name = newName;
+          unitObj.email = newEmail;
+        }
+
+        // Update unit name across all loaded requests in memory if changed
+        if (oldName && oldName !== newName) {
+          this.state.requests.forEach(r => {
+            if (r.unit === oldName) r.unit = newName;
+          });
+        }
+
+        this.closeModal('modal-unit-edit');
+        this.renderUnitsSettings();
+        this.populateDropdowns();
+        this.render();
+        this.showToast(`"${newName}" birim bilgileri başarıyla güncellendi!`, "success", "✏️");
+        this.logAction('Birim Güncellendi', `Birim: ${newName}${newEmail ? ` (${newEmail})` : ''}`);
+      }
     } catch (err) {
       console.error(err);
       this.showToast("Birim güncellenirken hata oluştu.", "error");
@@ -6958,17 +6994,19 @@ const App = {
   },
 
   async handleDeleteUnit(id, name) {
-    if (!confirm(`"${name}" birimini silmek istediğinizden emin misiniz?`)) return;
-    try {
-      await this.apiSync('units', 'DELETE', null, id);
-      this.state.units = this.state.units.filter(u => (typeof u === 'object' ? u.id : u) !== id);
-      this.renderUnitsSettings();
-      this.populateDropdowns();
-      this.showToast(`"${name}" birimi silindi.`, "info", "🗑️");
-    } catch (err) {
-      console.error(err);
-      this.showToast("Birim silinirken hata oluştu.", "error");
-    }
+    this.showConfirm("Birimi Sil", `"${name}" birimini silmek istediğinizden emin misiniz?`, async () => {
+      try {
+        await this.apiSync('units', 'DELETE', null, id);
+        this.state.units = this.state.units.filter(u => (typeof u === 'object' ? u.id : u) !== id);
+        this.renderUnitsSettings();
+        this.populateDropdowns();
+        this.showToast(`"${name}" birimi silindi.`, "info", "🗑️");
+        this.logAction('Birim Silindi', `Birim: ${name}`);
+      } catch (err) {
+        console.error(err);
+        this.showToast("Birim silinirken hata oluştu.", "error");
+      }
+    }, '🗑️');
   },
 
   async handleAddRegulation() {
