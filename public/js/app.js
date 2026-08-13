@@ -6914,24 +6914,33 @@ const App = {
     }
 
     try {
-      const res = await this.apiSync('units', 'POST', { name, email });
-      if (res) {
-        this.state.units.push(res);
-        if (nameInput) nameInput.value = '';
-        if (emailInput) emailInput.value = '';
-        this.renderUnitsSettings();
-        this.populateDropdowns();
-        this.showToast(`"${name}" birimi başarıyla eklendi.`, "success", "🏢");
-        this.logAction('Yeni Birim Eklendi', `Birim: ${name}${email ? ` (${email})` : ''}`);
+      const res = await fetch('/api/units', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Sunucu hatası (${res.status})`);
       }
+
+      const saved = await res.json();
+      this.state.units.push(saved);
+      if (nameInput) nameInput.value = '';
+      if (emailInput) emailInput.value = '';
+      this.renderUnitsSettings();
+      this.populateDropdowns();
+      this.showToast(`"${name}" birimi başarıyla eklendi.`, "success", "🏢");
+      this.logAction('Yeni Birim Eklendi', `Birim: ${name}${email ? ` (${email})` : ''}`);
     } catch (err) {
-      console.error(err);
-      this.showToast("Birim eklenirken hata oluştu.", "error");
+      console.error('Birim ekleme hatası:', err);
+      this.showToast(`Birim eklenemedi: ${err.message}`, "error");
     }
   },
 
   openEditUnitModal(unitId) {
-    const unitObj = this.state.units.find(u => (typeof u === 'object' ? u.id : u) === unitId);
+    const unitObj = (this.state.units || []).find(u => String(typeof u === 'object' ? u.id : u) === String(unitId));
     if (!unitObj) return;
 
     const id = typeof unitObj === 'object' ? unitObj.id : unitObj;
@@ -6952,8 +6961,12 @@ const App = {
   },
 
   async handleSaveEditUnit(e) {
-    if (e) e.preventDefault();
-    const id = parseInt(document.getElementById('ue-id')?.value, 10);
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const idVal = document.getElementById('ue-id')?.value;
+    const id = parseInt(idVal, 10);
     const newName = document.getElementById('ue-name')?.value.trim();
     const newEmail = document.getElementById('ue-email')?.value.trim() || '';
 
@@ -6962,34 +6975,45 @@ const App = {
       return;
     }
 
-    const unitObj = this.state.units.find(u => (typeof u === 'object' ? u.id : u) === id);
-    const oldName = typeof unitObj === 'object' ? unitObj.name : unitObj;
+    const unitIndex = (this.state.units || []).findIndex(u => String(typeof u === 'object' ? u.id : u) === String(id));
+    const oldUnit = unitIndex !== -1 ? this.state.units[unitIndex] : null;
+    const oldName = oldUnit ? (typeof oldUnit === 'object' ? oldUnit.name : oldUnit) : null;
 
     try {
-      const updated = await this.apiSync('units', 'PUT', { name: newName, email: newEmail }, id);
-      if (updated) {
-        if (unitObj && typeof unitObj === 'object') {
-          unitObj.name = newName;
-          unitObj.email = newEmail;
-        }
+      const res = await fetch(`/api/units/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, email: newEmail })
+      });
 
-        // Update unit name across all loaded requests in memory if changed
-        if (oldName && oldName !== newName) {
-          this.state.requests.forEach(r => {
-            if (r.unit === oldName) r.unit = newName;
-          });
-        }
-
-        this.closeModal('modal-unit-edit');
-        this.renderUnitsSettings();
-        this.populateDropdowns();
-        this.render();
-        this.showToast(`"${newName}" birim bilgileri başarıyla güncellendi!`, "success", "✏️");
-        this.logAction('Birim Güncellendi', `Birim: ${newName}${newEmail ? ` (${newEmail})` : ''}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Sunucu hatası (${res.status})`);
       }
+
+      const updated = await res.json();
+      
+      // Update in state
+      if (unitIndex !== -1) {
+        this.state.units[unitIndex] = { id: id, name: newName, email: newEmail };
+      }
+
+      // Update unit name across all loaded requests in memory if changed
+      if (oldName && oldName !== newName) {
+        (this.state.requests || []).forEach(r => {
+          if (r.unit === oldName) r.unit = newName;
+        });
+      }
+
+      this.closeModal('modal-unit-edit');
+      this.renderUnitsSettings();
+      this.populateDropdowns();
+      this.render();
+      this.showToast(`"${newName}" birim bilgileri başarıyla güncellendi!`, "success", "✏️");
+      this.logAction('Birim Güncellendi', `Birim: ${newName}${newEmail ? ` (${newEmail})` : ''}`);
     } catch (err) {
-      console.error(err);
-      this.showToast("Birim güncellenirken hata oluştu.", "error");
+      console.error('Birim güncelleme hatası:', err);
+      this.showToast(`Birim güncellenemedi: ${err.message}`, "error");
     }
   },
 
