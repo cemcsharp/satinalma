@@ -840,22 +840,23 @@ table.custom-table {
 }
 
 table.custom-table th {
-  background: rgba(13, 19, 34, 0.85);
-  color: var(--text-muted);
-  padding: 0.55rem 0.75rem;
-  font-weight: 600;
-  font-size: 0.74rem;
+  background: #0d1322;
+  color: #94a3b8;
+  padding: 0.65rem 0.85rem;
+  font-weight: 700;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border-color);
   white-space: nowrap;
 }
 
 table.custom-table td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border-color);
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   vertical-align: middle;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
+  color: #f1f5f9;
 }
 
 /* Specific elements that must stay on a single line */
@@ -1186,30 +1187,6 @@ table.custom-table tbody tr:hover {
 .pagination-btns button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-  table.custom-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-  }
-
-  table.custom-table th {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-    border: 1px solid #cbd5e1 !important;
-    font-weight: 700 !important;
-  }
-
-  table.custom-table td {
-    color: #334155 !important;
-    border: 1px solid #e2e8f0 !important;
-  }
-
-  .badge {
-    border: 1px solid #94a3b8 !important;
-    color: #0f172a !important;
-    background: #f8fafc !important;
-  }
 }
 
 /* ============================================================
