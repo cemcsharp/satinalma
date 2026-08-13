@@ -465,18 +465,28 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/email/test' && method === 'POST') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const body = await readBody(req);
-      const { testEmail } = JSON.parse(body || '{}');
+      const payload = JSON.parse(body || '{}');
       
-      const cfg = await getSmtpConfig();
-      if (!cfg || !cfg.host || !cfg.user) {
+      const dbCfg = await getSmtpConfig() || {};
+      const cfg = {
+        host: payload.host || dbCfg.host,
+        port: payload.port || dbCfg.port || 587,
+        secure: payload.secure !== undefined ? payload.secure : dbCfg.secure,
+        user: payload.user || dbCfg.user,
+        pass: (payload.pass && payload.pass !== '••••••••') ? payload.pass : dbCfg.pass,
+        from: payload.from || dbCfg.from || payload.user || dbCfg.user,
+        fromName: payload.fromName || dbCfg.fromName || 'Piri Reis Üni. Satınalma'
+      };
+      
+      if (!cfg || !cfg.host || !cfg.user || !cfg.pass) {
         res.writeHead(400);
-        res.end(JSON.stringify({ success: false, error: 'SMTP ayarları yapılandırılmamış. Lütfen önce sunucu ve kullanıcı bilgilerini giriniz.' }));
+        res.end(JSON.stringify({ success: false, error: 'Lütfen SMTP Sunucu, Kullanıcı Adı ve Şifre alanlarını eksiksiz giriniz.' }));
         return;
       }
 
       try {
         const transporter = createSmtpTransporter(cfg);
-        const target = testEmail || cfg.user;
+        const target = payload.testEmail || cfg.user;
         const info = await transporter.sendMail({
           from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
           to: target,
@@ -502,7 +512,7 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         console.error('SMTP test hatası:', err);
         res.writeHead(500);
-        res.end(JSON.stringify({ success: false, error: 'E-posta gönderilemedi: ' + err.message }));
+        res.end(JSON.stringify({ success: false, error: err.message }));
       }
       return;
     }

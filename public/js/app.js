@@ -6323,7 +6323,20 @@ const App = {
   },
 
   async testSmtpConnection() {
-    const testTarget = prompt('Test e-postasının gönderileceği e-posta adresini giriniz:', this.state.currentUser?.email || document.getElementById('smtp-user')?.value || '');
+    const host = document.getElementById('smtp-host')?.value.trim() || '';
+    const port = parseInt(document.getElementById('smtp-port')?.value, 10) || 587;
+    const user = document.getElementById('smtp-user')?.value.trim() || '';
+    const pass = document.getElementById('smtp-pass')?.value || '';
+    const fromName = document.getElementById('smtp-from-name')?.value.trim() || 'Piri Reis Üni. Satınalma';
+    const from = document.getElementById('smtp-from-email')?.value.trim() || '';
+    const secure = document.getElementById('smtp-secure')?.checked || false;
+
+    if (!host || !user) {
+      this.showToast('Lütfen önce SMTP Sunucu ve Kullanıcı Adı bilgilerini giriniz.', 'warning');
+      return;
+    }
+
+    const testTarget = prompt('Test e-postasının gönderileceği alıcı e-posta adresini giriniz:', this.state.currentUser?.email || user || '');
     if (!testTarget) return;
 
     this.showToast(`"${testTarget}" adresine test e-postası gönderiliyor...`, 'info', '✉️');
@@ -6331,7 +6344,10 @@ const App = {
       const res = await fetch('/api/email/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testEmail: testTarget })
+        body: JSON.stringify({
+          host, port, user, pass, secure, from, fromName,
+          testEmail: testTarget
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -6341,7 +6357,7 @@ const App = {
       }
     } catch (err) {
       console.error(err);
-      this.showToast('E-posta test isteği başarısız oldu.', 'error');
+      this.showToast('E-posta test isteği başarısız oldu: ' + err.message, 'error');
     }
   },
 
