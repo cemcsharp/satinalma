@@ -2101,17 +2101,30 @@
           <!-- 📧 SMTP E-Posta Bildirim Ayarları Card -->
           <div class="glass-card">
             <div class="card-header">
-              <h3>📧 Kurumsal E-Posta (SMTP) Bildirimleri</h3>
+              <div>
+                <h3>📧 Kurumsal E-Posta (SMTP) Bildirimleri</h3>
+                <p style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600; margin: 0.2rem 0 0 0;">
+                  🏢 Microsoft 365 / Exchange & Kurumsal E-Posta Entegrasyonu
+                </p>
+              </div>
               <span id="smtp-status-badge" class="badge status-open" style="font-size: 0.75rem;">Pasif</span>
             </div>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Talep atamaları, vade/SLA gecikmeleri ve kritik bildirimleri personele otomatik e-posta olarak göndermek için kurumsal SMTP sunucunuzu yapılandırın.
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Talep oluşturulduğunda birimlere, atamalarda personele otomatik bildirim göndermek için Microsoft 365 veya kurumsal SMTP sunucunuzu yapılandırın.
             </p>
+
+            <div style="background: rgba(30, 58, 138, 0.06); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.78rem; color: var(--text-main); line-height: 1.45;">
+              <strong>💡 Microsoft 365 (Office 365) Kullanıcıları İçin Önemli Notlar:</strong><br>
+              • <strong>Sunucu:</strong> <code>smtp.office365.com</code> &nbsp;|&nbsp; <strong>Port:</strong> <code>587</code> &nbsp;|&nbsp; <strong>SSL/TLS:</strong> İşaretsiz (STARTTLS)<br>
+              • <strong>MFA / İki Adımlı Doğrulama:</strong> Hesabınızda Authenticator/SMS doğrulaması varsa hesap şifresi yerine <em>Microsoft Güvenlik > Uygulama Parolası (App Password)</em> üretip girmelisiniz.<br>
+              • <strong>SMTP AUTH İzni:</strong> Microsoft 365 Yönetici Panelinde ilgili posta kutusu için <em>"Authenticated SMTP (Kimliği Doğrulanmış SMTP)"</em> yetkisinin açık olması gerekir.
+            </div>
+
             <form id="form-smtp-settings">
               <div class="form-grid" style="grid-template-columns: 2fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
                 <div class="form-group">
                   <label>SMTP Sunucu Adresi (Host)</label>
-                  <input type="text" id="smtp-host" placeholder="ör: smtp.office365.com veya mail.pirireis.edu.tr">
+                  <input type="text" id="smtp-host" placeholder="smtp.office365.com">
                 </div>
                 <div class="form-group">
                   <label>Port</label>
@@ -2121,7 +2134,7 @@
 
               <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
                 <div class="form-group">
-                  <label>Kullanıcı Adı / E-Posta</label>
+                  <label>Kullanıcı Adı / E-Posta (Kurumsal Mailiniz)</label>
                   <input type="email" id="smtp-user" placeholder="satinalma@pirireis.edu.tr">
                 </div>
                 <div class="form-group">
@@ -2158,6 +2171,9 @@
                 </button>
                 <button type="button" class="btn-secondary" id="btn-test-smtp" style="border-color: var(--accent-primary);">
                   <span>✉️</span> Test E-Postası Gönder
+                </button>
+                <button type="button" class="btn-secondary" id="btn-preset-m365" style="margin-left: auto;">
+                  <span>🏢</span> Microsoft 365 Şablonu
                 </button>
               </div>
             </form>

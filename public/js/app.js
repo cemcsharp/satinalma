@@ -769,6 +769,17 @@ const App = {
     document.getElementById('btn-modal-download-template')?.addEventListener('click', () => this.downloadExcelTemplate());
     document.getElementById('btn-confirm-excel-import')?.addEventListener('click', () => this.confirmExcelImport());
     document.getElementById('btn-test-smtp')?.addEventListener('click', () => this.testSmtpConnection());
+    document.getElementById('btn-preset-m365')?.addEventListener('click', () => {
+      const hostEl = document.getElementById('smtp-host');
+      const portEl = document.getElementById('smtp-port');
+      const secureEl = document.getElementById('smtp-secure');
+      const enabledEl = document.getElementById('smtp-is-enabled');
+      if (hostEl) hostEl.value = 'smtp.office365.com';
+      if (portEl) portEl.value = 587;
+      if (secureEl) secureEl.checked = false;
+      if (enabledEl) enabledEl.checked = true;
+      this.showToast('Microsoft 365 sunucu parametreleri (smtp.office365.com:587) uygulandı.', 'info', '🏢');
+    });
     document.getElementById('btn-update-system')?.addEventListener('click', () => this.handleUpdateSystem());
     document.getElementById('btn-reimport-excel')?.addEventListener('click', () => {
       document.getElementById('input-excel-file')?.click();
