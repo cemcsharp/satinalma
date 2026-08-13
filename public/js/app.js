@@ -4983,12 +4983,18 @@ const App = {
           const score = this.getVendorScore(sName);
           const safeName = sName.replace(/'/g, "\\'");
           
-          let scoreBadgeHtml = `<span style="font-size:0.78rem; color:var(--text-muted);">Puanlanmadı</span>`;
+          let scoreBadgeHtml = `<span style="font-size:0.75rem; color:var(--text-muted);">Puanlanmadı</span>`;
           if (score) {
             scoreBadgeHtml = `
-              <span class="score-badge-gold" title="Hız: ${score.speed}★ | Kalite: ${score.quality}★ | Evrak: ${score.compliance}★ | İletişim: ${score.communication}★">
-                ⭐ ${score.overall} <small style="opacity:0.75; font-size:0.72rem;">(${score.count} oy)</small>
-              </span>
+              <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                <span class="score-badge-gold" style="width:fit-content;">
+                  ⭐ ${score.overall} <small style="opacity:0.75; font-size:0.7rem;">(${score.count} Değerlendirme)</small>
+                </span>
+                <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                  ${score.goodsAvg ? `<span class="badge" style="background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); font-size:0.68rem; padding:0.1rem 0.35rem;" title="${score.goodsCount} Mal Alımı Değerlendirmesi">📦 Mal: ${score.goodsAvg}★ (${score.goodsCount})</span>` : ''}
+                  ${score.serviceAvg ? `<span class="badge" style="background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3); font-size:0.68rem; padding:0.1rem 0.35rem;" title="${score.serviceCount} Hizmet Alımı Değerlendirmesi">🛠️ Hizmet: ${score.serviceAvg}★ (${score.serviceCount})</span>` : ''}
+                </div>
+              </div>
             `;
           }
 
@@ -6679,25 +6685,32 @@ const App = {
   },
 
   // ----------------------------------------------------
-  // ⭐ VENDOR RATING CLIENT ENGINE
+  // ⭐ VENDOR RATING CLIENT ENGINE (MAL & HİZMET AYRIMLI)
   // ----------------------------------------------------
   getVendorScore(supplierName) {
     if (!supplierName) return null;
     const clean = supplierName.trim().toLowerCase();
     const ratings = (this.state.vendorRatings || []).filter(r => r.supplierName && r.supplierName.trim().toLowerCase() === clean);
     if (ratings.length === 0) return null;
-    const avgOverall = ratings.reduce((sum, r) => sum + (parseFloat(r.overallScore) || 0), 0) / ratings.length;
-    const avgSpeed = ratings.reduce((sum, r) => sum + (parseFloat(r.speedScore) || 0), 0) / ratings.length;
-    const avgQuality = ratings.reduce((sum, r) => sum + (parseFloat(r.qualityScore) || 0), 0) / ratings.length;
-    const avgCompliance = ratings.reduce((sum, r) => sum + (parseFloat(r.complianceScore) || 0), 0) / ratings.length;
-    const avgCommunication = ratings.reduce((sum, r) => sum + (parseFloat(r.communicationScore) || 0), 0) / ratings.length;
+
+    const goodsRatings = ratings.filter(r => (r.purchaseType || 'MAL') === 'MAL');
+    const serviceRatings = ratings.filter(r => r.purchaseType === 'HIZMET');
+
+    const avgOverall = (ratings.reduce((sum, r) => sum + (parseFloat(r.overallScore) || 0), 0) / ratings.length).toFixed(1);
+    const avgGoods = goodsRatings.length > 0
+      ? (goodsRatings.reduce((sum, r) => sum + (parseFloat(r.overallScore) || 0), 0) / goodsRatings.length).toFixed(1)
+      : null;
+    const avgService = serviceRatings.length > 0
+      ? (serviceRatings.reduce((sum, r) => sum + (parseFloat(r.overallScore) || 0), 0) / serviceRatings.length).toFixed(1)
+      : null;
+
     return {
       count: ratings.length,
-      overall: avgOverall.toFixed(1),
-      speed: avgSpeed.toFixed(1),
-      quality: avgQuality.toFixed(1),
-      compliance: avgCompliance.toFixed(1),
-      communication: avgCommunication.toFixed(1),
+      overall: avgOverall,
+      goodsCount: goodsRatings.length,
+      goodsAvg: avgGoods,
+      serviceCount: serviceRatings.length,
+      serviceAvg: avgService,
       reviews: ratings
     };
   },
@@ -6708,6 +6721,9 @@ const App = {
     document.getElementById('vr-supplier-title').innerText = `🏢 ${supplierName}`;
     document.getElementById('vr-review-notes').value = '';
 
+    // Default to MAL
+    this.setRatingPurchaseType('MAL');
+
     const scoreData = this.getVendorScore(supplierName);
     const statsEl = document.getElementById('vr-supplier-stats');
     const overallEl = document.getElementById('vr-overall-display');
@@ -6715,20 +6731,35 @@ const App = {
     const historyList = document.getElementById('vr-history-list');
 
     if (scoreData) {
-      if (statsEl) statsEl.innerText = `${scoreData.count} adet değerlendirme yapıldı. (Hız: ${scoreData.speed} | Kalite: ${scoreData.quality} | Evrak: ${scoreData.compliance} | İletişim: ${scoreData.communication})`;
+      const breakdownText = [
+        scoreData.goodsCount > 0 ? `📦 Mal: ${scoreData.goodsAvg}⭐ (${scoreData.goodsCount})` : null,
+        scoreData.serviceCount > 0 ? `🛠️ Hizmet: ${scoreData.serviceAvg}⭐ (${scoreData.serviceCount})` : null
+      ].filter(Boolean).join(' • ');
+
+      if (statsEl) statsEl.innerText = `${scoreData.count} adet toplam değerlendirme. ${breakdownText ? `[ ${breakdownText} ]` : ''}`;
       if (overallEl) overallEl.innerText = `${scoreData.overall} ⭐`;
       if (historySection && historyList) {
         historySection.style.display = 'block';
-        historyList.innerHTML = scoreData.reviews.map(r => `
-          <div style="background:var(--bg-card); border:1px solid var(--border-color); padding:0.5rem 0.75rem; border-radius:var(--radius-sm); font-size:0.8rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong>👤 ${r.ratedBy || 'Yetkili'}</strong>
-              <span style="color:#f59e0b; font-weight:700;">${r.overallScore} ⭐</span>
+        historyList.innerHTML = scoreData.reviews.map(r => {
+          const isService = (r.purchaseType || 'MAL') === 'HIZMET';
+          const typeBadge = isService
+            ? `<span class="badge" style="background:rgba(16,185,129,0.15); color:#059669; font-size:0.68rem; padding:0.1rem 0.4rem; border:1px solid rgba(16,185,129,0.3);">🛠️ Hizmet</span>`
+            : `<span class="badge" style="background:rgba(59,130,246,0.15); color:#2563eb; font-size:0.68rem; padding:0.1rem 0.4rem; border:1px solid rgba(59,130,246,0.3);">📦 Mal</span>`;
+
+          return `
+            <div style="background:var(--bg-card); border:1px solid var(--border-color); padding:0.5rem 0.75rem; border-radius:var(--radius-sm); font-size:0.8rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <strong>👤 ${r.ratedBy || 'Yetkili'}</strong>
+                  ${typeBadge}
+                </div>
+                <span style="color:#f59e0b; font-weight:700;">${r.overallScore} ⭐</span>
+              </div>
+              ${r.reviewNotes ? `<div style="margin-top:0.25rem; color:var(--text-muted); font-size:0.76rem;">"${r.reviewNotes}"</div>` : ''}
+              <div style="font-size:0.7rem; color:var(--text-muted); text-align:right; margin-top:0.2rem;">${r.ratedAt || ''}</div>
             </div>
-            ${r.reviewNotes ? `<div style="margin-top:0.25rem; color:var(--text-muted); font-size:0.76rem;">"${r.reviewNotes}"</div>` : ''}
-            <div style="font-size:0.7rem; color:var(--text-muted); text-align:right; margin-top:0.2rem;">${r.ratedAt || ''}</div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       }
     } else {
       if (statsEl) statsEl.innerText = 'Henüz bu tedarikçi için kayıtlı bir değerlendirme bulunmuyor.';
@@ -6736,8 +6767,129 @@ const App = {
       if (historySection) historySection.style.display = 'none';
     }
 
-    this.setupStarPickers();
     this.openModal('modal-vendor-rate');
+  },
+
+  setRatingPurchaseType(type) {
+    const hiddenType = document.getElementById('vr-purchase-type');
+    if (hiddenType) hiddenType.value = type;
+
+    const btnGoods = document.getElementById('btn-ptype-goods');
+    const btnService = document.getElementById('btn-ptype-service');
+    const labelEl = document.getElementById('vr-type-label');
+
+    if (type === 'MAL') {
+      btnGoods?.classList.add('active');
+      btnService?.classList.remove('active');
+      if (labelEl) labelEl.innerText = 'MAL ALIMI PUANI';
+    } else {
+      btnService?.classList.add('active');
+      btnGoods?.classList.remove('active');
+      if (labelEl) labelEl.innerText = 'HİZMET ALIMI PUANI';
+    }
+
+    this.renderCriteriaForType(type);
+    this.setupStarPickers();
+    this.recalcOverallScoreModal();
+  },
+
+  renderCriteriaForType(type) {
+    const container = document.getElementById('vr-criteria-container');
+    if (!container) return;
+
+    if (type === 'MAL') {
+      container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">📦 Ürün Kalitesi & Şartname Uyumu</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">İstenen marka, model, teknik özellik ve numuneye uygunluk</div>
+          </div>
+          <div class="star-rating-picker" data-criterion="quality" data-score="5">
+            <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+            <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">🚚 Teslimat Hızı & Hasarsız Ambalaj</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Siparişin zamanında, hasarsız ve sıfır ambalajında teslimi</div>
+          </div>
+          <div class="star-rating-picker" data-criterion="speed" data-score="5">
+            <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+            <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">🔧 Montaj, Kurulum ve İşçilik</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Eksiksiz montaj, temiz işçilik ve çalışır teslim</div>
+          </div>
+          <div class="star-rating-picker" data-criterion="assembly" data-score="5">
+            <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+            <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">🧾 Garanti Belgesi, Kılavuz & Evrak Doğruluğu</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">İrsaliye, fatura, garanti evrakları ve kullanım kılavuzları</div>
+          </div>
+          <div class="star-rating-picker" data-criterion="compliance" data-score="5">
+            <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+            <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+          </div>
+        </div>
+      `;
+    } else {
+      container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">🛠️ Hizmet Kalitesi & Kapsam Uyumu</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Yapılan bakım/hizmetin şartnameye ve ihtiyaca tam uygunluğu</div>
+          </div>
+          <div class="star-rating-picker" data-criterion="quality" data-score="5">
+            <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+            <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">⏱️ Müdahale Hızı & Çözüm Üretme</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Arıza ve taleplere hızlı reaksiyon gösterme ve çözüm süresi</div>
+          </div>
+          <div class="star-rating-picker" data-criterion="speed" data-score="5">
+            <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+            <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">👷‍♂️ Personel Yetkinliği & İSG / Kampüs Uyumu</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Teknik personelin ehil olması, saygılı iletişimi ve güvenlik kurallarına uyumu</div>
+          </div>
+          <div class="star-rating-picker" data-criterion="assembly" data-score="5">
+            <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+            <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">📋 Hizmet Sürekliliği & Servis Raporlaması</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Hizmetin aksamaması, periyodik bakım formları ve resmi evrak intizamı</div>
+          </div>
+          <div class="star-rating-picker" data-criterion="compliance" data-score="5">
+            <span class="star" data-val="1">★</span><span class="star" data-val="2">★</span><span class="star" data-val="3">★</span><span class="star" data-val="4">★</span><span class="star selected" data-val="5">★</span>
+            <span class="score-text" style="margin-left: 0.4rem; font-weight: 700; color: #f59e0b; width: 24px; display: inline-block; text-align: right;">5.0</span>
+          </div>
+        </div>
+      `;
+    }
   },
 
   setupStarPickers() {
@@ -6798,19 +6950,21 @@ const App = {
     const supplierName = document.getElementById('vr-supplier-name')?.value;
     if (!supplierName) return;
 
-    const speedScore = parseInt(document.querySelector('[data-criterion="speed"]')?.getAttribute('data-score') || '5', 10);
+    const purchaseType = document.getElementById('vr-purchase-type')?.value || 'MAL';
     const qualityScore = parseInt(document.querySelector('[data-criterion="quality"]')?.getAttribute('data-score') || '5', 10);
+    const speedScore = parseInt(document.querySelector('[data-criterion="speed"]')?.getAttribute('data-score') || '5', 10);
+    const assemblyScore = parseInt(document.querySelector('[data-criterion="assembly"]')?.getAttribute('data-score') || '5', 10);
     const complianceScore = parseInt(document.querySelector('[data-criterion="compliance"]')?.getAttribute('data-score') || '5', 10);
-    const communicationScore = parseInt(document.querySelector('[data-criterion="communication"]')?.getAttribute('data-score') || '5', 10);
-    const overallScore = parseFloat(((speedScore + qualityScore + complianceScore + communicationScore) / 4).toFixed(1));
+    const overallScore = parseFloat(((qualityScore + speedScore + assemblyScore + complianceScore) / 4).toFixed(1));
     const reviewNotes = document.getElementById('vr-review-notes')?.value.trim() || '';
 
     const newRating = {
       supplierName,
-      speedScore,
+      purchaseType,
       qualityScore,
+      speedScore,
       complianceScore,
-      communicationScore,
+      communicationScore: assemblyScore,
       overallScore,
       reviewNotes,
       ratedBy: this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi',
@@ -6818,14 +6972,21 @@ const App = {
     };
 
     try {
-      const res = await this.apiSync('vendor_ratings', 'POST', newRating);
-      if (res) {
+      const res = await fetch('/api/vendor_ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRating)
+      });
+      if (res.ok) {
+        const saved = await res.json();
         if (!this.state.vendorRatings) this.state.vendorRatings = [];
-        this.state.vendorRatings.push(res);
-        this.showToast(`"${supplierName}" firması için değerlendirmeniz kaydedildi! (${overallScore} ⭐)`, 'success', '⭐');
-        this.logAction('Tedarikçi Puanlandı', `Firma: ${supplierName}, Puan: ${overallScore} ⭐`);
+        this.state.vendorRatings.push(saved);
+        this.showToast(`"${supplierName}" firması için [${purchaseType === 'MAL' ? 'Mal' : 'Hizmet'}] puanlaması (${overallScore} ⭐) kaydedildi!`, 'success', '⭐');
+        this.logAction('Tedarikçi Puanlandı', `Firma: ${supplierName} (${purchaseType}): ${overallScore} ⭐`);
         this.closeModal('modal-vendor-rate');
         this.renderSupplierAnalysis();
+      } else {
+        this.showToast("Puanlama kaydedilemedi.", "error");
       }
     } catch (err) {
       console.error(err);

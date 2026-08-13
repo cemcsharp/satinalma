@@ -1234,6 +1234,7 @@ async function initDatabaseSchema() {
 
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE units ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+      ALTER TABLE vendor_ratings ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
     `);
 
     // Check if database is empty (users table has 0 rows)

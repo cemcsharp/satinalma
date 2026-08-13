@@ -2973,6 +2973,17 @@ th.sticky-col-left, th.sticky-col-right {
   transform: scale(1.01);
 }
 
+/* Purchase Type Switcher */
+.btn-purchase-type {
+  background: transparent;
+  color: var(--text-muted);
+}
+.btn-purchase-type.active {
+  background: var(--accent-primary-gradient);
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
 
 
 
