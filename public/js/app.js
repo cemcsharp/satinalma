@@ -6902,6 +6902,27 @@ const App = {
     }).join('');
   },
 
+  renderRegulationsSettings() {
+    const tbody = document.getElementById('tbody-regulations-settings');
+    if (!tbody) return;
+    if (!this.state.regulations || this.state.regulations.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:var(--text-muted); padding:1rem;">Tanımlı yönetmelik maddesi bulunamadı.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = this.state.regulations.map(r => {
+      const id = typeof r === 'object' ? r.id : r;
+      const name = typeof r === 'object' ? r.name : r;
+      return `
+        <tr>
+          <td style="font-weight:600; color:var(--text-main);">📜 Madde ${name}</td>
+          <td style="text-align:center;">
+            <button class="btn-icon" onclick="App.handleDeleteRegulation(${id}, '${name.replace(/'/g, "\\'")}')" title="Maddeyi Sil">🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
   async handleAddUnit() {
     const nameInput = document.getElementById('input-new-unit-name');
     const emailInput = document.getElementById('input-new-unit-email');
