@@ -8706,11 +8706,18 @@ const App = {
 
   exportSupplierAnalysisToExcel() {
     const requests = this.getFilteredRequests();
+    const searchVal = (document.getElementById('filter-supplier-search')?.value || '').toLowerCase().trim();
+    const unitVal = document.getElementById('filter-supplier-unit')?.value || 'ALL';
+    const tierVal = document.getElementById('filter-supplier-tier')?.value || 'ALL';
+    const sortVal = document.getElementById('filter-supplier-sort')?.value || 'SPEND_DESC';
+
     const suppMap = {};
     let totalSpendAll = 0;
 
     requests.forEach(r => {
       const s = (r.supplier && r.supplier !== '-') ? r.supplier.trim() : 'Diğer / Belirtilmemiş';
+      if (unitVal !== 'ALL' && r.unit !== unitVal) return;
+
       const sp = parseFloat(r.actualAmount) || 0;
       totalSpendAll += sp;
       if (!suppMap[s]) {
@@ -8722,18 +8729,79 @@ const App = {
       suppMap[s].spend += sp;
     });
 
-    const sortedSuppliers = Object.entries(suppMap).sort((a,b) => b[1].spend - a[1].spend);
+    let sortedSuppliers = Object.entries(suppMap);
+
+    if (searchVal) {
+      sortedSuppliers = sortedSuppliers.filter(([sName]) => sName.toLowerCase().includes(searchVal));
+    }
+
+    if (tierVal !== 'ALL') {
+      sortedSuppliers = sortedSuppliers.filter(([sName]) => {
+        const score = this.getVendorScore(sName);
+        const tier = this.getVendorTier(score?.overall, score?.count);
+        return tier.key === tierVal;
+      });
+    }
+
+    if (sortVal === 'COUNT_DESC') {
+      sortedSuppliers.sort((a, b) => b[1].count - a[1].count);
+    } else if (sortVal === 'NAME_ASC') {
+      sortedSuppliers.sort((a, b) => a[0].localeCompare(b[0], 'tr'));
+    } else if (sortVal === 'SCORE_DESC') {
+      sortedSuppliers.sort((a, b) => {
+        const scoreA = parseFloat(this.getVendorScore(a[0])?.overall || 0);
+        const scoreB = parseFloat(this.getVendorScore(b[0])?.overall || 0);
+        return scoreB - scoreA;
+      });
+    } else {
+      sortedSuppliers.sort((a, b) => b[1].spend - a[1].spend);
+    }
+
     const headers = [
-      'Sıra', 'Tedarikçi Firma Adı', 'Talep Adedi', 'Tamamlanan Sipariş', 'Açık / İşlemde', 'Toplam Harcama (TRY)', 'Bütçe Payı %'
+      'Sıra',
+      'Tedarikçi Firma Adı',
+      'Seviye / Segment (Tier)',
+      'Genel Karne Puanı',
+      'Değerlendirme Adedi',
+      'Mal Alımı Puanı',
+      'Hizmet Alımı Puanı',
+      'Ürün Kalitesi Puanı',
+      'Teslimat Hızı Puanı',
+      'Montaj / İşçilik Puanı',
+      'Garanti & Evrak Puanı',
+      'Talep Adedi',
+      'Tamamlanan Sipariş',
+      'Açık / İşlemde',
+      'Toplam Harcama (TRY)',
+      'Bütçe Payı %'
     ];
 
     let grandCount = 0;
+    let grandCompleted = 0;
+    let grandOpen = 0;
+    let grandSpend = 0;
+
     const rows = sortedSuppliers.map(([suppName, s], idx) => {
       grandCount += s.count;
+      grandCompleted += s.completed;
+      grandOpen += s.open;
+      grandSpend += s.spend;
       const share = totalSpendAll > 0 ? ((s.spend / totalSpendAll) * 100).toFixed(1) : 0;
+      const score = this.getVendorScore(suppName);
+      const tier = this.getVendorTier(score?.overall, score?.count);
+
       return [
         idx + 1,
         suppName,
+        tier.label,
+        score ? parseFloat(score.overall) : 'Puanlanmadı',
+        score ? score.count : 0,
+        score && score.goodsAvg ? parseFloat(score.goodsAvg) : '-',
+        score && score.serviceAvg ? parseFloat(score.serviceAvg) : '-',
+        score && score.quality ? parseFloat(score.quality) : '-',
+        score && score.speed ? parseFloat(score.speed) : '-',
+        score && score.assembly ? parseFloat(score.assembly) : '-',
+        score && score.compliance ? parseFloat(score.compliance) : '-',
         s.count,
         s.completed,
         s.open,
@@ -8743,13 +8811,14 @@ const App = {
     });
 
     rows.push([
-      '', 'GENEL TOPLAM', grandCount, '', '', totalSpendAll, 100
+      '', 'GENEL TOPLAM', '', '', '', '', '', '', '', '', '',
+      grandCount, grandCompleted, grandOpen, grandSpend, 100
     ]);
 
     this.exportToExcelXLSX({
-      filename: `Tedarikci_Analizi_${this.state.selectedYear}`,
-      sheetName: 'Tedarikçi Analizi',
-      title: 'TEDARİKÇİ BAZLI HARCAMA VE İŞ HACMİ RAPORU',
+      filename: `Tedarikci_Performans_ve_Harcama_Analizi_${this.state.selectedYear}`,
+      sheetName: 'Tedarikçi Karnesi',
+      title: 'TEDARİKÇİ PERFORMANS KARNESİ, SEGMENTASYON VE HARCAMA RAPORU',
       headers: headers,
       rows: rows
     });
