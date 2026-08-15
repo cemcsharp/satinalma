@@ -61,6 +61,13 @@ async function importExcel() {
   try {
     await client.query("SET client_encoding = 'UTF8'");
 
+    // Tablo şemasını güçlendir (varsa eksik sütunları ekle)
+    await client.query(`
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "sequenceNo" INTEGER;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "exchangeRate" NUMERIC;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
+    `);
+
     // Birimler, Kullanıcılar ve Yönetmelikler kümeleri
     const unitsSet = new Set();
     const usersSet = new Set();
