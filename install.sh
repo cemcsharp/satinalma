@@ -50,14 +50,18 @@ echo ""
 echo "🌐 [4/7] Nginx web sunucusu kuruluyor..."
 sudo apt install -y nginx
 
-# ─── 5. PROJE BAĞIMLILIKLARI ───
+# ─── 5. PROJE BAĞIMLILIKLARI & VERİ İÇE AKTARMA ───
 echo ""
 echo "📥 [5/7] Proje bağımlılıkları (npm) yükleniyor..."
 npm install --production
 
-# ─── 6. PM2 İLE UYGULAMA BAŞLATMA (7/24 ÇALIŞMA) ───
 echo ""
-echo "⚡ [6/7] PM2 süreç yöneticisi ile uygulama başlatılıyor..."
+echo "📊 [6/7] Talepler.xlsx verileri veritabanına otomatik aktarılıyor..."
+node import-excel.js || true
+
+# ─── 7. PM2 İLE UYGULAMA BAŞLATMA (7/24 ÇALIŞMA) ───
+echo ""
+echo "⚡ [7/7] PM2 süreç yöneticisi ile uygulama başlatılıyor..."
 sudo npm install -g pm2
 
 # Eğer zaten çalışıyorsa yeniden başlat, yoksa yeni başlat
