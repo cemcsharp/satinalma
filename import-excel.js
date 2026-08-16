@@ -61,11 +61,50 @@ async function importExcel() {
   try {
     await client.query("SET client_encoding = 'UTF8'");
 
-    // Tablo şemasını güçlendir (varsa eksik sütunları ekle)
+    // Gerekli tabloları oluştur
     await client.query(`
-      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "sequenceNo" INTEGER;
-      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "exchangeRate" NUMERIC;
-      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        title VARCHAR(255),
+        role VARCHAR(50) DEFAULT 'USER',
+        "isActive" BOOLEAN DEFAULT true,
+        password VARCHAR(255) DEFAULT '123456',
+        email VARCHAR(255)
+      );
+
+      CREATE TABLE IF NOT EXISTS units (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255)
+      );
+
+      CREATE TABLE IF NOT EXISTS regulations (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS requests (
+        id SERIAL PRIMARY KEY,
+        "sequenceNo" INTEGER,
+        "requestBarcode" VARCHAR(100),
+        subject VARCHAR(550),
+        unit VARCHAR(255),
+        "arrivalDate" VARCHAR(100),
+        "assignedTo" VARCHAR(255),
+        priority VARCHAR(50),
+        status VARCHAR(50),
+        "estimatedAmount" NUMERIC,
+        "actualAmount" NUMERIC,
+        currency VARCHAR(20) DEFAULT 'TRY',
+        "exchangeRate" NUMERIC,
+        supplier VARCHAR(255),
+        "orderBarcode" VARCHAR(100),
+        "orderDate" VARCHAR(100),
+        regulation VARCHAR(100),
+        description TEXT,
+        "purchaseType" VARCHAR(50) DEFAULT 'MAL'
+      );
     `);
 
     // Birimler, Kullanıcılar ve Yönetmelikler kümeleri
