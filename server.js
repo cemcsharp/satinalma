@@ -121,23 +121,6 @@ if (!fs.existsSync(BACKUP_DIR)) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
-// PostgreSQL Bağlantı Havuzu
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'satinalma_db',
-  password: process.env.DB_PASSWORD || '123456',
-  port: parseInt(process.env.DB_PORT, 10) || 5432,
-});
-
-pool.on('connect', (client) => {
-  client.query("SET client_encoding = 'UTF8'");
-});
-
-pool.on('error', (err) => {
-  console.error('Beklenmeyen veritabanı hatası', err);
-});
-
 // MIME Type Eşlemeleri
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
