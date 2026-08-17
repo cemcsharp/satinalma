@@ -129,8 +129,8 @@ server {
     listen 80;
     server_name _;
 
-    # Büyük dosya ve evrak yükleme limiti (50MB)
-    client_max_body_size 50M;
+    # Büyük dosya ve evrak yükleme limiti (100MB)
+    client_max_body_size 100M;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
