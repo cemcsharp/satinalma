@@ -1504,12 +1504,6 @@ const server = http.createServer(async (req, res) => {
           sendUnauthorized();
           return;
         }
-
-        // Kullanıcı yönetimi (users) için ADMIN kontrolü
-        if (table === 'users' && currentUser?.role !== 'ADMIN') {
-          sendForbidden('Kullanıcı hesaplarını yönetmek için ADMIN yetkisi gereklidir.');
-          return;
-        }
         
         // POST /api/:table
         if (method === 'POST') {
