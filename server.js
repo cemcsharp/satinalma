@@ -15,7 +15,7 @@ const nodemailer = require('nodemailer');
 // Parse NUMERIC / DECIMAL database fields as numbers instead of strings
 pg.types.setTypeParser(1700, (val) => (val === null ? null : parseFloat(val)));
 pg.types.setTypeParser(20, (val) => (val === null ? null : parseInt(val, 10)));
-const { Pool } = pg;
+const { Pool, Client } = pg;
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -23,6 +23,51 @@ const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const BACKUP_DIR = path.join(__dirname, 'backups');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'pruni-satinalma-sec-key-2026-auth-jwt';
+
+// ----------------------------------------------------
+// 🛠️ OTOMATİK VERİTABANI OLUŞTURMA (AUTO-HEALING)
+// ----------------------------------------------------
+async function ensureDatabaseExists() {
+  const dbName = process.env.DB_NAME || 'satinalma_db';
+  const defaultClient = new Client({
+    user: process.env.DB_USER || 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    database: 'postgres',
+    password: process.env.DB_PASSWORD || '123456',
+    port: parseInt(process.env.DB_PORT, 10) || 5432,
+  });
+
+  try {
+    await defaultClient.connect();
+    const checkRes = await defaultClient.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName]);
+    if (checkRes.rowCount === 0) {
+      console.log(`ℹ️ "${dbName}" veritabanı bulunamadı, otomatik oluşturuluyor...`);
+      await defaultClient.query(`CREATE DATABASE "${dbName}" WITH ENCODING = 'UTF8'`);
+      console.log(`✅ "${dbName}" veritabanı başarıyla oluşturuldu!`);
+    }
+  } catch (err) {
+    console.error('Veritabanı varlık kontrolü uyarısı:', err.message);
+  } finally {
+    await defaultClient.end().catch(() => {});
+  }
+}
+
+// PostgreSQL Bağlantı Havuzu
+const pool = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'satinalma_db',
+  password: process.env.DB_PASSWORD || '123456',
+  port: parseInt(process.env.DB_PORT, 10) || 5432,
+});
+
+pool.on('connect', (client) => {
+  client.query("SET client_encoding = 'UTF8'");
+});
+
+pool.on('error', (err) => {
+  console.error('Beklenmeyen veritabanı hatası', err);
+});
 
 // Bilinen ve İzin Verilen Veritabanı Tablo Sütunları (Güvenli Filtreleme)
 const TABLE_COLUMNS = {
@@ -2156,6 +2201,7 @@ const server = http.createServer(async (req, res) => {
 
 async function initDatabaseSchema() {
   try {
+    await ensureDatabaseExists();
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
