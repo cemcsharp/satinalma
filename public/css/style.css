@@ -3029,6 +3029,182 @@ th.sticky-col-left, th.sticky-col-right {
   }
 }
 
+/* ============================================================
+   📱 COMPREHENSIVE RESPONSIVE MOBILE & TABLET STYLES
+   ============================================================ */
+
+.btn-mobile-toggle {
+  display: none;
+}
+
+#sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 199;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+#sidebar-overlay.show {
+  display: block !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+@media (max-width: 992px) {
+  /* 1. Sidebar off-canvas drawer */
+  aside.sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 270px !important;
+    max-width: 85vw !important;
+    z-index: 200 !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6) !important;
+  }
+
+  aside.sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  /* 2. Main Content Full Width */
+  main.main-content,
+  aside.sidebar.collapsed + main.main-content,
+  body.sidebar-collapsed main.main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1rem 0.85rem 5rem 0.85rem !important;
+    min-height: 100vh !important;
+  }
+
+  /* 3. Hamburger Button in Top Header */
+  .btn-mobile-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-size: 1.3rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--transition-fast);
+  }
+  .btn-mobile-toggle:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-primary);
+  }
+
+  /* 4. Top Header Flexibility */
+  header.top-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.85rem !important;
+    padding-bottom: 0.85rem !important;
+  }
+
+  .header-left-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+  }
+
+  .header-title h2 {
+    font-size: 1.25rem !important;
+  }
+  .header-title p {
+    font-size: 0.75rem !important;
+  }
+
+  .header-controls {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.6rem !important;
+    width: 100% !important;
+  }
+
+  .top-search-container {
+    width: 100% !important;
+    order: 1 !important;
+  }
+  .top-search-container .search-input-box {
+    width: 100% !important;
+  }
+
+  .topbar-rates-pill {
+    font-size: 0.76rem !important;
+    padding: 0.35rem 0.65rem !important;
+  }
+
+  #btn-open-new-request {
+    margin-left: auto !important;
+    padding: 0.5rem 0.85rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* 5. Filter Bars and Search */
+  .filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.65rem !important;
+  }
+  .filter-bar .search-input-box,
+  .filter-bar select,
+  .filter-bar .filter-group {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  /* 6. Grids and Cards */
+  .grid-4, .grid-3, .grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+  }
+
+  /* 7. Tables Overflow Scrolling */
+  .table-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: var(--radius-sm) !important;
+    margin: 0.5rem 0 !important;
+  }
+
+  table.custom-table {
+    min-width: 650px !important;
+  }
+
+  /* 8. Modals Mobile Fit */
+  .modal-overlay {
+    padding: 0.5rem !important;
+    align-items: flex-start !important;
+  }
+  .modal-content {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0.5rem 0 !important;
+    padding: 1.25rem 1rem !important;
+    border-radius: var(--radius-md) !important;
+  }
+  .modal-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 
 
 
