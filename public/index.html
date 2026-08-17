@@ -3116,13 +3116,16 @@
             </div>
 
             <div style="display: flex; gap: 0.75rem; align-items: center;">
-              <input type="file" id="doc-upload-file-input" required accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.rar" style="font-size: 0.82rem; flex: 1;">
+              <input type="file" id="doc-upload-file-input" required multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.rar,.7z,.msg,.eml,.txt,.csv" style="font-size: 0.82rem; flex: 1;">
               <button type="submit" class="btn-primary" id="btn-submit-doc-upload" style="padding: 0.55rem 1.1rem; white-space: nowrap;">
-                <span>⬆️</span> Dosyayı Yükle
+                <span>⬆️</span> Dosyaları Yükle
               </button>
             </div>
+            <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.35rem;">
+              💡 <strong>Çoklu Dosya Desteği:</strong> <code>Ctrl</code> veya <code>Shift</code> ile birden fazla dosya (şartname, teklifler, sözleşme, fatura ekleri vb. - dosya başı maks. 100 MB) seçebilirsiniz.
+            </div>
             <div id="doc-upload-progress" style="display: none; font-size: 0.8rem; color: var(--accent-primary); margin-top: 0.5rem; font-weight: 600;">
-              ⏳ Dosya sunucuya yükleniyor, lütfen bekleyin...
+              ⏳ Dosyalar sunucuya yükleniyor, lütfen bekleyin...
             </div>
           </form>
         </div>

@@ -2116,61 +2116,92 @@ async init() {
     const progressEl = document.getElementById('doc-upload-progress');
     const submitBtn = document.getElementById('btn-submit-doc-upload');
 
-    const file = fileInput?.files?.[0];
-    if (!file) {
-      this.showToast("Lütfen yüklenecek bir dosya seçin.", "warning");
+    const files = Array.from(fileInput?.files || []);
+    if (files.length === 0) {
+      this.showToast("Lütfen yüklenecek en az bir dosya seçin.", "warning");
       return;
     }
 
-    if (file.size > 25 * 1024 * 1024) {
-      this.showToast("Dosya boyutu maksimum 25 MB olabilir.", "error");
-      return;
+    const MAX_SIZE = 100 * 1024 * 1024; // 100 MB
+    for (const f of files) {
+      if (f.size > MAX_SIZE) {
+        this.showToast(`"${f.name}" dosyası 100 MB sınırını aşıyor (${(f.size / (1024 * 1024)).toFixed(1)} MB).`, "error");
+        return;
+      }
     }
 
     if (progressEl) progressEl.style.display = 'block';
     if (submitBtn) submitBtn.disabled = true;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const fileData = e.target.result;
-        const payload = {
-          entityType,
-          entityId,
-          fileName: file.name,
-          fileType: file.type,
-          fileData,
-          category: categoryInput?.value || 'Genel',
-          description: descInput?.value?.trim() || '',
-          uploadedBy: this.state.currentUser ? this.state.currentUser.name : 'Sistem'
-        };
+    let successCount = 0;
+    let failCount = 0;
 
-        const res = await this.authFetch('/api/documents/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          const result = await res.json();
-          this.showToast(`"${file.name}" belgesi başarıyla yüklendi!`, "success", "📎");
-          this.logAction('Evrak Yüklendi', `${entityType} #${entityId} için "${file.name}" yüklendi.`);
-          if (fileInput) fileInput.value = '';
-          if (descInput) descInput.value = '';
-          await this.renderEntityDocuments();
-        } else {
-          const err = await res.json().catch(() => ({}));
-          this.showToast("Dosya yüklenemedi: " + (err.error || 'Sunucu hatası'), "error");
-        }
-      } catch (err) {
-        console.error(err);
-        this.showToast("Dosya yüklenirken hata oluştu.", "error");
-      } finally {
-        if (progressEl) progressEl.style.display = 'none';
-        if (submitBtn) submitBtn.disabled = false;
-      }
+    const readFileAsDataURL = (f) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(f);
+      });
     };
-    reader.readAsDataURL(file);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (progressEl) {
+          progressEl.innerText = `⏳ Dosyalar yükleniyor (${i + 1} / ${files.length}): "${file.name}"...`;
+        }
+
+        try {
+          const fileData = await readFileAsDataURL(file);
+          const payload = {
+            entityType,
+            entityId,
+            fileName: file.name,
+            fileType: file.type || 'application/octet-stream',
+            fileData,
+            category: categoryInput?.value || 'Genel',
+            description: descInput?.value?.trim() || '',
+            uploadedBy: this.state.currentUser ? this.state.currentUser.name : 'Sistem'
+          };
+
+          const res = await this.authFetch('/api/documents/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (res.ok) {
+            successCount++;
+            this.logAction('Evrak Yüklendi', `${entityType} #${entityId} için "${file.name}" yüklendi.`);
+          } else {
+            failCount++;
+            const err = await res.json().catch(() => ({}));
+            console.error(`"${file.name}" yüklenemedi:`, err.error);
+          }
+        } catch (err) {
+          failCount++;
+          console.error(`"${file.name}" okuma hatası:`, err);
+        }
+      }
+
+      if (successCount > 0) {
+        this.showToast(`${successCount} adet dosya başarıyla arşive yüklendi!`, "success", "📎");
+        if (fileInput) fileInput.value = '';
+        if (descInput) descInput.value = '';
+        await this.renderEntityDocuments();
+      }
+
+      if (failCount > 0) {
+        this.showToast(`${failCount} dosya yüklenirken hata oluştu.`, "error");
+      }
+    } finally {
+      if (progressEl) {
+        progressEl.style.display = 'none';
+        progressEl.innerText = '⏳ Dosyalar sunucuya yükleniyor, lütfen bekleyin...';
+      }
+      if (submitBtn) submitBtn.disabled = false;
+    }
   },
 
   previewDocument(docId) {

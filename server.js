@@ -112,7 +112,7 @@ const MIME_TYPES = {
 };
 
 // İzin verilen evrak dosya uzantıları (Güvenlik Beyaz Listesi)
-const ALLOWED_UPLOAD_EXTENSIONS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.txt', '.zip', '.csv'];
+const ALLOWED_UPLOAD_EXTENSIONS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.txt', '.zip', '.csv', '.rar', '.7z', '.webp', '.msg', '.eml', '.rtf', '.odt', '.ods'];
 
 // ----------------------------------------------------
 // 🔐 KRİPTO VE TOKEN YÖNETİMİ
@@ -204,9 +204,9 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // ----------------------------------------------------
-// 📥 GÜVENLİ BODY OKUYUCU (MAX BODY LIMIT)
+// 📥 GÜVENLİ BODY OKUYUCU (MAX BODY LIMIT - 100MB)
 // ----------------------------------------------------
-function readBody(req, maxBytes = 25 * 1024 * 1024) {
+function readBody(req, maxBytes = 100 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
@@ -1479,7 +1479,7 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/documents/upload' && method === 'POST') {
       if (!currentUser) return sendUnauthorized();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const body = await readBody(req, 25 * 1024 * 1024); // max 25MB
+      const body = await readBody(req, 100 * 1024 * 1024); // max 100MB per file payload
       if (!body) {
         res.writeHead(400); res.end(JSON.stringify({ error: 'Dosya verisi bulunamadı.' })); return;
       }
