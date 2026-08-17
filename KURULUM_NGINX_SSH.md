@@ -147,8 +147,8 @@ server {
     listen 80;
     server_name _; # Üniversite domaini veya IP adresi
 
-    # Dosya ve evrak yükleme boyutu sınırı (50MB)
-    client_max_body_size 50M;
+    # Dosya ve evrak yükleme boyutu sınırı (100MB)
+    client_max_body_size 100M;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
