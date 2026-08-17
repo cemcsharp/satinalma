@@ -1397,6 +1397,17 @@ async init() {
       this.fetchSmtpSettings();
     }
 
+    if (viewName === 'supplier-analysis' || viewName === 'vendor-profile') {
+      this.authFetch('/api/vendor_ratings').then(async res => {
+        if (res.ok) {
+          const list = await res.json();
+          this.state.vendorRatings = list || [];
+          if (this.state.currentView === 'supplier-analysis') this.renderSupplierAnalysis();
+          else if (this.state.currentView === 'vendor-profile') this.renderVendorProfile();
+        }
+      }).catch(() => {});
+    }
+
     if (viewName === 'my-requests') {
       const currentPersonName = this.state.currentUser ? this.state.currentUser.name : '';
       const today = new Date();
@@ -6909,8 +6920,13 @@ async init() {
   // ----------------------------------------------------
   getVendorScore(supplierName) {
     if (!supplierName) return null;
-    const clean = supplierName.trim().toLowerCase();
-    const ratings = (this.state.vendorRatings || []).filter(r => r.supplierName && r.supplierName.trim().toLowerCase() === clean);
+    const clean = supplierName.trim().toLocaleLowerCase('tr-TR');
+    const cleanStd = supplierName.trim().toLowerCase();
+    const ratings = (this.state.vendorRatings || []).filter(r => {
+      if (!r.supplierName) return false;
+      const s = r.supplierName.trim();
+      return s.toLocaleLowerCase('tr-TR') === clean || s.toLowerCase() === cleanStd;
+    });
     if (ratings.length === 0) return null;
 
     const goodsRatings = ratings.filter(r => (r.purchaseType || 'MAL') === 'MAL');
@@ -7004,10 +7020,11 @@ async init() {
     const vendorName = this.state.currentVendorProfile;
     if (!vendorName) return;
 
-    const safeClean = vendorName.trim().toLowerCase();
-    const vendorRequests = (this.state.requests || []).filter(r => r.supplier && r.supplier.trim().toLowerCase() === safeClean);
-    const vendorContracts = (this.state.contracts || []).filter(c => c.supplier && c.supplier.trim().toLowerCase() === safeClean);
-    const vendorGuarantees = (this.state.guarantees || []).filter(g => g.supplier && g.supplier.trim().toLowerCase() === safeClean);
+    const safeClean = vendorName.trim().toLocaleLowerCase('tr-TR');
+    const safeCleanStd = vendorName.trim().toLowerCase();
+    const vendorRequests = (this.state.requests || []).filter(r => r.supplier && (r.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || r.supplier.trim().toLowerCase() === safeCleanStd));
+    const vendorContracts = (this.state.contracts || []).filter(c => c.supplier && (c.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || c.supplier.trim().toLowerCase() === safeCleanStd));
+    const vendorGuarantees = (this.state.guarantees || []).filter(g => g.supplier && (g.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || g.supplier.trim().toLowerCase() === safeCleanStd));
 
     const totalSpend = vendorRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
     const totalRequestsCount = vendorRequests.length;
