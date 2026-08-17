@@ -257,6 +257,23 @@ async function getTableData(tableName) {
     const res = await pool.query('SELECT id, name, title, role, "isActive", email FROM users ORDER BY id ASC');
     return res.rows;
   }
+  if (tableName === 'vendor_ratings') {
+    const res = await pool.query('SELECT * FROM vendor_ratings ORDER BY id ASC');
+    return res.rows.map(r => ({
+      id: r.id,
+      supplierName: r.supplierName || r.suppliername || r.supplier || '',
+      purchaseType: r.purchaseType || r.purchasetype || 'MAL',
+      requestId: r.requestId || r.requestid || null,
+      qualityScore: parseFloat(r.qualityScore || r.qualityscore || 5),
+      speedScore: parseFloat(r.speedScore || r.speedscore || 5),
+      complianceScore: parseFloat(r.complianceScore || r.compliancescore || 5),
+      communicationScore: parseFloat(r.communicationScore || r.communicationscore || 5),
+      overallScore: parseFloat(r.overallScore || r.overallscore || 5),
+      reviewNotes: r.reviewNotes || r.reviewnotes || '',
+      ratedBy: r.ratedBy || r.ratedby || '',
+      ratedAt: r.ratedAt || r.ratedat || ''
+    }));
+  }
   const res = await pool.query(`SELECT * FROM ${tableName} ORDER BY id ASC`);
   return res.rows;
 }
@@ -1646,6 +1663,20 @@ const server = http.createServer(async (req, res) => {
           if (table === 'users') {
             const rawPass = data.password || '123456';
             data.password = hashPassword(rawPass);
+          }
+
+          if (table === 'vendor_ratings') {
+            data.supplierName = data.supplierName || data.suppliername || data.supplier || '';
+            data.purchaseType = data.purchaseType || data.purchasetype || 'MAL';
+            data.requestId = data.requestId || data.requestid || null;
+            data.qualityScore = data.qualityScore || data.qualityscore || 5;
+            data.speedScore = data.speedScore || data.speedscore || 5;
+            data.complianceScore = data.complianceScore || data.compliancescore || 5;
+            data.communicationScore = data.communicationScore || data.communicationscore || data.assemblyScore || 5;
+            data.overallScore = data.overallScore || data.overallscore || 5;
+            data.reviewNotes = data.reviewNotes || data.reviewnotes || '';
+            data.ratedBy = data.ratedBy || data.ratedby || '';
+            data.ratedAt = data.ratedAt || data.ratedat || '';
           }
 
           // If rating a vendor for a specific request, ensure single evaluation lock

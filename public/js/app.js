@@ -166,7 +166,7 @@ async init() {
         this.state.tenders = data.tenders || [];
         this.state.logs = data.logs || [];
         this.state.documents = data.documents || [];
-        this.state.vendorRatings = data.vendorRatings || [];
+        this.state.vendorRatings = (data.vendorRatings || []).map(r => this.normalizeRating(r)).filter(Boolean);
         this.state.settings = data.settings || {};
         if (data.rates) this.state.rates = data.rates;
         this.state.dismissedNotifs = JSON.parse(localStorage.getItem('dismissedNotifs') || '[]');
@@ -6918,12 +6918,30 @@ async init() {
   // ----------------------------------------------------
   // ⭐ VENDOR RATING CLIENT ENGINE (MAL & HİZMET AYRIMLI)
   // ----------------------------------------------------
+  normalizeRating(r) {
+    if (!r) return null;
+    return {
+      id: r.id,
+      supplierName: String(r.supplierName || r.suppliername || r.supplier || r.supplier_name || '').trim(),
+      purchaseType: String(r.purchaseType || r.purchasetype || r.purchase_type || 'MAL').toUpperCase(),
+      requestId: r.requestId || r.requestid || r.request_id || null,
+      qualityScore: parseFloat(r.qualityScore || r.qualityscore || r.quality_score || 5),
+      speedScore: parseFloat(r.speedScore || r.speedscore || r.speed_score || 5),
+      complianceScore: parseFloat(r.complianceScore || r.compliancescore || r.compliance_score || 5),
+      communicationScore: parseFloat(r.communicationScore || r.communicationscore || r.communication_score || r.assemblyScore || 5),
+      overallScore: parseFloat(r.overallScore || r.overallscore || r.overall_score || 5),
+      reviewNotes: r.reviewNotes || r.reviewnotes || r.review_notes || r.notes || '',
+      ratedBy: r.ratedBy || r.ratedby || r.rated_by || 'Yetkili',
+      ratedAt: r.ratedAt || r.ratedat || r.rated_at || ''
+    };
+  },
+
   getVendorScore(supplierName) {
     if (!supplierName) return null;
     const clean = supplierName.trim().toLocaleLowerCase('tr-TR');
     const cleanStd = supplierName.trim().toLowerCase();
-    const ratings = (this.state.vendorRatings || []).filter(r => {
-      if (!r.supplierName) return false;
+    const ratings = (this.state.vendorRatings || []).map(r => this.normalizeRating(r)).filter(r => {
+      if (!r || !r.supplierName) return false;
       const s = r.supplierName.trim();
       return s.toLocaleLowerCase('tr-TR') === clean || s.toLowerCase() === cleanStd;
     });
