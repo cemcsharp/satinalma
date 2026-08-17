@@ -1,91 +1,139 @@
 #!/bin/bash
 # ============================================================
 #  Piri Reis Üniversitesi — Satınalma Takip Sistemi
-#  Bilgi İşlem (IT) Otomatik Sunucu Kurulum Betiği
-#  Versiyon: 2.0 | Tarih: 2026-08-07
+#  Bilgi İşlem (IT) Sağlamlaştırılmış Otomatik Kurulum Betiği
+#  Versiyon: 2.1.0 | Tarih: 2026-08-13
 # ============================================================
 
-set -e
+# Hata oluştuğunda hemen kesilmesini engellemek için kritik adımları kontrollü yürütüyoruz
+export DEBIAN_FRONTEND=noninteractive
 
 echo "=========================================================="
 echo " 🏛️  Piri Reis Üniversitesi — Satınalma Takip Sistemi"
-echo " 🚀  Otomatik Sunucu Kurulumu Başlatılıyor..."
+echo " 🚀  Sunucu Kurulum ve Yapılandırması Başlatılıyor..."
 echo "=========================================================="
 
-# ─── 1. SİSTEM PAKETLERİNİ GÜNCELLE ───
-echo ""
-echo "📦 [1/7] Sistem paketleri güncelleniyor..."
-sudo apt update && sudo apt upgrade -y
+# Renkli Çıktı Fonksiyonları
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+log_ok() { echo -e "   ${GREEN}✓ $1${NC}"; }
+log_warn() { echo -e "   ${YELLOW}⚠ $1${NC}"; }
+log_err() { echo -e "   ${RED}✗ $1${NC}"; }
+log_step() { echo -e "\n${BLUE}▶ $1${NC}"; }
+
+# ─── 1. SİSTEM PAKETLERİ VE DİL DESTEĞİ ───
+log_step "[1/7] Sistem paketleri ve Türkçe dil desteği güncelleniyor..."
+sudo apt-get update -y
+sudo apt-get install -y locales curl git build-essential software-properties-common
+
+# Türkçe UTF-8 dil desteğini oluştur (PostgreSQL hatasını önler)
+sudo locale-gen tr_TR.UTF-8 2>/dev/null || true
+sudo update-locale LANG=tr_TR.UTF-8 LC_ALL=tr_TR.UTF-8 2>/dev/null || true
+log_ok "Sistem paketleri ve UTF-8 yerel ayarları hazırlandı."
 
 # ─── 2. NODE.JS 20 LTS KURULUMU ───
-echo ""
-echo "🟢 [2/7] Node.js 20 LTS kuruluyor..."
-if ! command -v node &> /dev/null; then
+log_step "[2/7] Node.js 20 LTS kontrol ediliyor / kuruluyor..."
+if ! command -v node &> /dev/null || [ $(node -v | cut -d'.' -f1 | tr -d 'v') -lt 18 ]; then
+  echo "   → NodeSource reposu ekleniyor ve Node.js kuruluyor..."
   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  sudo apt install -y nodejs
-else
-  echo "   ✓ Node.js zaten yüklü: $(node -v)"
+  sudo apt-get install -y nodejs
 fi
 
-# ─── 3. POSTGRESQL KURULUMU & YAPILANDIRMASI ───
-echo ""
-echo "🐘 [3/7] PostgreSQL kuruluyor ve yapılandırılıyor..."
-sudo apt install -y postgresql postgresql-contrib
+if command -v node &> /dev/null; then
+  log_ok "Node.js hazır: $(node -v) | npm: $(npm -v)"
+else
+  log_err "Node.js kurulamadı! Lütfen internet bağlantısını kontrol edin."
+  exit 1
+fi
 
-# PostgreSQL servisinin çalıştığından emin ol
+# ─── 3. POSTGRESQL VERİTABANI KURULUMU ───
+log_step "[3/7] PostgreSQL kuruluyor ve yapılandırılıyor..."
+sudo apt-get install -y postgresql postgresql-contrib
+
+# PostgreSQL servisini başlat ve açılışa ekle
 sudo systemctl enable postgresql
-sudo systemctl start postgresql
+sudo systemctl restart postgresql
 
-# Veritabanı ve kullanıcı ayarları
+# PostgreSQL soketinin hazır olmasını bekle (maksimum 10 sn)
+for i in {1..10}; do
+  if sudo -u postgres psql -c '\q' 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+# PostgreSQL kullanıcısı ve veritabanı ayarları
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '123456';" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE DATABASE satinalma_db ENCODING 'UTF8' LC_COLLATE 'tr_TR.UTF-8' LC_CTYPE 'tr_TR.UTF-8' TEMPLATE template0;" 2>/dev/null || true
+
+# Veritabanı oluşturma (varsa devam et, yoksa UTF8 ile oluştur)
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'satinalma_db'" | grep -q 1 || \
+  sudo -u postgres psql -c "CREATE DATABASE satinalma_db ENCODING 'UTF8';" 2>/dev/null || true
+
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE satinalma_db TO postgres;" 2>/dev/null || true
 
-# UTF-8 encoding doğrulaması
-sudo -u postgres psql -d satinalma_db -c "SET client_encoding = 'UTF8';"
-echo "   ✓ Veritabanı 'satinalma_db' UTF-8 kodlamasıyla hazır."
+if sudo -u postgres psql -d satinalma_db -c '\q' 2>/dev/null; then
+  log_ok "PostgreSQL veritabanı 'satinalma_db' başarıyla hazırlandı."
+else
+  log_warn "Veritabanı kontrol edilemedi, ancak servis çalışıyor."
+fi
 
-# ─── 4. NGINX KURULUMU ───
-echo ""
-echo "🌐 [4/7] Nginx web sunucusu kuruluyor..."
-sudo apt install -y nginx
+# ─── 4. NGINX WEB SUNUCUSU KURULUMU ───
+log_step "[4/7] Nginx web sunucusu kuruluyor..."
+sudo apt-get install -y nginx
+sudo systemctl enable nginx
+sudo systemctl restart nginx
+log_ok "Nginx web sunucusu kuruldu ve çalıştırıldı."
 
-# ─── 5. PROJE BAĞIMLILIKLARI & VERİ İÇE AKTARMA ───
-echo ""
-echo "📥 [5/7] Proje bağımlılıkları (npm) yükleniyor..."
+# ─── 5. PROJE BAĞIMLILIKLARI VE DİZİN İZİNLERİ ───
+log_step "[5/7] Proje bağımlılıkları ve dizin izinleri yapılandırılıyor..."
+mkdir -p uploads backups
+sudo chmod -R 775 uploads backups 2>/dev/null || true
+
 npm install --production
+log_ok "Proje npm bağımlılıkları yüklendi."
 
-echo ""
-echo "📊 [6/7] Talepler.xlsx verileri veritabanına otomatik aktarılıyor..."
-node import-excel.js || true
+# Talepler.xlsx varsa otomatik aktarım yap
+if [ -f "import-excel.js" ] && [ -f "Talepler.xlsx" ]; then
+  echo "   → Talepler.xlsx verileri veritabanına aktarılıyor..."
+  node import-excel.js || true
+fi
 
-# ─── 7. PM2 İLE UYGULAMA BAŞLATMA (7/24 ÇALIŞMA) ───
-echo ""
-echo "⚡ [7/7] PM2 süreç yöneticisi ile uygulama başlatılıyor..."
-sudo npm install -g pm2
+# ─── 6. PM2 İLE UYGULAMANIN 7/24 BAŞLATILMASI ───
+log_step "[6/7] PM2 Süreç Yöneticisi yapılandırılıyor..."
+if ! command -v pm2 &> /dev/null; then
+  sudo npm install -g pm2
+fi
 
-# Eğer zaten çalışıyorsa yeniden başlat, yoksa yeni başlat
-pm2 describe satinalma > /dev/null 2>&1 && pm2 restart satinalma || pm2 start server.js --name "satinalma"
+# Mevcut çalışıyorsa durdurup temiz başlat
+pm2 delete satinalma 2>/dev/null || true
+pm2 start server.js --name "satinalma"
 pm2 save
 
-# PM2'nin sunucu yeniden başlatıldığında otomatik çalışmasını sağla
-pm2 startup systemd -u $USER --hp $HOME 2>/dev/null || true
+# Sistem başlangıcına otomatik ekleme
+STARTUP_CMD=$(pm2 startup systemd -u $USER --hp $HOME 2>/dev/null | grep -E 'sudo|pm2' | tail -n 1)
+if [ -n "$STARTUP_CMD" ]; then
+  eval "$STARTUP_CMD" 2>/dev/null || true
+fi
 pm2 save
+log_ok "PM2 yapılandırıldı; uygulama 7/24 arka planda çalışıyor."
 
-# ─── 7. NGINX REVERSE PROXY YAPILANDIRMASI ───
-echo ""
-echo "🔧 [7/7] Nginx reverse proxy ayarlanıyor (80 → 3000)..."
+# ─── 7. NGINX REVERSE PROXY AYARLARI ───
+log_step "[7/7] Nginx Reverse Proxy (Port 80 → 3000) ayarlanıyor..."
 
 cat << 'EOF' | sudo tee /etc/nginx/sites-available/satinalma > /dev/null
 server {
     listen 80;
     server_name _;
-    
-    # Büyük dosya yükleme limiti (Excel import vb.)
+
+    # Büyük dosya ve evrak yükleme limiti (50MB)
     client_max_body_size 50M;
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -94,8 +142,8 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # Zaman aşımı ayarları
+
+        # Zaman aşımı limitleri
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
@@ -103,23 +151,38 @@ server {
 }
 EOF
 
-sudo ln -sf /etc/nginx/sites-available/satinalma /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/satinalma /etc/nginx/sites-enabled/satinalma
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl restart nginx
-sudo systemctl enable nginx
+log_ok "Nginx Reverse Proxy yapılandırması tamamlandı ve aktifleştirildi."
+
+# ─── SİSTEM SAĞLIK DOĞRULAMASI ───
+echo ""
+echo "=========================================================="
+echo " 🔍 SİSTEM SAĞLIK VE SERVİS KONTROLÜ"
+echo "=========================================================="
+
+echo -n " • Node.js Sürümü     : " && node -v
+echo -n " • PostgreSQL Durumu  : " && (systemctl is-active postgresql || echo "Çalışmıyor")
+echo -n " • Nginx Durumu       : " && (systemctl is-active nginx || echo "Çalışmıyor")
+echo -n " • PM2 Uygulama Durumu: " && (pm2 jlist | grep -q '"name":"satinalma"' && echo "Online (Çalışıyor)" || echo "Durduruldu")
+
+SERVER_IP=$(hostname -I | awk '{print $1}')
+if [ -z "$SERVER_IP" ]; then SERVER_IP="SUNUCU_IP_ADRESI"; fi
 
 echo ""
 echo "=========================================================="
-echo " ✅ TEBRİKLER! Kurulum Başarıyla Tamamlandı!"
+echo -e "${GREEN} ✅ KURULUM BAŞARIYLA TAMAMLANDI!${NC}"
 echo "=========================================================="
 echo ""
-echo " 🌐 Web Erişimi  : http://localhost/ veya http://$(hostname -I | awk '{print $1}')/"
+echo " 🌐 Web Arayüzü  : http://$SERVER_IP/ veya http://localhost/"
 echo " 🗄️  Veritabanı   : PostgreSQL → satinalma_db (Port 5432)"
-echo " ⚡ Süreç Yöneticisi: PM2 (7/24 otomatik çalışır)"
+echo " 🛡️  Güvenlik     : JWT Token + PBKDF2 Şifreleme Aktif"
+echo " ⚡ Süreç Yöneticisi: PM2 (Otomatik restart 7/24)"
 echo " 🔄 Güncelleme   : bash update.sh"
 echo ""
 echo " 👤 Varsayılan Giriş Bilgileri:"
 echo "    Kullanıcı : Cem TUR (Admin)"
-echo "    Şifre     : 123456"
+echo "    Şifre     : 1234 (veya 123456)"
 echo ""
 echo "=========================================================="

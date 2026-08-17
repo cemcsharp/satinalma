@@ -6,3 +6,5 @@ backups/*.json
 .env
 .env*.local
 prisma/
+uploads/*
+!uploads/.gitkeep

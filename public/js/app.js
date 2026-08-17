@@ -37,12 +37,72 @@ const App = {
     charts: {}
   },
 
-  async init() {
-    console.log("Initializing Satınalma Takip App...");
+    async authFetch(url, options = {}) {
+    const token = localStorage.getItem('authToken');
+    const headers = options.headers ? { ...options.headers } : {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const opts = { ...options, headers };
+    try {
+      const res = await fetch(url, opts);
+      if (res.status === 401) {
+        console.warn('Oturum süresi doldu veya yetkisiz istek.');
+        if (this.state.isLoggedIn) {
+          this.handleLogout();
+          this.showToast('Oturum süreniz doldu, lütfen tekrar giriş yapın.', 'warning');
+        }
+      }
+      return res;
+    } catch (err) {
+      console.error(`authFetch Hatası (${url}):`, err);
+      throw err;
+    }
+  },
+
+  async fetchUsersList() {
+    try {
+      const res = await fetch('/api/auth/users-list');
+      if (res.ok) {
+        const users = await res.json();
+        this.state.users = users;
+        this.populateLoginDropdown();
+      }
+    } catch (e) {
+      console.error('fetchUsersList error:', e);
+      this.populateLoginDropdown();
+    }
+  },
+
+async init() {
+    console.log("Initializing Satınalma Takip App (Güvenli Mod)...");
     this.initTheme();
-    this.populateLoginDropdown();
     this.bindEvents();
-    await this.fetchInitialData();
+    await this.fetchUsersList();
+
+    const savedToken = localStorage.getItem('authToken');
+    if (savedToken) {
+      try {
+        const meRes = await this.authFetch('/api/auth/me');
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          this.state.currentUser = meData.user;
+          this.state.isLoggedIn = true;
+          document.getElementById('login-screen').style.display = 'none';
+          document.getElementById('app').style.display = 'flex';
+          this.updateUserProfileCard();
+          await this.fetchInitialData();
+          const savedView = localStorage.getItem('activeView') || 'dashboard';
+          this.switchView(savedView);
+          this.handleHashRoute();
+          return;
+        }
+      } catch (e) {
+        console.error('Session validation failed:', e);
+      }
+    }
+
+    this.handleLogout();
   },
 
   initTheme() {
@@ -90,7 +150,7 @@ const App = {
 
   async fetchInitialData() {
     try {
-      const res = await fetch('/api/data');
+      const res = await this.authFetch('/api/data');
       if (res.ok) {
         const data = await res.json();
         this.state.requests = (data.requests || []).map(r => ({
@@ -115,23 +175,6 @@ const App = {
         this.populateDropdowns();
         this.populateYearSelect();
         this.syncRatesInputUI();
-
-        // Restore login session from localStorage
-        const savedUserId = localStorage.getItem('loggedInUserId');
-        if (savedUserId) {
-          const user = this.state.users.find(u => u.id === parseInt(savedUserId));
-          if (user) {
-            this.state.currentUser = user;
-            this.state.isLoggedIn = true;
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app').style.display = 'flex';
-            this.updateUserProfileCard();
-
-            const savedView = localStorage.getItem('activeView') || 'dashboard';
-            this.switchView(savedView);
-            this.handleHashRoute();
-          }
-        }
       }
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -346,12 +389,13 @@ const App = {
     });
   },
 
-  handleLogin(e) {
+  async handleLogin(e) {
     e.preventDefault();
     const selectEl = document.getElementById('login-screen-user-select');
     const selectedVal = selectEl?.value;
     const passInput = document.getElementById('login-screen-password')?.value || '';
     const errMsg = document.getElementById('login-error-msg');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
 
     if (!selectedVal) {
       if (errMsg) {
@@ -361,53 +405,72 @@ const App = {
       return;
     }
 
-    const usersList = (this.state.users && this.state.users.length > 0) ? this.state.users : [
-      { id: 1, name: 'Cem TUR', username: 'cem', role: 'ADMIN', title: 'Satınalma Mdr. Yrd.', password: '123', isActive: true },
-      { id: 2, name: 'Merih AVCI', username: 'merih', role: 'ADMIN', title: 'Satınalma Müdürü', password: '123456', isActive: true },
-      { id: 3, name: 'Gülsüm YILDIRIM', username: 'gülsüm', role: 'STAFF', title: 'Satınalma Kd. Uz.', password: '123', isActive: true },
-      { id: 4, name: 'Sultan MERİÇ', username: 'sultan', role: 'STAFF', title: 'Satınalma Uzmanı', password: '123', isActive: true },
-      { id: 5, name: 'Caner TÜRKMEN', username: 'caner', role: 'STAFF', title: 'IT Uzmanı', password: '123', isActive: true },
-      { id: 6, name: 'Hilal AKYOL', username: 'hilal', role: 'STAFF', title: 'Satınalma Asistanı', password: '123', isActive: true }
-    ];
-
-    const user = usersList.find(u => String(u.id) === String(selectedVal));
-
-    if (!user) {
-      if (errMsg) {
-        errMsg.innerText = '⚠️ Seçilen personel sistemde bulunamadı!';
-        errMsg.style.display = 'block';
-      }
-      return;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerText = '⏳ Giriş Yapılıyor...';
     }
 
-    const validPass = user.password || '123';
-    if (passInput === validPass) {
-      this.state.currentUser = user;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: parseInt(selectedVal, 10), password: passInput })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        if (errMsg) {
+          errMsg.innerText = `⚠️ ${data.error || 'Şifre hatalı! Lütfen tekrar deneyin.'}`;
+          errMsg.style.display = 'block';
+        }
+        return;
+      }
+
+      // Başarılı Giriş
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('loggedInUserId', data.user.id);
+      this.state.currentUser = data.user;
       this.state.isLoggedIn = true;
-      localStorage.setItem('loggedInUserId', user.id);
-      
+
       if (errMsg) errMsg.style.display = 'none';
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app').style.display = 'flex';
 
       this.updateUserProfileCard();
+      await this.fetchInitialData();
+      
       const savedView = localStorage.getItem('activeView') || 'dashboard';
       this.switchView(savedView);
-    } else {
+      this.showToast(`Hoş geldiniz, Sayın ${data.user.name}`, 'success', '👋');
+    } catch (err) {
+      console.error('Login error:', err);
       if (errMsg) {
-        errMsg.innerText = '⚠️ Şifre hatalı! Lütfen tekrar deneyin.';
+        errMsg.innerText = '⚠️ Sunucu ile bağlantı kurulamadı.';
         errMsg.style.display = 'block';
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = '🚀 Güvenli Giriş Yap';
       }
     }
   },
 
-  handleLogout() {
+  async handleLogout() {
+    try {
+      await this.authFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    } catch (e) {}
     this.state.isLoggedIn = false;
     this.state.currentUser = null;
+    localStorage.removeItem('authToken');
     localStorage.removeItem('loggedInUserId');
     document.getElementById('app').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('login-screen-password').value = '';
+    const passField = document.getElementById('login-screen-password');
+    if (passField) passField.value = '';
+    const errMsg = document.getElementById('login-error-msg');
+    if (errMsg) errMsg.style.display = 'none';
+    this.populateLoginDropdown();
   },
 
   updateUserProfileCard() {
@@ -454,11 +517,10 @@ const App = {
     else if (type === 'invoice') this.viewInvoiceDetails(id);
   },
 
-  handlePortalSearch(query) {
+  async handlePortalSearch(query) {
     const resultsBox = document.getElementById('portal-search-results');
     if (!resultsBox) return;
 
-    // Temizleme: Baştaki # simgesi ve fazla boşluklar temizlenir
     const cleanQ = query?.toString().replace(/^#/, '').toLowerCase().trim();
     if (!cleanQ || cleanQ.length < 2) {
       resultsBox.innerHTML = `
@@ -469,55 +531,67 @@ const App = {
       return;
     }
 
-    // Bilgi Güvenliği & Gizlilik: Yalnızca Barkod No veya Sipariş No sorgulanır
-    const matches = (this.state.requests || []).filter(r => {
-      const reqBc = r.requestBarcode?.toString().toLowerCase().trim() || '';
-      const ordBc = r.orderBarcode?.toString().toLowerCase().trim() || '';
-      return reqBc === cleanQ || ordBc === cleanQ;
-    }).slice(0, 5);
-
-    if (matches.length === 0) {
+    try {
       resultsBox.innerHTML = `
-        <div style="padding: 1.5rem; text-align: center; color: var(--status-rejected); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
-          ⚠️ "${query}" numaralı bir talep kaydı bulunamadı. Lütfen barkod veya sipariş numaranızı kontrol edin.
+        <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+          ⏳ Barkod sorgulanıyor...
         </div>
       `;
-      return;
-    }
 
-    resultsBox.innerHTML = matches.map(r => {
-      let orderStatusText = '🚚 İşlemde / Sipariş Sürecinde';
-      if (r.status === 'Tamamlandı') orderStatusText = '✅ Tamamlandı / Kapatıldı';
-      else if (r.status === 'Reddedildi') orderStatusText = '❌ İptal Edildi';
-      else if (r.orderBarcode) orderStatusText = `🚚 Sipariş Verildi (#${r.orderBarcode})`;
+      const res = await fetch(`/api/public/search-demand?barcode=${encodeURIComponent(cleanQ)}`);
+      if (!res.ok) throw new Error('Arama hatası');
+      const matches = await res.json();
 
-      const expertUser = (this.state.users || []).find(u => u.name === r.assignedTo);
-      const expertPhone = expertUser?.phone || (r.assignedTo === 'Merih AVCI' ? '1101' : r.assignedTo === 'Cem TUR' ? '1102' : r.assignedTo === 'Gülsüm YILDIRIM' ? '1103' : r.assignedTo === 'Sultan MERİÇ' ? '1104' : r.assignedTo === 'Şimal ERDEM' ? '1105' : '1106');
-      const expertEmail = expertUser?.email || (r.assignedTo ? (r.assignedTo.split(' ')[0].toLowerCase() + '@pirireis.edu.tr') : '');
-
-      return `
-        <div class="portal-result-card">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.45rem;">
-            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary); font-size: 1rem;">
-              Barkod #${r.requestBarcode || r.id}
-            </span>
-            <span class="badge status-${r.status?.toLowerCase()}">${r.status}</span>
+      if (!matches || matches.length === 0) {
+        resultsBox.innerHTML = `
+          <div style="padding: 1.5rem; text-align: center; color: var(--status-rejected); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+            ⚠️ "${query}" numaralı bir talep kaydı bulunamadı. Lütfen barkod veya sipariş numaranızı kontrol edin.
           </div>
-          <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); margin-bottom: 0.5rem; line-height: 1.4;">${r.subject}</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted); display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-bottom: 0.2rem; background: var(--bg-card); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-            <div>🏢 Birim: <strong style="color: var(--text-main);">${r.unit}</strong></div>
-            <div>👤 Sorumlu Uzman: <strong style="color: var(--accent-primary);">${r.assignedTo || '-'}</strong></div>
-            <div>📅 Geliş Tarihi: <strong style="color: var(--text-main);">${r.arrivalDate || r.requestDate || '-'}</strong></div>
-            <div>🚚 Süreç Durumu: <strong style="color: var(--status-completed);">${orderStatusText}</strong></div>
-            ${r.description ? `<div style="grid-column: span 2; border-top: 1px dashed var(--border-color); padding-top: 0.35rem; margin-top: 0.2rem; color: var(--text-main); font-size: 0.8rem; line-height: 1.45;">📝 <strong>Açıklama / Not:</strong> ${r.description}</div>` : ''}
-            <div style="grid-column: span 2; border-top: 1px solid var(--border-color); padding-top: 0.4rem; margin-top: 0.25rem; color: var(--accent-purple); font-weight: 600; display: flex; gap: 1rem; flex-wrap: wrap;">
-              <span>📞 Dahili Tel: <strong>${expertPhone}</strong></span>
-              <span>✉️ E-Posta: <strong>${expertEmail}</strong></span>
+        `;
+        return;
+      }
+
+      resultsBox.innerHTML = matches.map(r => {
+        let orderStatusText = '🚚 İşlemde / Sipariş Sürecinde';
+        if (r.status === 'Tamamlandı') orderStatusText = '✅ Tamamlandı / Kapatıldı';
+        else if (r.status === 'Reddedildi' || r.status === 'İptal') orderStatusText = '❌ İptal Edildi';
+        else if (r.orderBarcode) orderStatusText = `🚚 Sipariş Verildi (#${r.orderBarcode})`;
+
+        const expertUser = (this.state.users || []).find(u => u.name === r.assignedTo);
+        const expertPhone = expertUser?.phone || (r.assignedTo === 'Merih AVCI' ? '1101' : r.assignedTo === 'Cem TUR' ? '1102' : r.assignedTo === 'Gülsüm YILDIRIM' ? '1103' : r.assignedTo === 'Sultan MERİÇ' ? '1104' : r.assignedTo === 'Şimal ERDEM' ? '1105' : '1106');
+        const expertEmail = expertUser?.email || (r.assignedTo ? (r.assignedTo.split(' ')[0].toLowerCase() + '@pirireis.edu.tr') : '');
+
+        return `
+          <div class="portal-result-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.45rem;">
+              <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary); font-size: 1rem;">
+                Barkod #${r.requestBarcode || r.id}
+              </span>
+              <span class="badge status-${r.status?.toLowerCase()}">${r.status || 'Açık'}</span>
+            </div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); margin-bottom: 0.5rem; line-height: 1.4;">${r.subject}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-bottom: 0.2rem; background: var(--bg-card); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+              <div>🏢 Birim: <strong style="color: var(--text-main);">${r.unit}</strong></div>
+              <div>👤 Sorumlu Uzman: <strong style="color: var(--accent-primary);">${r.assignedTo || '-'}</strong></div>
+              <div>📅 Geliş Tarihi: <strong style="color: var(--text-main);">${r.arrivalDate || r.requestDate || '-'}</strong></div>
+              <div>🚚 Süreç Durumu: <strong style="color: var(--status-completed);">${orderStatusText}</strong></div>
+              ${r.description ? `<div style="grid-column: span 2; border-top: 1px dashed var(--border-color); padding-top: 0.35rem; margin-top: 0.2rem; color: var(--text-main); font-size: 0.8rem; line-height: 1.45;">📝 <strong>Açıklama / Not:</strong> ${r.description}</div>` : ''}
+              <div style="grid-column: span 2; border-top: 1px solid var(--border-color); padding-top: 0.4rem; margin-top: 0.25rem; color: var(--accent-purple); font-weight: 600; display: flex; gap: 1rem; flex-wrap: wrap;">
+                <span>📞 Dahili Tel: <strong>${expertPhone}</strong></span>
+                <span>✉️ E-Posta: <strong>${expertEmail}</strong></span>
+              </div>
             </div>
           </div>
+        `;
+      }).join('');
+    } catch (e) {
+      console.error('Portal arama hatası:', e);
+      resultsBox.innerHTML = `
+        <div style="padding: 1.5rem; text-align: center; color: var(--status-rejected); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+          ⚠️ Arama yapılırken bir hata oluştu.
         </div>
       `;
-    }).join('');
+    }
   },
 
   bindEvents() {
@@ -953,7 +1027,7 @@ const App = {
       const usd = parseFloat(document.getElementById('setting-rate-usd').value) || 36.50;
       const eur = parseFloat(document.getElementById('setting-rate-eur').value) || 39.80;
       this.state.rates = { USD: usd, EUR: eur, lastUpdated: new Date().toLocaleString('tr-TR') };
-      await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates: this.state.rates }) }).catch(e => console.error(e));
+      await this.authFetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates: this.state.rates }) }).catch(e => console.error(e));
       this.logAction('Döviz Kuru Güncellendi', `USD: ${usd} ₺, EUR: ${eur} ₺`);
       this.showToast("Döviz kurları başarıyla güncellendi!", "success");
       this.render();
@@ -1141,7 +1215,7 @@ const App = {
       const btn = document.getElementById('btn-fetch-tcmb-rates');
       if (btn) btn.innerText = '⌛ Merkez Bankası\'na Bağlanılıyor...';
 
-      const res = await fetch('/api/fetch-tcmb-rates');
+      const res = await this.authFetch('/api/fetch-tcmb-rates');
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -1159,7 +1233,7 @@ const App = {
           if (eurInput) eurInput.value = data.EUR;
           if (dateLabel) dateLabel.innerText = `TCMB Güncelleme: ${data.lastUpdated}`;
 
-          await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates: this.state.rates }) }).catch(e => console.error(e));
+          await this.authFetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates: this.state.rates }) }).catch(e => console.error(e));
           this.logAction('TCMB Kurları Çekildi', `Merkez Bankası Satış Kurları -> USD: ${data.USD} ₺, EUR: ${data.EUR} ₺ (${data.lastUpdated})`);
           this.showToast(`TCMB Kurları Başarıyla Çekildi! (USD: ${data.USD} ₺, EUR: ${data.EUR} ₺)`, "success", "🏛️");
           this.render();
@@ -1960,7 +2034,7 @@ const App = {
     `;
 
     try {
-      const res = await fetch(`/api/documents?entityType=${entityType}&entityId=${entityId}`);
+      const res = await this.authFetch(`/api/documents?entityType=${entityType}&entityId=${entityId}`);
       if (res.ok) {
         const docs = await res.json();
         if (countEl) countEl.innerText = docs.length;
@@ -2060,7 +2134,7 @@ const App = {
           uploadedBy: this.state.currentUser ? this.state.currentUser.name : 'Sistem'
         };
 
-        const res = await fetch('/api/documents/upload', {
+        const res = await this.authFetch('/api/documents/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -2099,7 +2173,7 @@ const App = {
   async deleteDocument(docId) {
     this.showConfirm("Evrakı Sil", "Bu evrakı sistemden ve sunucu diskinden kalıcı olarak silmek istediğinize emin misiniz?", async () => {
       try {
-        const res = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        const res = await this.authFetch(`/api/documents/${docId}`, { method: 'DELETE' });
         if (res.ok) {
           this.showToast("Evrak başarıyla silindi.", "warning", "🗑️");
           this.logAction('Evrak Silindi', `Doküman ID #${docId} silindi.`);
@@ -2519,7 +2593,7 @@ const App = {
 
     this.showToast(`"${req.unit}" birimine puanlama hatırlatması gönderiliyor...`, 'info', '⏳');
     try {
-      const res = await fetch(`/api/requests/${reqId}/remind-rating`, { method: 'POST' });
+      const res = await this.authFetch(`/api/requests/${reqId}/remind-rating`, { method: 'POST' });
       const data = await res.json();
       if (res.ok && data.success) {
         this.showToast(`"${req.unit}" birimine puanlama hatırlatma e-postası başarıyla gönderildi!`, 'success', '🔔');
@@ -6413,7 +6487,7 @@ const App = {
   // ----------------------------------------------------
   async fetchSmtpSettings() {
     try {
-      const res = await fetch('/api/settings/smtp');
+      const res = await this.authFetch('/api/settings/smtp');
       if (res.ok) {
         const cfg = await res.json();
         this.state.smtpConfig = cfg;
@@ -6465,7 +6539,7 @@ const App = {
     };
 
     try {
-      const res = await fetch('/api/settings/smtp', {
+      const res = await this.authFetch('/api/settings/smtp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cfg)
@@ -6502,7 +6576,7 @@ const App = {
 
     this.showToast(`"${testTarget}" adresine test e-postası gönderiliyor...`, 'info', '✉️');
     try {
-      const res = await fetch('/api/email/test', {
+      const res = await this.authFetch('/api/email/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -6533,7 +6607,7 @@ const App = {
     const tbody = document.getElementById('tbody-backups-list');
     if (!tbody) return;
     try {
-      const res = await fetch('/api/backups');
+      const res = await this.authFetch('/api/backups');
       if (res.ok) {
         const backups = await res.json();
         if (!Array.isArray(backups) || backups.length === 0) {
@@ -6571,7 +6645,7 @@ const App = {
   async triggerManualBackup() {
     try {
       this.showToast("Veritabanı yedeği alınıyor...", "info", "💾");
-      const res = await fetch('/api/backups/create', { method: 'POST' });
+      const res = await this.authFetch('/api/backups/create', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         this.showToast(`Veritabanı yedeği oluşturuldu (${data.backup?.filename || 'Yedek Alındı'})`, "success", "✅");
@@ -6593,7 +6667,7 @@ const App = {
       async () => {
         try {
           this.showToast(`Veritabanı "${filename}" yedeğinden geri yükleniyor...`, 'info', '🔄');
-          const res = await fetch('/api/backups/restore', {
+          const res = await this.authFetch('/api/backups/restore', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filename })
@@ -6622,7 +6696,7 @@ const App = {
       `"${filename}" yedek dosyasını sunucu diskinden kalıcı olarak silmek istediğinizden emin misiniz?`,
       async () => {
         try {
-          const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+          const res = await this.authFetch(`/api/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' });
           if (res.ok) {
             this.showToast(`"${filename}" yedek dosyası silindi.`, 'warning', '🗑️');
             await this.fetchBackups();
@@ -6802,7 +6876,7 @@ const App = {
     if (statusEl) statusEl.innerText = 'Veriler veritabanına aktarılıyor, lütfen bekleyiniz...';
 
     try {
-      const res = await fetch('/api/demands/batch', {
+      const res = await this.authFetch('/api/demands/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items })
@@ -7475,7 +7549,7 @@ const App = {
     };
 
     try {
-      const res = await fetch('/api/vendor_ratings', {
+      const res = await this.authFetch('/api/vendor_ratings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRating)
@@ -7551,7 +7625,7 @@ const App = {
     if (!confirm("Sunucudaki uygulama son koda (Git) güncellenecek ve servis yeniden başlatılacak. Devam etmek istiyor musunuz?")) return;
     try {
       this.showToast("Sunucu güncelleniyor, lütfen bekleyin...", "info", "🚀");
-      const res = await fetch('/api/update-system', { method: 'POST' });
+      const res = await this.authFetch('/api/update-system', { method: 'POST' });
       if (res.ok) {
         this.showToast("🎉 Sunucu başarıyla son sürüme güncellendi!", "success", "✅");
       } else {
@@ -7626,7 +7700,7 @@ const App = {
     }
 
     try {
-      const res = await fetch('/api/units', {
+      const res = await this.authFetch('/api/units', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email })
@@ -7692,7 +7766,7 @@ const App = {
     const oldName = oldUnit ? (typeof oldUnit === 'object' ? oldUnit.name : oldUnit) : null;
 
     try {
-      const res = await fetch(`/api/units/${id}`, {
+      const res = await this.authFetch(`/api/units/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName, email: newEmail })
@@ -7898,7 +7972,7 @@ const App = {
     }
 
     try {
-      const response = await fetch(url, options);
+      const response = await this.authFetch(url, options);
       if (!response.ok) {
         throw new Error(`API Hatası: ${response.statusText}`);
       }
@@ -9015,7 +9089,7 @@ const App = {
       const tbody = document.getElementById('tbody-backups-list');
       if (!tbody) return;
       
-      const res = await fetch('/api/backups');
+      const res = await this.authFetch('/api/backups');
       if (res.ok) {
         const backups = await res.json();
         if (!backups || backups.length === 0) {
@@ -9043,7 +9117,7 @@ const App = {
       const btn = document.getElementById('btn-trigger-backup-now');
       if (btn) btn.innerHTML = '<span>⌛</span> Yedek Alınıyor...';
 
-      const res = await fetch('/api/backup-now', { method: 'POST' });
+      const res = await this.authFetch('/api/backup-now', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {

@@ -1,12 +1,13 @@
 // ============================================================
 //  Piri Reis Üniversitesi — Satınalma Takip Sunucusu (Node.js)
-//  Veritabanı: PostgreSQL (REST API)
+//  Güvenlik & Yetkilendirme Güçlendirilmiş REST API Modülü
 // ============================================================
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 const pg = require('pg');
 const archiver = require('archiver');
 const nodemailer = require('nodemailer');
@@ -21,6 +22,8 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const BACKUP_DIR = path.join(__dirname, 'backups');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'pruni-satinalma-sec-key-2026-auth-jwt';
+
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
@@ -30,11 +33,11 @@ if (!fs.existsSync(BACKUP_DIR)) {
 
 // PostgreSQL Bağlantı Havuzu
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'satinalma_db',
-  password: '123456',
-  port: 5432,
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'satinalma_db',
+  password: process.env.DB_PASSWORD || '123456',
+  port: parseInt(process.env.DB_PORT, 10) || 5432,
 });
 
 pool.on('connect', (client) => {
@@ -59,12 +62,118 @@ const MIME_TYPES = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
+  '.pdf': 'application/pdf',
+  '.zip': 'application/zip'
 };
 
-function readBody(req) {
+// İzin verilen evrak dosya uzantıları (Güvenlik Beyaz Listesi)
+const ALLOWED_UPLOAD_EXTENSIONS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.txt', '.zip', '.csv'];
+
+// ----------------------------------------------------
+// 🔐 KRİPTO VE TOKEN YÖNETİMİ
+// ----------------------------------------------------
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(String(password), salt, 10000, 64, 'sha512').toString('hex');
+  return `$pbkdf2$10000$${salt}$${hash}`;
+}
+
+function verifyPassword(password, storedHash) {
+  if (!storedHash) return false;
+  if (!storedHash.startsWith('$pbkdf2$')) {
+    // Düz metin geriye dönük uyumluluk (migration öncesi)
+    return String(storedHash) === String(password);
+  }
+  try {
+    const parts = storedHash.split('$');
+    const iterations = parseInt(parts[2], 10);
+    const salt = parts[3];
+    const originalHash = parts[4];
+    const verifyHash = crypto.pbkdf2Sync(String(password), salt, iterations, 64, 'sha512').toString('hex');
+    return originalHash === verifyHash;
+  } catch (e) {
+    return false;
+  }
+}
+
+function generateToken(user) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const exp = Date.now() + (24 * 60 * 60 * 1000); // 24 saat geçerli
+  const payload = Buffer.from(JSON.stringify({
+    id: user.id,
+    name: user.name,
+    role: user.role || 'STAFF',
+    title: user.title || '',
+    email: user.email || '',
+    exp
+  })).toString('base64url');
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest('base64url');
+  return `${header}.${payload}.${signature}`;
+}
+
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [header, payload, signature] = parts;
+  const expectedSig = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest('base64url');
+  if (signature !== expectedSig) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (data.exp && Date.now() > data.exp) return null; // Süresi dolmuş token
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getAuthUser(req) {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return null;
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
+  return verifyToken(token);
+}
+
+// ----------------------------------------------------
+// 🛡️ RATE LIMITING (KABA KUVVET KORUMASI)
+// ----------------------------------------------------
+const rateLimitMap = new Map();
+function checkRateLimit(key, maxRequests = 15, windowMs = 60000) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key) || { count: 0, resetTime: now + windowMs };
+  if (now > entry.resetTime) {
+    entry.count = 0;
+    entry.resetTime = now + windowMs;
+  }
+  entry.count++;
+  rateLimitMap.set(key, entry);
+  return entry.count <= maxRequests;
+}
+
+// Periyodik temizlik (Bellek şişmesini engellemek için)
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateLimitMap.entries()) {
+    if (now > v.resetTime) rateLimitMap.delete(k);
+  }
+}, 5 * 60 * 1000);
+
+// ----------------------------------------------------
+// 📥 GÜVENLİ BODY OKUYUCU (MAX BODY LIMIT)
+// ----------------------------------------------------
+function readBody(req, maxBytes = 25 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
+    let size = 0;
     const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
+    req.on('data', chunk => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        req.destroy();
+        reject(new Error('Payload Too Large'));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
@@ -98,6 +207,11 @@ function fetchTCMBRates() {
 }
 
 async function getTableData(tableName) {
+  if (tableName === 'users') {
+    // Şifre alanını ASLA API ile açık olarak döndürme
+    const res = await pool.query('SELECT id, name, title, role, "isActive", email FROM users ORDER BY id ASC');
+    return res.rows;
+  }
   const res = await pool.query(`SELECT * FROM ${tableName} ORDER BY id ASC`);
   return res.rows;
 }
@@ -115,7 +229,7 @@ function sanitizeVal(val, k) {
 // ----------------------------------------------------
 async function exportAllDatabaseData() {
   const tables = ['users', 'units', 'regulations', 'rates', 'requests', 'contracts', 'invoices', 'guarantees', 'tenders', 'documents', 'logs', 'vendor_ratings', 'settings'];
-  const snapshot = { exportedAt: new Date().toISOString(), version: '2.0.0' };
+  const snapshot = { exportedAt: new Date().toISOString(), version: '2.1.0' };
   for (const t of tables) {
     try {
       const r = await pool.query(`SELECT * FROM ${t} ORDER BY id ASC`);
@@ -204,7 +318,6 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
     const cfg = await getSmtpConfig();
     if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) return;
 
-    // Look up unit email
     const unitRes = await pool.query('SELECT email FROM units WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [demand.unit]);
     const unitEmail = unitRes.rows[0]?.email;
     if (!unitEmail || !unitEmail.includes('@')) {
@@ -212,7 +325,6 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
       return;
     }
 
-    // Look up assigned expert email/phone if any
     let expertInfo = demand.assignedTo || 'Satınalma Uzmanı';
     if (demand.assignedTo && demand.assignedTo !== 'Henüz Atanmadı') {
       const userRes = await pool.query('SELECT name, title, email, phone FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [demand.assignedTo]);
@@ -268,7 +380,7 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
     if (demand.status === 'Tamamlandı' && demand.supplier) {
       const pType = demand.purchaseType || 'MAL';
       const typeLabel = pType === 'HIZMET' ? 'Hizmet' : 'Mal / Ürün';
-      const rateUrl = `http://localhost:3000/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
+      const rateUrl = `http://localhost:${PORT}/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
       ratingSection = `
         <div style="margin-top: 18px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 8px; padding: 16px; text-align: center;">
           <div style="font-size: 0.95rem; font-weight: 700; color: #166534; margin-bottom: 4px;">
@@ -347,7 +459,6 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
       html: html
     });
 
-    // Add log
     await pool.query(
       'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
       [dateStr, 'Sistem (E-Posta Servisi)', 'Birim Bilgilendirme E-Postası', `Talep #${barcode} için "${demand.unit}" birimine (${unitEmail}) e-posta gönderildi. [${eventType}]`]
@@ -361,7 +472,7 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
 
 async function sendRatingReminderEmail(demand) {
   const cfg = await getSmtpConfig();
-  if (!cfg.isEnabled || !cfg.host) {
+  if (!cfg || !cfg.isEnabled || !cfg.host) {
     throw new Error('SMTP e-posta servisi aktif değil veya yapılandırılmamış.');
   }
 
@@ -378,7 +489,7 @@ async function sendRatingReminderEmail(demand) {
   const barcode = demand.requestBarcode || demand.id;
   const pType = demand.purchaseType || 'MAL';
   const typeLabel = pType === 'HIZMET' ? 'Hizmet' : 'Mal / Ürün';
-  const rateUrl = `http://localhost:3000/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
+  const rateUrl = `http://localhost:${PORT}/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
 
   const dateStr = new Date().toLocaleDateString('tr-TR');
   const subject = `🔔 Hatırlatma: ${demand.unit} — Tedarikçi Değerlendirmesi (#${barcode})`;
@@ -457,19 +568,23 @@ async function sendRatingReminderEmail(demand) {
   console.log(`🔔 Puanlama Hatırlatma E-Postası Gönderildi -> ${demand.unit} (${unitEmail}) [#${barcode}]`);
 }
 
+// ----------------------------------------------------
+// 🚀 ANA HTTP SUNUCU VE YÖNLENDİRME MOTORU
+// ----------------------------------------------------
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const urlPath = url.pathname;
   const method = req.method.toUpperCase();
   const parts = urlPath.split('/').filter(Boolean);
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
 
-  const pad = (n) => String(n).padStart(2, '0');
-  const now = new Date();
-  console.log(`[${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}] ${method} ${urlPath}`);
-
+  // HTTP Güvenlik Başlıkları
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
   if (method === 'OPTIONS') {
     res.writeHead(200);
@@ -483,13 +598,190 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Auth / Role Yardımcıları
+  const currentUser = getAuthUser(req);
+
+  function sendUnauthorized(msg = 'Oturum açmanız gerekmektedir.') {
+    res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: msg, code: 'UNAUTHORIZED' }));
+  }
+
+  function sendForbidden(msg = 'Bu işlem için ADMIN (Yönetici) yetkisi gereklidir.') {
+    res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: msg, code: 'FORBIDDEN' }));
+  }
+
   try {
-    // 1. Initial Load
+    // ----------------------------------------------------
+    // 🔑 AUTHENTICATION & LOGIN ENDPOINTS (PUBLIC)
+    // ----------------------------------------------------
+    if (urlPath === '/api/auth/users-list' && method === 'GET') {
+      // Login dropdown için güvenli personel listesi (Şifresiz)
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const result = await pool.query('SELECT id, name, title, role, "isActive" FROM users ORDER BY "isActive" DESC, id ASC');
+      res.writeHead(200);
+      res.end(JSON.stringify(result.rows));
+      return;
+    }
+
+    if (urlPath === '/api/auth/login' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      
+      // Brute-force koruması (1 dakikada maks 10 deneme)
+      if (!checkRateLimit(`login_${clientIp}`, 10, 60000)) {
+        res.writeHead(429);
+        res.end(JSON.stringify({ error: 'Çok fazla hatalı giriş denemesi yapıldı. Lütfen 1 dakika bekleyin.' }));
+        return;
+      }
+
+      const body = await readBody(req, 1024 * 1024);
+      const { userId, password } = JSON.parse(body || '{}');
+
+      if (!userId || !password) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Lütfen kullanıcı ve şifre giriniz.' }));
+        return;
+      }
+
+      const userRes = await pool.query('SELECT id, name, title, role, "isActive", password, email FROM users WHERE id = $1', [parseInt(userId, 10)]);
+      if (userRes.rowCount === 0) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Kullanıcı bulunamadı.' }));
+        return;
+      }
+
+      const user = userRes.rows[0];
+      if (user.isActive === false) {
+        res.writeHead(403);
+        res.end(JSON.stringify({ error: 'Bu kullanıcı hesabı pasif durumdadır.' }));
+        return;
+      }
+
+      const isMatch = verifyPassword(password, user.password);
+      if (!isMatch) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Şifre hatalı! Lütfen tekrar deneyin.' }));
+        return;
+      }
+
+      const token = generateToken(user);
+      const safeUser = {
+        id: user.id,
+        name: user.name,
+        title: user.title,
+        role: user.role,
+        email: user.email
+      };
+
+      // Giriş logu
+      const pad = (n) => String(n).padStart(2, '0');
+      const now = new Date();
+      const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      await pool.query(
+        'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+        [dateStr, user.name, 'Kullanıcı Girişi', `Sisteme başarıyla giriş yapıldı (IP: ${clientIp})`]
+      ).catch(() => {});
+
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, token, user: safeUser }));
+      return;
+    }
+
+    if (urlPath === '/api/auth/me' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      if (!currentUser) {
+        sendUnauthorized();
+        return;
+      }
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, user: currentUser }));
+      return;
+    }
+
+    if (urlPath === '/api/auth/logout' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, message: 'Çıkış yapıldı.' }));
+      return;
+    }
+
+    // ----------------------------------------------------
+    // 🔍 PUBLIC PORTAL BARKOD SORGU ENDPOINT'İ
+    // ----------------------------------------------------
+    if (urlPath === '/api/public/search-demand' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const query = (url.searchParams.get('barcode') || '').trim().toLowerCase();
+      if (!query || query.length < 2) {
+        res.writeHead(200);
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      const searchRes = await pool.query(`
+        SELECT id, "requestBarcode", "orderBarcode", subject, unit, "arrivalDate", "requestDate", "assignedTo", priority, status, description, "orderDate", supplier, "purchaseType"
+        FROM requests
+        WHERE LOWER(TRIM("requestBarcode")) = LOWER(TRIM($1))
+           OR LOWER(TRIM("orderBarcode")) = LOWER(TRIM($1))
+           OR LOWER("requestBarcode") LIKE $2
+        ORDER BY id DESC
+        LIMIT 5
+      `, [query, `%${query}%`]);
+
+      res.writeHead(200);
+      res.end(JSON.stringify(searchRes.rows));
+      return;
+    }
+
+    // ----------------------------------------------------
+    // 📊 DÖVİZ KURLARI (TCMB)
+    // ----------------------------------------------------
+    if (urlPath === '/api/fetch-tcmb-rates' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      try {
+        const rates = await fetchTCMBRates();
+        res.writeHead(200);
+        res.end(JSON.stringify(rates));
+      } catch (err) {
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+      return;
+    }
+
+    // ----------------------------------------------------
+    // ⭐ TEDARİKÇİ PUANLAMA (E-POSTA LİNKİNDEN GELEN PUBLIC İŞLEMLER)
+    // ----------------------------------------------------
+    if (urlPath === '/api/vendor_ratings/check' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const reqId = url.searchParams.get('reqId');
+      if (!reqId) {
+        res.writeHead(200);
+        res.end(JSON.stringify({ alreadyRated: false }));
+        return;
+      }
+      const checkRes = await pool.query('SELECT * FROM vendor_ratings WHERE "requestId" = $1 ORDER BY id DESC LIMIT 1', [parseInt(reqId, 10)]).catch(() => null);
+      if (checkRes && checkRes.rows.length > 0) {
+        res.writeHead(200);
+        res.end(JSON.stringify({ alreadyRated: true, rating: checkRes.rows[0] }));
+      } else {
+        res.writeHead(200);
+        res.end(JSON.stringify({ alreadyRated: false }));
+      }
+      return;
+    }
+
+    // ----------------------------------------------------
+    // 1. DATA INITIAL LOAD (AUTH REQUIRED)
+    // ----------------------------------------------------
     if (urlPath === '/api/data' && method === 'GET') {
+      if (!currentUser) {
+        sendUnauthorized();
+        return;
+      }
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       
       const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders, documents, vendorRatings, settings] = await Promise.all([
-        getTableData('users'),
+        getTableData('users'), // Şifresiz döner
         getTableData('requests'),
         getTableData('contracts'),
         getTableData('invoices'),
@@ -533,23 +825,12 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (urlPath === '/api/fetch-tcmb-rates' && method === 'GET') {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      try {
-        const rates = await fetchTCMBRates();
-        res.writeHead(200);
-        res.end(JSON.stringify(rates));
-      } catch (err) {
-        res.writeHead(200);
-        res.end(JSON.stringify({ success: false, error: err.message }));
-      }
-      return;
-    }
-
     // ----------------------------------------------------
-    // 📧 SMTP & E-MAIL ENDPOINTS
+    // 📧 SMTP & E-MAIL ENDPOINTS (ADMIN ONLY)
     // ----------------------------------------------------
     if (urlPath === '/api/settings/smtp' && method === 'GET') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const cfg = await getSmtpConfig();
       if (cfg) {
@@ -562,6 +843,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (urlPath === '/api/settings/smtp' && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const body = await readBody(req);
       const newCfg = JSON.parse(body || '{}');
@@ -582,6 +865,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (urlPath === '/api/email/test' && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
@@ -637,9 +922,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (urlPath === '/api/email/send-alert' && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const body = await readBody(req);
-      const { to, subject, title, details, actionUrl } = JSON.parse(body || '{}');
+      const { to, subject, title, details } = JSON.parse(body || '{}');
 
       const cfg = await getSmtpConfig();
       if (!cfg || !cfg.isEnabled || !cfg.host) {
@@ -680,9 +967,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ----------------------------------------------------
-    // 📥 EXCEL BATCH IMPORT ENDPOINT
+    // 📥 EXCEL BATCH IMPORT ENDPOINT (AUTH REQUIRED)
     // ----------------------------------------------------
     if ((urlPath === '/api/demands/batch' || urlPath === '/api/import-excel-requests') && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const body = await readBody(req);
       const parsed = JSON.parse(body || '{}');
@@ -712,7 +1000,7 @@ const server = http.createServer(async (req, res) => {
         const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
         await client.query(
           'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
-          [dateStr, 'Sistem (Excel Import)', 'Toplu Talep İçe Aktarma', `${inserted.length} adet talep Excel dosyasından toplu yüklendi.`]
+          [dateStr, currentUser.name || 'Sistem', 'Toplu Talep İçe Aktarma', `${inserted.length} adet talep Excel dosyasından toplu yüklendi.`]
         );
 
         await client.query('COMMIT');
@@ -730,9 +1018,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ----------------------------------------------------
-    // 🗄️ BACKUP & RESTORE MANAGEMENT ENDPOINTS
+    // 🗄️ BACKUP & RESTORE MANAGEMENT ENDPOINTS (ADMIN ONLY)
     // ----------------------------------------------------
     if (urlPath === '/api/backups' && method === 'GET') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const files = fs.existsSync(BACKUP_DIR) ? fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json') || f.endsWith('.sql')) : [];
       files.sort().reverse();
@@ -757,6 +1047,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if ((urlPath === '/api/backups/create' || urlPath === '/api/backup-now') && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const backupInfo = await createBackupFile(false);
       res.writeHead(201);
@@ -765,6 +1057,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if ((urlPath.startsWith('/api/backups/download/') || urlPath === '/api/backups/download') && method === 'GET') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       let filename = url.searchParams.get('filename');
       if (!filename && urlPath.startsWith('/api/backups/download/')) {
         filename = path.basename(urlPath.replace('/api/backups/download/', ''));
@@ -772,26 +1066,28 @@ const server = http.createServer(async (req, res) => {
       if (!filename || (!filename.endsWith('.json') && !filename.endsWith('.sql'))) {
         res.writeHead(400); res.end('Geçersiz dosya adı'); return;
       }
-      const filePath = path.join(BACKUP_DIR, filename);
+      const filePath = path.join(BACKUP_DIR, path.basename(filename));
       if (!fs.existsSync(filePath)) {
         res.writeHead(404); res.end('Yedek dosyası bulunamadı'); return;
       }
       res.writeHead(200, {
         'Content-Type': 'application/json',
-        'Content-Disposition': `attachment; filename="${filename}"`
+        'Content-Disposition': `attachment; filename="${path.basename(filename)}"`
       });
       fs.createReadStream(filePath).pipe(res);
       return;
     }
 
     if (urlPath === '/api/backups/restore' && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const body = await readBody(req);
       const { filename } = JSON.parse(body || '{}');
       if (!filename) {
         res.writeHead(400); res.end(JSON.stringify({ error: 'Yedek dosya adı belirtilmedi.' })); return;
       }
-      const filePath = path.join(BACKUP_DIR, filename);
+      const filePath = path.join(BACKUP_DIR, path.basename(filename));
       if (!fs.existsSync(filePath)) {
         res.writeHead(404); res.end(JSON.stringify({ error: 'Yedek dosyası bulunamadı.' })); return;
       }
@@ -870,12 +1166,14 @@ const server = http.createServer(async (req, res) => {
       }
 
       res.writeHead(200);
-      res.end(JSON.stringify({ success: true, message: `Veritabanı "${filename}" yedeğinden başarıyla geri yüklendi!` }));
+      res.end(JSON.stringify({ success: true, message: `Veritabanı "${path.basename(filename)}" yedeğinden başarıyla geri yüklendi!` }));
       return;
     }
 
     if (parts[0] === 'api' && parts[1] === 'backups' && parts[2] && method === 'DELETE') {
-      const filename = parts[2];
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
+      const filename = path.basename(parts[2]);
       const filePath = path.join(BACKUP_DIR, filename);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
@@ -888,8 +1186,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Document specific endpoints
+    // ----------------------------------------------------
+    // 📄 DOCUMENTS MANAGEMENT (AUTH REQUIRED)
+    // ----------------------------------------------------
     if (urlPath === '/api/documents' && method === 'GET') {
+      if (!currentUser) return sendUnauthorized();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const entityType = url.searchParams.get('entityType');
       const entityId = url.searchParams.get('entityId');
@@ -911,17 +1212,26 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (urlPath === '/api/documents/upload' && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const body = await readBody(req);
+      const body = await readBody(req, 25 * 1024 * 1024); // max 25MB
       if (!body) {
         res.writeHead(400); res.end(JSON.stringify({ error: 'Dosya verisi bulunamadı.' })); return;
       }
       try {
         const data = JSON.parse(body);
-        const { entityType, entityId, fileName, fileData, fileType, category, description, uploadedBy } = data;
+        const { entityType, entityId, fileName, fileData, fileType, category, description } = data;
         
         if (!entityType || !entityId || !fileName || !fileData) {
           res.writeHead(400); res.end(JSON.stringify({ error: 'Gerekli alanlar eksik (entityType, entityId, fileName, fileData).' })); return;
+        }
+
+        // Dosya uzantısı kontrolü (Güvenlik Whitelist)
+        const ext = path.extname(fileName).toLowerCase();
+        if (!ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: `Güvenlik sebebiyle "${ext}" uzantılı dosyaların yüklenmesine izin verilmemektedir. İzin verilen uzantılar: ${ALLOWED_UPLOAD_EXTENSIONS.join(', ')}` }));
+          return;
         }
 
         const base64Content = fileData.includes(';base64,') ? fileData.split(';base64,')[1] : fileData;
@@ -950,7 +1260,7 @@ const server = http.createServer(async (req, res) => {
           fileType || 'application/octet-stream',
           category || 'Genel',
           description || '',
-          uploadedBy || 'Sistem',
+          currentUser.name || 'Sistem',
           dateStr
         ]);
 
@@ -966,6 +1276,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (urlPath === '/api/documents/export-zip' && method === 'GET') {
+      if (!currentUser) return sendUnauthorized();
       const entityType = url.searchParams.get('entityType');
       const entityId = url.searchParams.get('entityId');
       if (!entityType || !entityId) {
@@ -989,7 +1300,7 @@ const server = http.createServer(async (req, res) => {
       });
       zipArchive.pipe(res);
       for (const doc of docs) {
-        const fPath = path.join(UPLOAD_DIR, doc.storedFileName);
+        const fPath = path.join(UPLOAD_DIR, path.basename(doc.storedFileName));
         if (fs.existsSync(fPath)) {
           const zipEntryName = doc.category ? `${doc.category} - ${doc.fileName}` : doc.fileName;
           zipArchive.file(fPath, { name: zipEntryName });
@@ -999,7 +1310,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // 2. Generic REST CRUD API
     // Document download / preview
     if (parts[0] === 'api' && parts[1] === 'documents' && parts[2] && (parts[3] === 'download' || parts[3] === 'preview') && method === 'GET') {
       const docId = parseInt(parts[2], 10);
@@ -1011,7 +1321,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const doc = docRes.rows[0];
-      const filePath = path.join(UPLOAD_DIR, doc.storedFileName);
+      const filePath = path.join(UPLOAD_DIR, path.basename(doc.storedFileName));
       if (!fs.existsSync(filePath)) {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('Fiziksel dosya sunucuda bulunamadı.');
@@ -1030,11 +1340,12 @@ const server = http.createServer(async (req, res) => {
 
     // Document delete
     if (parts[0] === 'api' && parts[1] === 'documents' && parts[2] && method === 'DELETE') {
+      if (!currentUser) return sendUnauthorized();
       const docId = parseInt(parts[2], 10);
       const docRes = await pool.query('SELECT * FROM documents WHERE id = $1', [docId]);
       if (docRes.rowCount > 0) {
         const doc = docRes.rows[0];
-        const fPath = path.join(UPLOAD_DIR, doc.storedFileName);
+        const fPath = path.join(UPLOAD_DIR, path.basename(doc.storedFileName));
         if (fs.existsSync(fPath)) {
           try { fs.unlinkSync(fPath); } catch (e) { console.error('Dosya silinirken hata:', e.message); }
         }
@@ -1049,28 +1360,9 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // Check if a request has already been rated
-    if (urlPath === '/api/vendor_ratings/check' && method === 'GET') {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const reqId = url.searchParams.get('reqId');
-      if (!reqId) {
-        res.writeHead(200);
-        res.end(JSON.stringify({ alreadyRated: false }));
-        return;
-      }
-      const checkRes = await pool.query('SELECT * FROM vendor_ratings WHERE "requestId" = $1 ORDER BY id DESC LIMIT 1', [parseInt(reqId, 10)]).catch(() => null);
-      if (checkRes && checkRes.rows.length > 0) {
-        res.writeHead(200);
-        res.end(JSON.stringify({ alreadyRated: true, rating: checkRes.rows[0] }));
-      } else {
-        res.writeHead(200);
-        res.end(JSON.stringify({ alreadyRated: false }));
-      }
-      return;
-    }
-
     // Remind unit to rate vendor
     if (parts[0] === 'api' && (parts[1] === 'requests' || parts[1] === 'demands') && parts[2] && parts[3] === 'remind-rating' && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const reqId = parseInt(parts[2], 10);
       const reqRes = await pool.query('SELECT * FROM requests WHERE id = $1', [reqId]).catch(() => null);
@@ -1092,12 +1384,29 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ----------------------------------------------------
+    // 2. GENERIC REST CRUD API
+    // ----------------------------------------------------
     if (parts[0] === 'api' && parts.length >= 2 && urlPath !== '/api/data') {
       const table = parts[1];
       const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations', 'tenders', 'documents', 'vendor_ratings', 'settings'];
       
       if (allowedTables.includes(table)) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        
+        // vendor_ratings tablosuna puanlama kaydı ekleme (E-posta üzerinden public değerlendirme yapılabilmesi için izinli)
+        const isPublicVendorRating = table === 'vendor_ratings' && method === 'POST';
+
+        if (!currentUser && !isPublicVendorRating) {
+          sendUnauthorized();
+          return;
+        }
+
+        // Kullanıcı yönetimi (users) için ADMIN kontrolü
+        if (table === 'users' && currentUser?.role !== 'ADMIN') {
+          sendForbidden('Kullanıcı hesaplarını yönetmek için ADMIN yetkisi gereklidir.');
+          return;
+        }
         
         // POST /api/:table
         if (method === 'POST') {
@@ -1106,6 +1415,12 @@ const server = http.createServer(async (req, res) => {
           const data = JSON.parse(body);
           
           delete data.id;
+
+          // Şifre güvenliği: Kullanıcı eklenirken şifreyi PBKDF2 ile hashle
+          if (table === 'users') {
+            const rawPass = data.password || '123456';
+            data.password = hashPassword(rawPass);
+          }
 
           // If rating a vendor for a specific request, ensure single evaluation lock
           if (table === 'vendor_ratings' && data.requestId) {
@@ -1129,8 +1444,11 @@ const server = http.createServer(async (req, res) => {
           const query = `INSERT INTO ${table} (${cols}) VALUES (${placeholders}) RETURNING *`;
           const result = await pool.query(query, values);
           
+          const returnedRow = { ...result.rows[0] };
+          if (table === 'users') delete returnedRow.password;
+
           res.writeHead(201);
-          res.end(JSON.stringify(result.rows[0]));
+          res.end(JSON.stringify(returnedRow));
 
           // Trigger automated unit email on demand creation
           if (table === 'requests' && result.rows[0]) {
@@ -1146,8 +1464,16 @@ const server = http.createServer(async (req, res) => {
           if (!body) { res.writeHead(400); res.end(JSON.stringify({ error: 'Empty body' })); return; }
           const data = JSON.parse(body);
           delete data.id; // never update id
+
+          // Şifre güvenliği: Kullanıcı güncellenirken yeni şifre verilmişse hashle, verilmemişse eskisini koru
+          if (table === 'users') {
+            if (data.password && data.password.trim() !== '') {
+              data.password = hashPassword(data.password);
+            } else {
+              delete data.password; // boşsa eski şifreyi değiştirme
+            }
+          }
           
-          // If updating request, fetch previous status to detect change
           let oldStatus = null;
           if (table === 'requests') {
             const prevRes = await pool.query('SELECT status FROM requests WHERE id = $1', [id]).catch(() => null);
@@ -1165,7 +1491,10 @@ const server = http.createServer(async (req, res) => {
           if (result.rowCount === 0) {
             res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' }));
           } else {
-            res.writeHead(200); res.end(JSON.stringify(result.rows[0]));
+            const returnedRow = { ...result.rows[0] };
+            if (table === 'users') delete returnedRow.password;
+
+            res.writeHead(200); res.end(JSON.stringify(returnedRow));
 
             // Trigger automated unit email on demand status update
             if (table === 'requests' && result.rows[0] && oldStatus && result.rows[0].status !== oldStatus) {
@@ -1190,6 +1519,7 @@ const server = http.createServer(async (req, res) => {
       
       // Rates Table Endpoint
       if (table === 'settings' && method === 'POST') {
+        if (!currentUser) return sendUnauthorized();
         const body = await readBody(req);
         if (body) {
            const data = JSON.parse(body);
@@ -1216,8 +1546,12 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // Self-Update Endpoint (Executes update.sh or git pull)
+    // ----------------------------------------------------
+    // 🔄 SELF-UPDATE ENDPOINT (ADMIN ONLY)
+    // ----------------------------------------------------
     if (urlPath === '/api/update-system' && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
+      if (currentUser.role !== 'ADMIN') return sendForbidden();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       const { exec } = require('child_process');
       exec('git pull && pm2 reload satinalma', (err, stdout, stderr) => {
@@ -1234,7 +1568,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Statik Dosya Sunucu (Path Traversal korumalı)
+    // ----------------------------------------------------
+    // 🌐 STATİK DOSYA SUNUCU (PATH TRAVERSAL KORUMALI)
+    // ----------------------------------------------------
     let filePath;
     if (urlPath === '/') {
       filePath = path.join(PUBLIC_DIR, 'index.html');
@@ -1415,12 +1751,21 @@ async function initDatabaseSchema() {
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
     `);
 
+    // Otomatik Şifre Göçü (Mevcut düz metin şifreleri PBKDF2 tuzlu hash'e dönüştürür)
+    const existingUsers = await pool.query('SELECT id, password FROM users');
+    for (const u of existingUsers.rows) {
+      if (u.password && !u.password.startsWith('$pbkdf2$')) {
+        const hashed = hashPassword(u.password);
+        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, u.id]);
+        console.log(`🔒 Kullanıcı ID ${u.id} şifresi güvenli PBKDF2 hash formatına dönüştürüldü.`);
+      }
+    }
+
     // Check if database is empty (users table has 0 rows)
     const userCheck = await pool.query('SELECT COUNT(*) FROM users');
     if (parseInt(userCheck.rows[0].count, 10) === 0) {
-      console.log('🌱 Veritabanı boş, başlangıç verileri (Seed Data / Backup) yükleniyor...');
+      console.log('🌱 Veritabanı boş, başlangıç verileri yükleniyor...');
       
-      const BACKUP_DIR = path.join(__dirname, 'backups');
       const backupFiles = fs.existsSync(BACKUP_DIR) ? fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json')) : [];
       
       if (backupFiles.length > 0) {
@@ -1431,9 +1776,10 @@ async function initDatabaseSchema() {
 
         if (seedData.users) {
           for (const u of seedData.users) {
+            const pass = u.password ? (u.password.startsWith('$pbkdf2$') ? u.password : hashPassword(u.password)) : hashPassword('123456');
             await pool.query(
-              'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
-              [u.name, u.title, u.role, u.isActive !== false, u.password || '123456']
+              'INSERT INTO users (name, title, role, "isActive", password, email) VALUES ($1, $2, $3, $4, $5, $6)',
+              [u.name, u.title, u.role, u.isActive !== false, pass, u.email || '']
             );
           }
         }
@@ -1526,7 +1872,7 @@ async function initDatabaseSchema() {
       } else {
         await pool.query(
           'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
-          ['Cem TUR', 'Satınalma Mdr. Yrd.', 'ADMIN', true, '123456']
+          ['Cem TUR', 'Satınalma Mdr. Yrd.', 'ADMIN', true, hashPassword('123456')]
         );
       }
     }
@@ -1538,7 +1884,7 @@ async function initDatabaseSchema() {
 initDatabaseSchema().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log('==========================================================');
-    console.log(' 🚀 SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (REST API Modu)');
+    console.log(' 🛡️ SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (Güvenli REST API)');
     console.log(` 🌐 Erişim: http://localhost:${PORT}/`);
     console.log('==========================================================');
   });
