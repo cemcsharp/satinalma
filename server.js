@@ -421,11 +421,22 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
       </div>
     ` : '';
 
+function getAppBaseUrl(cfg) {
+  if (process.env.APP_URL && process.env.APP_URL.trim()) {
+    return process.env.APP_URL.trim().replace(/\/$/, '');
+  }
+  if (cfg && cfg.appUrl && cfg.appUrl.trim()) {
+    return cfg.appUrl.trim().replace(/\/$/, '');
+  }
+  return 'http://109.236.48.236';
+}
+
     let ratingSection = '';
     if (demand.status === 'Tamamlandı' && demand.supplier) {
       const pType = demand.purchaseType || 'MAL';
       const typeLabel = pType === 'HIZMET' ? 'Hizmet' : 'Mal / Ürün';
-      const rateUrl = `http://localhost:${PORT}/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
+      const baseUrl = getAppBaseUrl(cfg);
+      const rateUrl = `${baseUrl}/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
       ratingSection = `
         <div style="margin-top: 18px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 8px; padding: 16px; text-align: center;">
           <div style="font-size: 0.95rem; font-weight: 700; color: #166534; margin-bottom: 4px;">
@@ -534,7 +545,8 @@ async function sendRatingReminderEmail(demand) {
   const barcode = demand.requestBarcode || demand.id;
   const pType = demand.purchaseType || 'MAL';
   const typeLabel = pType === 'HIZMET' ? 'Hizmet' : 'Mal / Ürün';
-  const rateUrl = `http://localhost:${PORT}/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
+  const baseUrl = getAppBaseUrl(cfg);
+  const rateUrl = `${baseUrl}/rate-vendor.html?reqId=${demand.id || ''}&barcode=${encodeURIComponent(barcode)}&supplier=${encodeURIComponent(demand.supplier || '')}&unit=${encodeURIComponent(demand.unit || '')}&subject=${encodeURIComponent(demand.subject || '')}&type=${encodeURIComponent(pType)}`;
 
   const dateStr = new Date().toLocaleDateString('tr-TR');
   const subject = `🔔 Hatırlatma: ${demand.unit} — Tedarikçi Değerlendirmesi (#${barcode})`;
