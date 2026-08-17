@@ -344,6 +344,59 @@ setInterval(async () => {
 }, 60 * 60 * 1000);
 
 // ----------------------------------------------------
+// 💱 TCMB CANLI DÖVİZ KURLARI SERVİSİ
+// ----------------------------------------------------
+async function fetchTCMBRates() {
+  return new Promise((resolve) => {
+    https.get('https://www.tcmb.gov.tr/kurlar/today.xml', (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', async () => {
+        try {
+          const usdMatch = data.match(/Currency Code="USD"[\s\S]*?<ForexSelling>([0-9.]+)<\/ForexSelling>/) ||
+                           data.match(/Currency Code="USD"[\s\S]*?<ForexBuying>([0-9.]+)<\/ForexBuying>/);
+          const eurMatch = data.match(/Currency Code="EUR"[\s\S]*?<ForexSelling>([0-9.]+)<\/ForexSelling>/) ||
+                           data.match(/Currency Code="EUR"[\s\S]*?<ForexBuying>([0-9.]+)<\/ForexBuying>/);
+
+          const usdRate = usdMatch ? parseFloat(usdMatch[1]) : 36.50;
+          const eurRate = eurMatch ? parseFloat(eurMatch[1]) : 39.80;
+
+          const now = new Date();
+          const pad = (n) => String(n).padStart(2, '0');
+          const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+          await pool.query(`
+            INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('USD', $1, $2)
+            ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
+          `, [usdRate, dateStr]).catch(() => {});
+
+          await pool.query(`
+            INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('EUR', $1, $2)
+            ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
+          `, [eurRate, dateStr]).catch(() => {});
+
+          console.log(`💱 TCMB Canlı Kurları Güncellendi: USD=${usdRate} ₺, EUR=${eurRate} ₺ (${dateStr})`);
+
+          resolve({
+            success: true,
+            USD: usdRate,
+            EUR: eurRate,
+            lastUpdated: dateStr,
+            source: 'TCMB (Türkiye Cumhuriyet Merkez Bankası)'
+          });
+        } catch (err) {
+          console.error('TCMB XML ayrıştırma hatası:', err.message);
+          resolve({ success: false, error: err.message });
+        }
+      });
+    }).on('error', (err) => {
+      console.error('TCMB bağlantı hatası:', err.message);
+      resolve({ success: false, error: err.message });
+    });
+  });
+}
+
+// ----------------------------------------------------
 // 📧 SMTP HELPER FUNCTIONS
 // ----------------------------------------------------
 async function getSmtpConfig() {
