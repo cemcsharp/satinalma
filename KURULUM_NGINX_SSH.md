@@ -182,17 +182,67 @@ sudo systemctl enable nginx
 
 ## 4. DOMAIN & SSL (HTTPS) YAPILANDIRMASI
 
-Üniversite alt alan adı (örnek: `satinalma.pirireis.edu.tr`) bağlamak için:
+Üniversite alt alan adı (örnek: `satinalma.pirireis.edu.tr`) bağlamak için aşağıdaki 2 seçenekten kurumunuza uygun olanı uygulayabilirsiniz:
 
-1. `/etc/nginx/sites-available/satinalma` dosyasındaki `server_name _` satırını değiştirin:
-   ```nginx
-   server_name satinalma.pirireis.edu.tr;
-   ```
-2. Ücretsiz SSL sertifikası (Certbot) tanımlamak için:
-   ```bash
-   sudo apt-get install -y certbot python3-certbot-nginx
-   sudo certbot --nginx -d satinalma.pirireis.edu.tr
-   ```
+### 1. Alan Adı (Domain) Tanımı:
+`/etc/nginx/sites-available/satinalma` dosyasındaki `server_name _` satırını kurum alan adınızla güncelleyin:
+```nginx
+server_name satinalma.pirireis.edu.tr;
+```
+
+---
+
+### 2. SSL Sertifikası Yükleme:
+
+#### Seçenek A: Ücretsiz Otomatik SSL (Let's Encrypt / Certbot - Önerilen)
+Sunucu doğrudan dış internete açıksa tek komutla otomatik SSL kurabilirsiniz:
+```bash
+sudo apt-get install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d satinalma.pirireis.edu.tr
+```
+*(Certbot Nginx dosyanızı otomatik olarak HTTPS 443 portuna yönlendirecek ve sertifikayı her 90 günde bir kendisi yenileyecektir).*
+
+#### Seçenek B: Üniversite Bilgi İşlem Tarafından Verilen Kurumsal SSL (.crt ve .key)
+Eğer üniversite kendi Wildcard / Kurumsal SSL sertifikasını verirse:
+1. Sertifika dosyalarını sunucuya yükleyin (örneğin: `/etc/ssl/certs/pirireis.crt` ve `/etc/ssl/private/pirireis.key`).
+2. `/etc/nginx/sites-available/satinalma` dosyasını aşağıdaki gibi HTTPS uyumlu düzenleyin:
+
+```nginx
+server {
+    listen 80;
+    server_name satinalma.pirireis.edu.tr;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name satinalma.pirireis.edu.tr;
+
+    ssl_certificate /etc/ssl/certs/pirireis.crt;
+    ssl_certificate_key /etc/ssl/private/pirireis.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+3. Nginx'i test edip yeniden başlatın:
+```bash
+sudo nginx -t && sudo systemctl restart nginx
+```
 
 ---
 
