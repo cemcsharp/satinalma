@@ -6495,8 +6495,8 @@ async init() {
         const portEl = document.getElementById('smtp-port');
         const userEl = document.getElementById('smtp-user');
         const passEl = document.getElementById('smtp-pass');
-        const fromNameEl = document.getElementById('smtp-from-name');
         const fromEmailEl = document.getElementById('smtp-from-email');
+        const appUrlEl = document.getElementById('smtp-app-url');
         const enabledEl = document.getElementById('smtp-is-enabled');
         const secureEl = document.getElementById('smtp-secure');
         const badgeEl = document.getElementById('smtp-status-badge');
@@ -6507,6 +6507,7 @@ async init() {
         if (passEl) passEl.value = cfg.pass || '';
         if (fromNameEl) fromNameEl.value = cfg.fromName || 'Piri Reis Üni. Satınalma';
         if (fromEmailEl) fromEmailEl.value = cfg.from || '';
+        if (appUrlEl) appUrlEl.value = cfg.appUrl || window.location.origin;
         if (enabledEl) enabledEl.checked = !!cfg.isEnabled;
         if (secureEl) secureEl.checked = !!cfg.secure;
 
@@ -6534,6 +6535,7 @@ async init() {
       pass: document.getElementById('smtp-pass')?.value || '',
       fromName: document.getElementById('smtp-from-name')?.value.trim() || 'Piri Reis Üni. Satınalma',
       from: document.getElementById('smtp-from-email')?.value.trim() || '',
+      appUrl: document.getElementById('smtp-app-url')?.value.trim() || window.location.origin,
       isEnabled: document.getElementById('smtp-is-enabled')?.checked || false,
       secure: document.getElementById('smtp-secure')?.checked || false
     };
