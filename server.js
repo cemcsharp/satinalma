@@ -506,8 +506,9 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
         messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin süreci güncellenmiştir.<br><br>
         Önceki Durum: <strong>${oldStatus || 'Açık'}</strong> ➔ Güncel Durum: <strong style="color:${badgeColor}; font-size:1.05rem;">${status}</strong>`;
       }
-      return;
     }
+
+    console.log(`✉️ "${demand.unit}" birimine durum bildirimi hazırlanıyor: [${demand.status || eventType}] -> ${unitEmail}`);
 
     const orderSection = demand.orderBarcode ? `
       <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-top:14px;">
@@ -1870,7 +1871,7 @@ const server = http.createServer(async (req, res) => {
 
               // Trigger automated emails on demand status update & staff delegation
               if (table === 'requests' && result.rows[0]) {
-                if (oldStatus && result.rows[0].status !== oldStatus) {
+                if (result.rows[0].status === 'Revize İstendi' || (oldStatus && result.rows[0].status !== oldStatus)) {
                   notifyUnitOnDemandEvent(result.rows[0], 'STATUS_CHANGED', oldStatus).catch(e => console.error('Birim e-posta güncelleme hatası:', e.message));
                 }
                 if (result.rows[0].assignedTo && result.rows[0].assignedTo !== oldAssignedTo && result.rows[0].assignedTo !== 'Henüz Atanmadı') {
