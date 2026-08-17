@@ -834,6 +834,175 @@ async function sendRatingReminderEmail(demand) {
 }
 
 // ----------------------------------------------------
+// ⏳ OTOMATİK SÖZLEŞME BİTİŞ & VADE UYARI MOTORU
+// ----------------------------------------------------
+async function notifyContractExpiry(contract, daysLeft) {
+  if (!contract || !contract.endDate) return;
+  try {
+    const cfg = await getSmtpConfig();
+    if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) return;
+
+    // İlgili birim e-postası
+    let unitEmail = null;
+    if (contract.unit) {
+      const unitRes = await pool.query('SELECT email FROM units WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [contract.unit]).catch(() => null);
+      unitEmail = unitRes?.rows[0]?.email;
+    }
+
+    // İlgili uzman e-postası
+    let expertEmail = null;
+    let expertInfo = contract.assignedTo || 'Satınalma Uzmanı';
+    if (contract.assignedTo && contract.assignedTo !== 'Henüz Atanmadı') {
+      const userRes = await pool.query('SELECT name, title, email, phone FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [contract.assignedTo]).catch(() => null);
+      if (userRes && userRes.rowCount > 0) {
+        const u = userRes.rows[0];
+        expertEmail = u.email;
+        expertInfo = `${u.name} (${u.title || 'Satınalma Uzmanı'}${u.phone ? ` - Dahili: ${u.phone}` : ''}${u.email ? ` - ${u.email}` : ''})`;
+      }
+    }
+
+    // Hedef alıcılar
+    const recipients = [];
+    if (unitEmail && unitEmail.includes('@')) recipients.push(unitEmail);
+    if (expertEmail && expertEmail.includes('@') && !recipients.includes(expertEmail)) recipients.push(expertEmail);
+
+    if (recipients.length === 0) {
+      console.log(`ℹ️ Sözleşme #${contract.contractNo} (${contract.unit}) için alıcı e-posta adresi bulunamadı.`);
+      return;
+    }
+
+    const badgeColor = daysLeft <= 7 ? '#ef4444' : (daysLeft <= 15 ? '#f97316' : (daysLeft <= 30 ? '#eab308' : '#3b82f6'));
+    const urgencyLabel = daysLeft <= 7 ? '🚨 ACİL SON UYARI' : (daysLeft <= 15 ? '⚠️ ACİL HATIRLATMA' : '⏳ SÖZLEŞME BİTİŞ UYARISI');
+    const subject = `⏳ Sözleşme Bitiş Uyarısı (${daysLeft} Gün Kaldı) — #${contract.contractNo} (${contract.title || contract.supplier || 'Sözleşme'})`;
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 640px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 24px; color: #ffffff; text-align: left; border-bottom: 3px solid ${badgeColor};">
+          <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; margin-bottom: 4px;">PİRİ REİS ÜNİVERSİTESİ</div>
+          <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em;">Satınalma Müdürlüğü — Sözleşme Vade Takip Sistemi</div>
+        </div>
+        
+        <div style="padding: 24px; color: #1e293b;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+            <h2 style="margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 700;">${urgencyLabel}</h2>
+            <span style="background: ${badgeColor}; color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 700;">${daysLeft} Gün Kaldı</span>
+          </div>
+
+          <p style="font-size: 0.92rem; line-height: 1.6; color: #334155; margin-top: 0;">
+            Sayın İlgili,<br><br>
+            <strong>${contract.unit || 'İlgili Birim'}</strong> biriminizin kullanımında olan <strong>#${contract.contractNo}</strong> numaralı ve <strong>"${contract.title}"</strong> başlıklı sözleşmenin yürürlük süresinin dolmasına <strong>${daysLeft} gün</strong> kalmıştır.<br><br>
+            Hizmet veya mal tedarikinde herhangi bir kesinti yaşanmaması, yeni ihale / sözleşme uzatım süreçlerinin zamanında başlatılabilmesi için lütfen sorumlu satınalma uzmanımızla irtibata geçerek gerekiyorsa yeni satınalma talebinizi sisteme iletiniz.
+          </p>
+
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.86rem; background: #f8fafc; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+            <tbody>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; color: #64748b; font-weight: 600; width: 35%;">Sözleşme No / Kod:</td>
+                <td style="padding: 10px 14px; font-weight: 700; color: #1e3a8a; font-family: monospace;">#${contract.contractNo}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; color: #64748b; font-weight: 600;">Sözleşme Konusu / Başlık:</td>
+                <td style="padding: 10px 14px; font-weight: 600; color: #0f172a;">${contract.title}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; color: #64748b; font-weight: 600;">Tedarikçi / Yüklenici Firma:</td>
+                <td style="padding: 10px 14px; font-weight: 600; color: #0f172a;">${contract.supplier || '-'}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; color: #64748b; font-weight: 600;">İlgili Birim:</td>
+                <td style="padding: 10px 14px; color: #0f172a;">${contract.unit || '-'}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; color: #64748b; font-weight: 600;">Sözleşme Başlangıç - Bitiş:</td>
+                <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">${contract.startDate || '-'} ➔ <span style="color:#ef4444;">${contract.endDate}</span></td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; color: #64748b; font-weight: 600;">Toplam Sözleşme Bedeli:</td>
+                <td style="padding: 10px 14px; font-weight: 700; color: #166534; font-family: monospace;">${contract.totalAmount ? Number(contract.totalAmount).toLocaleString('tr-TR') + ' ' + (contract.currency || 'TRY') : '-'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 14px; color: #64748b; font-weight: 600;">Takip Eden Satınalma Uzmanı:</td>
+                <td style="padding: 10px 14px; font-weight: 600; color: #0f172a;">${expertInfo}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 20px; padding: 12px; background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; font-size: 0.82rem; color: #9a3412; line-height: 1.5;">
+            💡 <strong>Bilgi Notu:</strong> 4734 Sayılı Kamu İhale Kanunu ve Üniversite Satınalma Yönetmeliği gereği yeni ihale/sipariş hazırlıklarının en az 30 gün önceden başlatılması önerilmektedir.
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; padding: 14px 24px; text-align: center; font-size: 0.75rem; color: #64748b; border-top: 1px solid #e2e8f0;">
+          Bu bilgilendirme e-postası Piri Reis Üniversitesi Satınalma Takip Sistemi tarafından otomatik olarak gönderilmiştir.
+        </div>
+      </div>
+    `;
+
+    const transporter = createSmtpTransporter(cfg);
+    const fromAddr = cfg.from && cfg.from.trim() ? cfg.from.trim() : `Piri Reis Üniversitesi Satınalma <${cfg.user}>`;
+
+    await transporter.sendMail({
+      from: fromAddr,
+      to: recipients.join(', '),
+      subject,
+      html
+    });
+
+    console.log(`✅ Sözleşme #${contract.contractNo} (${daysLeft} gün kaldı) vade uyarı e-postası başarıyla gönderildi -> ${recipients.join(', ')}`);
+  } catch (err) {
+    console.error(`❌ Sözleşme vade uyarı e-postası hatası (#${contract.contractNo}):`, err.message);
+  }
+}
+
+async function checkContractExpirationsAndNotify() {
+  try {
+    const res = await pool.query('SELECT * FROM contracts WHERE status = \'Aktif\' AND "endDate" IS NOT NULL');
+    if (!res || res.rowCount === 0) return { checked: 0, notified: 0 };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const THRESHOLDS = [60, 30, 15, 7];
+    let notifiedCount = 0;
+
+    for (const contract of res.rows) {
+      const endDt = new Date(contract.endDate);
+      if (isNaN(endDt.getTime())) continue;
+      endDt.setHours(0, 0, 0, 0);
+
+      const diffDays = Math.ceil((endDt - today) / (1000 * 60 * 60 * 24));
+
+      for (const threshold of THRESHOLDS) {
+        if (diffDays === threshold) {
+          const notifKey = `contract_notif_${contract.id}_${threshold}`;
+          // Mükerrerlik kontrolü (bu eşik için daha önce mail atıldı mı?)
+          const notifCheck = await pool.query('SELECT value FROM settings WHERE key = $1', [notifKey]).catch(() => null);
+          if (notifCheck && notifCheck.rowCount > 0) {
+            continue;
+          }
+
+          // Gönder
+          await notifyContractExpiry(contract, diffDays);
+          notifiedCount++;
+
+          // İşaretle (Settings tablosuna kaydet)
+          const nowStr = new Date().toISOString().split('T')[0];
+          await pool.query(
+            'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+            [notifKey, nowStr]
+          ).catch(e => console.error('Bildirim kaydı hatası:', e.message));
+        }
+      }
+    }
+
+    return { checked: res.rowCount, notified: notifiedCount };
+  } catch (err) {
+    console.error('checkContractExpirationsAndNotify hatası:', err.message);
+    return { error: err.message };
+  }
+}
+
+// ----------------------------------------------------
 // 🚀 ANA HTTP SUNUCU VE YÖNLENDİRME MOTORU
 // ----------------------------------------------------
 const server = http.createServer(async (req, res) => {
@@ -1278,6 +1447,23 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: err.message }));
       } finally {
         client.release();
+      }
+      return;
+    }
+
+    // ----------------------------------------------------
+    // ⏳ CONTRACT EXPIRATION CHECK TRIGGER
+    // ----------------------------------------------------
+    if (urlPath === '/api/contracts/check-expirations' && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
+      try {
+        const result = await checkContractExpirationsAndNotify();
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true, result }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: e.message }));
       }
       return;
     }
@@ -2294,5 +2480,13 @@ initDatabaseSchema().then(() => {
     console.log(' 🛡️ SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (Güvenli REST API)');
     console.log(` 🌐 Erişim: http://localhost:${PORT}/`);
     console.log('==========================================================');
+
+    // ⏳ Otomatik Sözleşme Vade & Bitiş Uyarı Motoru (Başlangıçta ve 12 saatte bir çalışır)
+    setTimeout(() => {
+      checkContractExpirationsAndNotify().catch(e => console.error('Sözleşme kontrolü hatası:', e.message));
+    }, 15000);
+    setInterval(() => {
+      checkContractExpirationsAndNotify().catch(e => console.error('Sözleşme kontrolü hatası:', e.message));
+    }, 12 * 60 * 60 * 1000);
   });
 });

@@ -835,9 +835,14 @@
             <h3>📑 Sözleşme Takip ve Teminat Yönetimi</h3>
             <p style="font-size: 0.85rem; color: var(--text-muted);">Üniversite sözleşmelerinin başlangıç/bitiş tarihleri, yüklenici tedarikçiler ve kalan süre takibi</p>
           </div>
-          <button class="btn-primary" id="btn-open-add-contract">
-            <span>➕</span> Yeni Sözleşme Ekle
-          </button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn-secondary" onclick="App.checkContractExpirations()" title="Süresi yaklaşan sözleşmeler için birimlere otomatik e-posta bildirimlerini kontrol et ve gönder">
+              <span>⏳</span> Vade Bildirimlerini Kontrol Et
+            </button>
+            <button class="btn-primary" id="btn-open-add-contract">
+              <span>➕</span> Yeni Sözleşme Ekle
+            </button>
+          </div>
         </div>
 
         <!-- Contract KPI Cards -->

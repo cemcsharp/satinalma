@@ -3368,6 +3368,28 @@ async init() {
     this.renderContracts();
   },
 
+  async checkContractExpirations() {
+    this.showToast("Sözleşme vadeleri taranıyor ve bildirimler kontrol ediliyor...", "info", "⏳");
+    try {
+      const res = await this.authFetch('/api/contracts/check-expirations', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const notif = data.result?.notified || 0;
+        const checked = data.result?.checked || 0;
+        if (notif > 0) {
+          this.showToast(`${checked} sözleşme tarandı, süresi yaklaşan ${notif} sözleşme için ilgili birimlere uyarı e-postası gönderildi!`, "success", "✉️");
+        } else {
+          this.showToast(`${checked} aktif sözleşme tarandı. Bugün için yeni kritik eşik (60/30/15/7 gün) uyarısı bulunmuyor.`, "info", "✅");
+        }
+      } else {
+        this.showToast(data.error || 'Sözleşme kontrolü yapılamadı.', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      this.showToast('Sunucu hatası: ' + e.message, 'error');
+    }
+  },
+
   getTRYEquivalent(amount, currency = 'TRY', itemExchangeRate = null) {
     if (!amount) return 0;
     const curr = (currency || 'TRY').toUpperCase();
