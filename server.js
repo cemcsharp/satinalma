@@ -526,6 +526,123 @@ function getAppBaseUrl(cfg) {
   }
 }
 
+// ----------------------------------------------------
+// 📧 SATINALMA PERSONELİ İŞ ATAMA & DEVİR BİLDİRİM FONKSİYONU
+// ----------------------------------------------------
+async function notifyStaffOnAssignment(demand, eventType, oldAssignedTo = null) {
+  if (!demand || !demand.assignedTo || demand.assignedTo === 'Henüz Atanmadı') return;
+  try {
+    const cfg = await getSmtpConfig();
+    if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) return;
+
+    const userRes = await pool.query(
+      'SELECT name, email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND "isActive" = true',
+      [demand.assignedTo]
+    );
+    const staff = userRes.rows[0];
+    if (!staff || !staff.email || !staff.email.includes('@')) {
+      console.log(`ℹ️ Personel "${demand.assignedTo}" için kayıtlı e-posta bulunamadı, görev bildirim maili gönderilmedi.`);
+      return;
+    }
+
+    const barcode = demand.requestBarcode || demand.id;
+    const baseUrl = getAppBaseUrl(cfg);
+    const appDirectLink = `${baseUrl}/#request/${demand.id || ''}`;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    let subject = '';
+    let headerTitle = '';
+    let messageText = '';
+    let badgeColor = '#3b82f6';
+
+    if (eventType === 'ASSIGNED') {
+      subject = `🎯 Yeni Talep Size Atandı: #${barcode} — ${demand.unit || ''} (${demand.subject || ''})`;
+      headerTitle = 'Yeni Satınalma Talebi Size Atandı';
+      badgeColor = '#2563eb';
+      messageText = `Sayın <strong>${staff.name}</strong>,<br><br>Sistemimize yeni kaydedilen <strong>#${barcode}</strong> numaralı talep takibiniz için tarafınıza atanmıştır.`;
+    } else if (eventType === 'DELEGATED') {
+      subject = `🔄 Talep Devri: #${barcode} Size Aktarıldı — ${demand.unit || ''} (${demand.subject || ''})`;
+      headerTitle = 'Talep Tarafınıza Devredildi';
+      badgeColor = '#8b5cf6';
+      messageText = `Sayın <strong>${staff.name}</strong>,<br><br><strong>#${barcode}</strong> numaralı satınalma talebi <strong>${oldAssignedTo || 'Önceki Uzman'}</strong> üzerinden devralınarak tarafınıza aktarılmıştır.`;
+    } else {
+      return;
+    }
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 24px; color: #ffffff; text-align: left; border-bottom: 3px solid #f59e0b;">
+          <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; margin-bottom: 4px;">PİRİ REİS ÜNİVERSİTESİ</div>
+          <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em;">Satınalma Takip Sistemi — Görev Ataması</div>
+        </div>
+        
+        <div style="padding: 24px; color: #1e293b;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+            <h2 style="margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 700;">${headerTitle}</h2>
+            <span style="background: ${badgeColor}; color: #ffffff; padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 700;">${demand.priority || 'Normal'} Öncelik</span>
+          </div>
+
+          <p style="font-size: 0.92rem; line-height: 1.6; color: #334155; margin-top: 0;">${messageText}</p>
+
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.86rem; background: #f8fafc; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+            <tbody>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b; width: 36%;">Talep Barkod / No:</td>
+                <td style="padding: 10px 14px; font-weight: 700; color: #1e3a8a; font-family: monospace; font-size: 0.95rem;">#${barcode}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Talep Eden Birim:</td>
+                <td style="padding: 10px 14px; font-weight: 600; color: #0f172a;">${demand.unit || '-'}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Talep Konusu:</td>
+                <td style="padding: 10px 14px; color: #0f172a; font-weight: 600;">${demand.subject || '-'}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Geliş / Talep Tarihi:</td>
+                <td style="padding: 10px 14px; color: #0f172a;">${demand.arrivalDate || demand.requestDate || dateStr}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Tahmini Bütçe:</td>
+                <td style="padding: 10px 14px; color: #0f172a; font-weight: 700;">${Number(demand.estimatedAmount || demand.budgetAmount || 0).toLocaleString('tr-TR')} ${demand.currency || 'TRY'}</td>
+              </tr>
+              ${demand.description ? `
+              <tr>
+                <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Talep Notu / Açıklama:</td>
+                <td style="padding: 10px 14px; color: #334155;">${demand.description}</td>
+              </tr>` : ''}
+            </tbody>
+          </table>
+
+          <div style="margin-top: 24px; text-align: center;">
+            <a href="${appDirectLink}" target="_blank" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              🚀 Talebi İncele & Siparişe Dönüştür
+            </a>
+          </div>
+
+          <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 0.78rem; color: #64748b; line-height: 1.5;">
+            💡 <em>Bu görevlendirme e-postası Piri Reis Üniversitesi Satınalma Takip Sistemi tarafından otomatik olarak iletilmiştir.</em>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const transporter = createSmtpTransporter(cfg);
+    await transporter.sendMail({
+      from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
+      to: staff.email,
+      subject: subject,
+      html: html
+    });
+
+    console.log(`✉️ Satınalma Uzmanı Görev E-Postası Gönderildi -> ${staff.name} (${staff.email}) [${eventType} - #${barcode}]`);
+  } catch (err) {
+    console.error('Personel görevlendirme e-posta hatası:', err.message);
+  }
+}
+
 async function sendRatingReminderEmail(demand) {
   const cfg = await getSmtpConfig();
   if (!cfg || !cfg.isEnabled || !cfg.host) {
@@ -1575,9 +1692,12 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(201);
             res.end(JSON.stringify(returnedRow));
 
-            // Trigger automated unit email on demand creation
+            // Trigger automated unit & staff email on demand creation
             if (table === 'requests' && result.rows[0]) {
               notifyUnitOnDemandEvent(result.rows[0], 'CREATED').catch(e => console.error('Birim e-posta tetikleme hatası:', e.message));
+              if (result.rows[0].assignedTo && result.rows[0].assignedTo !== 'Henüz Atanmadı') {
+                notifyStaffOnAssignment(result.rows[0], 'ASSIGNED').catch(e => console.error('Personel e-posta tetikleme hatası:', e.message));
+              }
             }
           } catch (err) {
             console.error(`INSERT hatası (${table}):`, err.message);
@@ -1605,9 +1725,11 @@ const server = http.createServer(async (req, res) => {
           }
           
           let oldStatus = null;
+          let oldAssignedTo = null;
           if (table === 'requests') {
-            const prevRes = await pool.query('SELECT status FROM requests WHERE id = $1', [id]).catch(() => null);
+            const prevRes = await pool.query('SELECT status, "assignedTo" FROM requests WHERE id = $1', [id]).catch(() => null);
             oldStatus = prevRes?.rows[0]?.status;
+            oldAssignedTo = prevRes?.rows[0]?.assignedTo;
           }
 
           // Güvenli sütun filtreleme (Sadece veritabanında var olan sütunları güncelle)
@@ -1642,9 +1764,14 @@ const server = http.createServer(async (req, res) => {
 
               res.writeHead(200); res.end(JSON.stringify(returnedRow));
 
-              // Trigger automated unit email on demand status update
-              if (table === 'requests' && result.rows[0] && oldStatus && result.rows[0].status !== oldStatus) {
-                notifyUnitOnDemandEvent(result.rows[0], 'STATUS_CHANGED', oldStatus).catch(e => console.error('Birim e-posta güncelleme hatası:', e.message));
+              // Trigger automated emails on demand status update & staff delegation
+              if (table === 'requests' && result.rows[0]) {
+                if (oldStatus && result.rows[0].status !== oldStatus) {
+                  notifyUnitOnDemandEvent(result.rows[0], 'STATUS_CHANGED', oldStatus).catch(e => console.error('Birim e-posta güncelleme hatası:', e.message));
+                }
+                if (result.rows[0].assignedTo && result.rows[0].assignedTo !== oldAssignedTo && result.rows[0].assignedTo !== 'Henüz Atanmadı') {
+                  notifyStaffOnAssignment(result.rows[0], 'DELEGATED', oldAssignedTo).catch(e => console.error('Personel devir e-posta hatası:', e.message));
+                }
               }
             }
           } catch (err) {
