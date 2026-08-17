@@ -1869,6 +1869,14 @@ const server = http.createServer(async (req, res) => {
         // DELETE /api/:table/:id
         if (method === 'DELETE' && parts[2]) {
           const id = parseInt(parts[2], 10);
+
+          // Talep silme yetkisi sadece ADMIN kullanıcılar içindir
+          if (table === 'requests' && currentUser?.role !== 'ADMIN') {
+            res.writeHead(403);
+            res.end(JSON.stringify({ error: 'Talep silme işlemi sadece Yönetici (ADMIN) yetkisine sahip kullanıcılar tarafından yapılabilir.' }));
+            return;
+          }
+
           try {
             const result = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
             if (result.rowCount === 0) {

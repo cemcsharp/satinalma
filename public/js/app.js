@@ -2759,6 +2759,8 @@ async init() {
       return;
     }
 
+    const isAdmin = this.state.currentUser?.role === 'ADMIN';
+
     tbody.innerHTML = pageRequests.map((r, i) => `
       <tr>
         <td><input type="checkbox" class="chk-select-request" data-id="${r.id}" onchange="App._onRowCheckboxChange()"></td>
@@ -2779,7 +2781,7 @@ async init() {
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-icon" onclick="App.openDocumentManager('request', '${r.id}', '#${r.requestBarcode || r.id} — ${r.subject?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
             <button class="btn-icon" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>
-            <button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil">🗑️</button>
+            ${isAdmin ? `<button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil (Sadece Yönetici)">🗑️</button>` : ''}
           </div>
         </td>
       </tr>
@@ -3065,6 +3067,8 @@ async init() {
       return;
     }
 
+    const isAdmin = this.state.currentUser?.role === 'ADMIN';
+
     tbody.innerHTML = requests.map(r => `
       <tr>
         <td style="white-space:nowrap;"><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
@@ -3080,7 +3084,7 @@ async init() {
           <div class="action-btns">
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" onclick="App.openEditModal('${r.id}')">Sipariş Gir / Güncelle</button>
-            <button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil">🗑️</button>
+            ${isAdmin ? `<button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil (Sadece Yönetici)">🗑️</button>` : ''}
           </div>
         </td>
       </tr>
@@ -3336,6 +3340,11 @@ async init() {
   },
 
   async deleteRequest(requestId) {
+    if (this.state.currentUser?.role !== 'ADMIN') {
+      this.showToast("Talep silme yetkisi sadece Yöneticilere (ADMIN) aittir.", "warning", "🛡️");
+      return;
+    }
+
     const req = this.state.requests.find(r => String(r.id) === String(requestId));
     if (!req) {
       this.showToast(`Silinecek talep kaydı (#${requestId}) bulunamadı.`, "error");
@@ -3343,8 +3352,12 @@ async init() {
     }
 
     const barcodeText = req.requestBarcode ? `Barkod #${req.requestBarcode}` : 'Talep';
-    this.showConfirm("Talebi Sil", `${barcodeText} - "${req.subject}" başlıklı talebi silmek istediğinizden emin misiniz?`, async () => {
-      await this.apiSync('requests', 'DELETE', req.id);
+    this.showConfirm("Talebi Sil", `${barcodeText} - "${req.subject}" başlıklı talebi silmek istediğinizden emin misiniz?\n\n(Bu işlem kalıcıdır ve sadece Yönetici yetkisiyle gerçekleştirilebilir.)`, async () => {
+      const res = await this.apiSync('requests', 'DELETE', req.id);
+      if (res && res.error) {
+        this.showToast(res.error, "error");
+        return;
+      }
       this.state.requests = this.state.requests.filter(r => String(r.id) !== String(requestId));
       this.logAction('Talep Silindi', `Barkod: ${req.requestBarcode || '-'}, Konu: ${req.subject}`);
       this.showToast("Talep başarıyla silindi!", "warning");
