@@ -24,6 +24,51 @@ const BACKUP_DIR = path.join(__dirname, 'backups');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'pruni-satinalma-sec-key-2026-auth-jwt';
 
+// Bilinen ve İzin Verilen Veritabanı Tablo Sütunları (Güvenli Filtreleme)
+const TABLE_COLUMNS = {
+  users: ['name', 'title', 'role', 'isActive', 'password', 'phone', 'email', 'username'],
+  requests: [
+    'sequenceNo', 'requestBarcode', 'subject', 'unit', 'arrivalDate', 'requestDate',
+    'assignedTo', 'priority', 'status', 'estimatedAmount', 'budgetAmount', 'actualAmount',
+    'currency', 'supplier', 'orderBarcode', 'orderDate', 'regulation', 'description',
+    'purchaseType', 'academicYear'
+  ],
+  contracts: [
+    'contractNo', 'title', 'supplier', 'unit', 'assignedTo', 'startDate', 'endDate',
+    'totalAmount', 'currency', 'exchangeRate', 'guaranteeAmount', 'guaranteeExpiry',
+    'status', 'notes', 'description', 'academicYear'
+  ],
+  invoices: [
+    'invoiceNo', 'supplier', 'invoiceDate', 'dueDate', 'amount', 'currency',
+    'requestBarcode', 'relatedBarcode', 'status', 'paymentStatus', 'accountingDeliveryDate',
+    'paymentDate', 'notes', 'description', 'academicYear'
+  ],
+  guarantees: [
+    'letterNo', 'bank', 'bankName', 'type', 'title', 'supplier', 'unit',
+    'amount', 'guaranteeAmount', 'currency', 'issueDate', 'expiryDate',
+    'storageLocation', 'status', 'notes', 'description'
+  ],
+  logs: ['timestamp', 'user', 'action', 'details'],
+  units: ['name', 'email'],
+  regulations: ['name'],
+  tenders: [
+    'tenderNo', 'title', 'tenderDate', 'tenderTime', 'status', 'unit',
+    'relatedBarcode', 'regulation', 'estimatedAmount', 'currency',
+    'assignedTo', 'winnerSupplier', 'actualAmount', 'notes'
+  ],
+  documents: [
+    'entityType', 'entityId', 'fileName', 'storedFileName', 'fileSize',
+    'fileType', 'category', 'description', 'uploadedBy', 'uploadedAt'
+  ],
+  vendor_ratings: [
+    'supplierName', 'purchaseType', 'requestId', 'speedScore', 'qualityScore',
+    'complianceScore', 'communicationScore', 'overallScore', 'reviewNotes',
+    'ratedBy', 'ratedAt'
+  ],
+  settings: ['key', 'value'],
+  rates: ['currency', 'rate', 'lastUpdated']
+};
+
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
@@ -1387,6 +1432,64 @@ const server = http.createServer(async (req, res) => {
     // ----------------------------------------------------
     // 2. GENERIC REST CRUD API
     // ----------------------------------------------------
+    // ----------------------------------------------------
+    // 💱 CANLI DÖVİZ KURLARI & GENEL AYARLAR (SETTINGS & RATES)
+    // ----------------------------------------------------
+    if ((urlPath === '/api/settings' || urlPath === '/api/rates') && method === 'POST') {
+      if (!currentUser) return sendUnauthorized();
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      try {
+        const body = await readBody(req);
+        const data = JSON.parse(body || '{}');
+        const ratesData = data.rates || (data.USD || data.EUR ? data : null);
+
+        if (ratesData && (ratesData.USD || ratesData.EUR)) {
+          const now = new Date();
+          const pad = (n) => String(n).padStart(2, '0');
+          const dateStr = ratesData.lastUpdated || `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+          if (ratesData.USD) {
+            await pool.query(`
+              INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('USD', $1, $2)
+              ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
+            `, [parseFloat(ratesData.USD), dateStr]);
+          }
+          if (ratesData.EUR) {
+            await pool.query(`
+              INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('EUR', $1, $2)
+              ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
+            `, [parseFloat(ratesData.EUR), dateStr]);
+          }
+
+          res.writeHead(200);
+          res.end(JSON.stringify({ success: true, message: 'Döviz kurları başarıyla güncellendi ve kaydedildi.' }));
+          return;
+        }
+
+        if (data.key && data.value !== undefined) {
+          await pool.query(`
+            INSERT INTO settings (key, value) VALUES ($1, $2)
+            ON CONFLICT (key) DO UPDATE SET value = $2
+          `, [String(data.key), typeof data.value === 'object' ? JSON.stringify(data.value) : String(data.value)]);
+
+          res.writeHead(200);
+          res.end(JSON.stringify({ success: true }));
+          return;
+        }
+
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        console.error('Settings/Rates save error:', err);
+        res.writeHead(500);
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+      return;
+    }
+
+    // ----------------------------------------------------
+    // 2. GENERIC REST CRUD API (GÜVENLİ VE FİLTRELİ)
+    // ----------------------------------------------------
     if (parts[0] === 'api' && parts.length >= 2 && urlPath !== '/api/data') {
       const table = parts[1];
       const allowedTables = ['users', 'requests', 'contracts', 'invoices', 'guarantees', 'logs', 'units', 'regulations', 'tenders', 'documents', 'vendor_ratings', 'settings'];
@@ -1436,23 +1539,44 @@ const server = http.createServer(async (req, res) => {
             }
           }
 
-          const keys = Object.keys(data);
+          // Güvenli sütun filtreleme (Sadece veritabanında var olan sütunları ekle)
+          const validCols = TABLE_COLUMNS[table] || Object.keys(data);
+          const sanitizedData = {};
+          for (const k of Object.keys(data)) {
+            if (validCols.includes(k) && k !== 'id') {
+              sanitizedData[k] = sanitizeVal(data[k], k);
+            }
+          }
+
+          const keys = Object.keys(sanitizedData);
+          if (keys.length === 0) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Kaydedilecek geçerli sütun verisi bulunamadı.' }));
+            return;
+          }
+
           const cols = keys.map(k => `"${k}"`).join(', ');
           const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-          const values = keys.map(k => sanitizeVal(data[k], k));
+          const values = keys.map(k => sanitizedData[k]);
 
-          const query = `INSERT INTO ${table} (${cols}) VALUES (${placeholders}) RETURNING *`;
-          const result = await pool.query(query, values);
-          
-          const returnedRow = { ...result.rows[0] };
-          if (table === 'users') delete returnedRow.password;
+          try {
+            const query = `INSERT INTO ${table} (${cols}) VALUES (${placeholders}) RETURNING *`;
+            const result = await pool.query(query, values);
+            
+            const returnedRow = { ...result.rows[0] };
+            if (table === 'users') delete returnedRow.password;
 
-          res.writeHead(201);
-          res.end(JSON.stringify(returnedRow));
+            res.writeHead(201);
+            res.end(JSON.stringify(returnedRow));
 
-          // Trigger automated unit email on demand creation
-          if (table === 'requests' && result.rows[0]) {
-            notifyUnitOnDemandEvent(result.rows[0], 'CREATED').catch(e => console.error('Birim e-posta tetikleme hatası:', e.message));
+            // Trigger automated unit email on demand creation
+            if (table === 'requests' && result.rows[0]) {
+              notifyUnitOnDemandEvent(result.rows[0], 'CREATED').catch(e => console.error('Birim e-posta tetikleme hatası:', e.message));
+            }
+          } catch (err) {
+            console.error(`INSERT hatası (${table}):`, err.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Kayıt veritabanına eklenemedi: ' + err.message }));
           }
           return;
         }
@@ -1480,26 +1604,47 @@ const server = http.createServer(async (req, res) => {
             oldStatus = prevRes?.rows[0]?.status;
           }
 
-          const keys = Object.keys(data);
+          // Güvenli sütun filtreleme (Sadece veritabanında var olan sütunları güncelle)
+          const validCols = TABLE_COLUMNS[table] || Object.keys(data);
+          const sanitizedData = {};
+          for (const k of Object.keys(data)) {
+            if (validCols.includes(k) && k !== 'id') {
+              sanitizedData[k] = sanitizeVal(data[k], k);
+            }
+          }
+
+          const keys = Object.keys(sanitizedData);
+          if (keys.length === 0) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Güncellenecek geçerli sütun verisi bulunamadı.' }));
+            return;
+          }
+
           const updates = keys.map((k, i) => `"${k}" = $${i + 1}`).join(', ');
-          const values = keys.map(k => sanitizeVal(data[k], k));
+          const values = keys.map(k => sanitizedData[k]);
           values.push(id);
 
-          const query = `UPDATE ${table} SET ${updates} WHERE id = $${values.length} RETURNING *`;
-          const result = await pool.query(query, values);
-          
-          if (result.rowCount === 0) {
-            res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' }));
-          } else {
-            const returnedRow = { ...result.rows[0] };
-            if (table === 'users') delete returnedRow.password;
+          try {
+            const query = `UPDATE ${table} SET ${updates} WHERE id = $${values.length} RETURNING *`;
+            const result = await pool.query(query, values);
+            
+            if (result.rowCount === 0) {
+              res.writeHead(404); res.end(JSON.stringify({ error: 'Kayıt bulunamadı' }));
+            } else {
+              const returnedRow = { ...result.rows[0] };
+              if (table === 'users') delete returnedRow.password;
 
-            res.writeHead(200); res.end(JSON.stringify(returnedRow));
+              res.writeHead(200); res.end(JSON.stringify(returnedRow));
 
-            // Trigger automated unit email on demand status update
-            if (table === 'requests' && result.rows[0] && oldStatus && result.rows[0].status !== oldStatus) {
-              notifyUnitOnDemandEvent(result.rows[0], 'STATUS_CHANGED', oldStatus).catch(e => console.error('Birim e-posta güncelleme hatası:', e.message));
+              // Trigger automated unit email on demand status update
+              if (table === 'requests' && result.rows[0] && oldStatus && result.rows[0].status !== oldStatus) {
+                notifyUnitOnDemandEvent(result.rows[0], 'STATUS_CHANGED', oldStatus).catch(e => console.error('Birim e-posta güncelleme hatası:', e.message));
+              }
             }
+          } catch (err) {
+            console.error(`UPDATE hatası (${table}):`, err.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Kayıt güncellenemedi: ' + err.message }));
           }
           return;
         }
@@ -1507,42 +1652,20 @@ const server = http.createServer(async (req, res) => {
         // DELETE /api/:table/:id
         if (method === 'DELETE' && parts[2]) {
           const id = parseInt(parts[2], 10);
-          const result = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
-          if (result.rowCount === 0) {
-            res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' }));
-          } else {
-            res.writeHead(200); res.end(JSON.stringify({ success: true }));
+          try {
+            const result = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
+            if (result.rowCount === 0) {
+              res.writeHead(404); res.end(JSON.stringify({ error: 'Kayıt bulunamadı' }));
+            } else {
+              res.writeHead(200); res.end(JSON.stringify({ success: true }));
+            }
+          } catch (err) {
+            console.error(`DELETE hatası (${table}):`, err.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Kayıt silinemedi: ' + err.message }));
           }
           return;
         }
-      }
-      
-      // Rates Table Endpoint
-      if (table === 'settings' && method === 'POST') {
-        if (!currentUser) return sendUnauthorized();
-        const body = await readBody(req);
-        if (body) {
-           const data = JSON.parse(body);
-           const client = await pool.connect();
-           try {
-             await client.query('BEGIN');
-             await client.query('CREATE TABLE IF NOT EXISTS rates (currency VARCHAR(10) PRIMARY KEY, rate NUMERIC(12,4), "lastUpdated" VARCHAR(100))');
-             await client.query('ALTER TABLE rates ADD COLUMN IF NOT EXISTS "lastUpdated" VARCHAR(100)');
-             await client.query('TRUNCATE rates');
-             const lastUp = (data.rates && data.rates.lastUpdated) ? data.rates.lastUpdated : new Date().toLocaleString('tr-TR');
-             if (data.rates && data.rates.USD) await client.query('INSERT INTO rates ("currency", "rate", "lastUpdated") VALUES ($1, $2, $3)', ['USD', data.rates.USD, lastUp]);
-             if (data.rates && data.rates.EUR) await client.query('INSERT INTO rates ("currency", "rate", "lastUpdated") VALUES ($1, $2, $3)', ['EUR', data.rates.EUR, lastUp]);
-             await client.query('COMMIT');
-             res.writeHead(200);
-             res.end(JSON.stringify({ success: true }));
-           } catch (e) {
-             await client.query('ROLLBACK');
-             throw e;
-           } finally {
-             client.release();
-           }
-        }
-        return;
       }
     }
 
@@ -1744,11 +1867,49 @@ async function initDatabaseSchema() {
         value TEXT
       );
 
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100);
+
       ALTER TABLE units ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "sequenceNo" INTEGER;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "requestDate" VARCHAR(100);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "budgetAmount" NUMERIC;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "academicYear" VARCHAR(50);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "orderBarcode" VARCHAR(100);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "orderDate" VARCHAR(100);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS supplier VARCHAR(255);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS regulation VARCHAR(100);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS description TEXT;
+
+      ALTER TABLE contracts ADD COLUMN IF NOT EXISTS "exchangeRate" NUMERIC;
+      ALTER TABLE contracts ADD COLUMN IF NOT EXISTS "guaranteeAmount" NUMERIC;
+      ALTER TABLE contracts ADD COLUMN IF NOT EXISTS "guaranteeExpiry" VARCHAR(100);
+      ALTER TABLE contracts ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE contracts ADD COLUMN IF NOT EXISTS "academicYear" VARCHAR(50);
+
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS "dueDate" VARCHAR(100);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS "paymentStatus" VARCHAR(50);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS "accountingDeliveryDate" VARCHAR(100);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS "relatedBarcode" VARCHAR(100);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS "paymentDate" VARCHAR(100);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS "academicYear" VARCHAR(50);
+
+      ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS "bankName" VARCHAR(255);
+      ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS type VARCHAR(100);
+      ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS title VARCHAR(255);
+      ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS unit VARCHAR(255);
+      ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS amount NUMERIC;
+      ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS "storageLocation" VARCHAR(255);
+      ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS notes TEXT;
+
+      ALTER TABLE rates ADD COLUMN IF NOT EXISTS "lastUpdated" VARCHAR(100);
+
       ALTER TABLE vendor_ratings ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
       ALTER TABLE vendor_ratings ADD COLUMN IF NOT EXISTS "requestId" INTEGER;
-      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
     `);
 
     // Otomatik Şifre Göçü (Mevcut düz metin şifreleri PBKDF2 tuzlu hash'e dönüştürür)
