@@ -138,8 +138,17 @@ body.light-theme .table-container {
   padding: 0;
 }
 
+body, button, input, select, textarea, optgroup, option, table, th, td, label {
+  font-family: var(--font-primary) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code, kbd, samp, pre, .font-mono, [style*="font-family: var(--font-mono)"], [style*="font-family:var(--font-mono)"], [style*="font-family: monospace"] {
+  font-family: var(--font-mono) !important;
+}
+
 body {
-  font-family: var(--font-primary);
   background-color: var(--bg-dark);
   color: var(--text-main);
   line-height: 1.5;
