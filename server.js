@@ -354,6 +354,16 @@ function createSmtpTransporter(config) {
   });
 }
 
+function getAppBaseUrl(cfg) {
+  if (process.env.APP_URL && process.env.APP_URL.trim()) {
+    return process.env.APP_URL.trim().replace(/\/$/, '');
+  }
+  if (cfg && cfg.appUrl && cfg.appUrl.trim()) {
+    return cfg.appUrl.trim().replace(/\/$/, '');
+  }
+  return 'http://109.236.48.236';
+}
+
 // ----------------------------------------------------
 // 📧 BİRİM OTOMATİK TALEP SÜREÇ BİLDİRİM FONKSİYONU
 // ----------------------------------------------------
@@ -420,16 +430,6 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
         </div>
       </div>
     ` : '';
-
-function getAppBaseUrl(cfg) {
-  if (process.env.APP_URL && process.env.APP_URL.trim()) {
-    return process.env.APP_URL.trim().replace(/\/$/, '');
-  }
-  if (cfg && cfg.appUrl && cfg.appUrl.trim()) {
-    return cfg.appUrl.trim().replace(/\/$/, '');
-  }
-  return 'http://109.236.48.236';
-}
 
     let ratingSection = '';
     if (demand.status === 'Tamamlandı' && demand.supplier) {
