@@ -476,16 +476,36 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
       messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına oluşturulan <strong>#${barcode}</strong> numaralı satınalma talebiniz sistemimize başarıyla kaydedilmiş ve işleme alınmıştır. Talebinizin süreç adımları uzmanımız tarafından takip edilmektedir.`;
     } else if (eventType === 'STATUS_CHANGED') {
       const status = demand.status || 'İşlemde';
-      if (status === 'Tamamlandı') badgeColor = '#10b981';
-      else if (status === 'Reddedildi' || status === 'İptal') badgeColor = '#ef4444';
-      else if (status === 'Sipariş Verildi' || demand.orderBarcode) badgeColor = '#8b5cf6';
-      else badgeColor = '#f59e0b';
-
-      subject = `🔄 Talep Durumu Güncellendi: [${status}] — #${barcode} (${demand.subject || ''})`;
-      headerTitle = `Talep Durumu: ${status}`;
-      messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin süreci güncellenmiştir.<br><br>
-      Önceki Durum: <strong>${oldStatus || 'Açık'}</strong> ➔ Güncel Durum: <strong style="color:${badgeColor}; font-size:1.05rem;">${status}</strong>`;
-    } else {
+      if (status === 'Tamamlandı') {
+        badgeColor = '#10b981';
+        subject = `✅ Satınalma Talebiniz Tamamlandı — #${barcode} (${demand.subject || ''})`;
+        headerTitle = `Talebiniz Başarıyla Tamamlandı`;
+        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin tüm teslimat ve fatura süreçleri tamamlanmıştır.`;
+      } else if (status === 'Revize İstendi') {
+        badgeColor = '#ea580c';
+        subject = `⚠️ Satınalma Talebiniz İçin Revize İsteği — #${barcode} (${demand.subject || ''})`;
+        headerTitle = `Talep İçin Revize / Ek Bilgi İstendi`;
+        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz satınalma ekibimiz tarafından incelenmiş ve işleme devam edilebilmesi için <strong>revize / ek teknik şartname bilgisi</strong> talep edilmiştir.<br><br>
+        ${demand.description ? `<div style="background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid #ea580c; border-radius:6px; padding:12px; margin:12px 0; font-size:0.88rem; color:#9a3412;"><strong>📝 Satınalma Uzmanının Revize Notu / Eksikler:</strong><br>${demand.description}</div>` : ''}
+        Lütfen talep edilen eksik belgeleri veya bilgileri güncelleyerek satınalma sorumlusu ile iletişime geçiniz.`;
+      } else if (status === 'Reddedildi' || status === 'İptal') {
+        badgeColor = '#ef4444';
+        subject = `❌ Talep İptal / Reddedildi: #${barcode} (${demand.subject || ''})`;
+        headerTitle = `Talep Durumu: ${status}`;
+        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz <strong>${status}</strong> durumuna alınmıştır.<br><br>
+        ${demand.description ? `<div style="background:#fef2f2; border:1px solid #fecaca; border-left:4px solid #ef4444; border-radius:6px; padding:12px; margin:12px 0; font-size:0.88rem; color:#991b1b;"><strong>Açıklama:</strong><br>${demand.description}</div>` : ''}`;
+      } else if (status === 'Sipariş Verildi' || demand.orderBarcode) {
+        badgeColor = '#8b5cf6';
+        subject = `📦 Sipariş Verildi: #${barcode} (${demand.subject || ''})`;
+        headerTitle = `Sipariş Sürecine Geçildi`;
+        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz için tedarikçi firmaya resmi sipariş geçilmiştir.`;
+      } else {
+        badgeColor = '#f59e0b';
+        subject = `🔄 Talep Durumu Güncellendi: [${status}] — #${barcode} (${demand.subject || ''})`;
+        headerTitle = `Talep Durumu: ${status}`;
+        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin süreci güncellenmiştir.<br><br>
+        Önceki Durum: <strong>${oldStatus || 'Açık'}</strong> ➔ Güncel Durum: <strong style="color:${badgeColor}; font-size:1.05rem;">${status}</strong>`;
+      }
       return;
     }
 

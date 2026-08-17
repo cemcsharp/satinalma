@@ -108,6 +108,21 @@ body.light-theme .badge.status-rejected {
   color: #991b1b;
   border: 1px solid #fecaca;
 }
+body.light-theme .badge.status-revision,
+body.light-theme .badge.status-revize {
+  background: #ffedd5;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+  font-weight: 700;
+}
+
+.badge.status-revision,
+.badge.status-revize {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.45);
+  font-weight: 700;
+}
 
 body.light-theme .modal-content,
 body.light-theme .login-card {

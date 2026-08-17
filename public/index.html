@@ -3568,6 +3568,142 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=3.0"></script>
+  <!-- MODAL: REQUEST REVISION (BİRİMDEN EKSİK ŞARTNAME / REVİZE İSTE) -->
+  <div id="modal-request-revision" class="modal-overlay">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header" style="border-bottom: 2px solid #ea580c;">
+        <h3 style="color: #ea580c; display: flex; align-items: center; gap: 0.5rem;">
+          <span>⚠️</span> Birimden Revize / Ek Bilgi İste
+        </h3>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <form id="form-request-revision" onsubmit="App.handleRevisionSubmit(event)">
+        <input type="hidden" id="rev-request-id">
+        <div style="background: var(--bg-card); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Talep Barkod / No:</span>
+            <strong id="rev-barcode-label" style="font-family: var(--font-mono); color: var(--accent-primary);">#0</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Talep Eden Birim:</span>
+            <strong id="rev-unit-label" style="color: var(--text-main);">-</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Talep Konusu:</span>
+            <span id="rev-subject-label" style="font-weight: 600; color: var(--text-main);">-</span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label style="font-weight: 700; color: var(--text-main);">
+            📝 Eksiklik Açıklaması / Revize Gerekçesi <span class="required">*</span>
+          </label>
+          <textarea id="rev-notes" rows="4" required placeholder="ör: Talep edilen malzeme için teknik şartname eksiktir. Lütfen cihazın CPU, RAM, ekran kartı ve garanti şartlarını içeren teknik şartnameyi ekleyerek güncelleyiniz..." style="width: 100%;"></textarea>
+          <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.35rem;">
+            💡 Bu açıklama talep geçmişine işlenecek ve ilgili birime resmi bildirim e-postası olarak otomatik iletilecektir.
+          </small>
+        </div>
+
+        <div class="form-actions" style="justify-content: space-between;">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); border-color: #ea580c;">
+            <span>✉️</span> Birime Bildir & Statüyü Revize Yap
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: OFFICIAL INSPECTION & ACCEPTANCE REPORT (MUAYENE VE KABUL TUTANAĞI) -->
+  <div id="modal-inspection-report" class="modal-overlay">
+    <div class="modal-content" style="max-width: 860px; max-height: 92vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h3>📄 Resmi Muayene ve Kabul Komisyonu Tutanağı</h3>
+        <div style="display: flex; gap: 0.5rem; margin-left: auto; margin-right: 0.5rem;">
+          <button type="button" class="btn-primary" onclick="App.printInspectionReport()" style="padding: 0.4rem 0.9rem; font-size: 0.82rem;">
+            <span>🖨️</span> Tutanağı Yazdır / PDF
+          </button>
+        </div>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 1.25rem 0.5rem; overflow-y: auto; flex: 1;">
+        <div id="inspection-report-sheet" class="inspection-sheet" style="background: #ffffff; color: #0f172a; padding: 2rem 2.25rem; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.08); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <!-- Inspection Report Header -->
+          <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+            <div style="font-size: 1.1rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #0f172a;">T.C. PİRİ REİS ÜNİVERSİTESİ REKTÖRLÜĞÜ</div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: #1e3a8a; margin-top: 2px;">SATINALMA MÜDÜRLÜĞÜ</div>
+            <div style="font-size: 1.2rem; font-weight: 900; color: #0f172a; margin-top: 8px; letter-spacing: 0.02em; text-decoration: underline;">MUAYENE VE KABUL KOMİSYONU TUTANAĞI</div>
+          </div>
+
+          <!-- Metadata Grid Table -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.25rem; font-size: 0.88rem;">
+            <tbody>
+              <tr>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9; width: 25%;">Talep Eden Birim:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; width: 25%;" id="ir-unit">-</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9; width: 25%;">Talep Barkod / No:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-family: monospace; font-weight: 700; color: #1e3a8a; width: 25%;" id="ir-barcode">-</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9;">İşin / Alımın Konusu:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px;" colspan="3" id="ir-subject">-</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9;">Tedarikçi Firma:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px;" id="ir-supplier">-</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9;">Alım Türü:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 600;" id="ir-type">-</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9;">Sipariş Barkod / No:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-family: monospace;" id="ir-order-barcode">-</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9;">Sipariş Tarihi:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px;" id="ir-order-date">-</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9;">Muayene / Teslim Tarihi:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px;" id="ir-inspection-date">-</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 700; background: #f1f5f9;">Toplam Tutar:</td>
+                <td style="border: 1px solid #94a3b8; padding: 7px 10px; font-weight: 800; font-size: 0.95rem; color: #166534;" id="ir-amount">-</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Legal Inspection Text -->
+          <div style="border: 1px solid #94a3b8; background: #f8fafc; padding: 14px 18px; border-radius: 4px; margin-bottom: 1.75rem; line-height: 1.6; font-size: 0.88rem; text-align: justify;">
+            <strong>KOMİSYON KARARI VE KABUL BEYANI:</strong><br>
+            Yukarıda kayıt bilgileri, konusu ve tedarikçisi belirtilen mal / hizmet alımına ait teslimatlar komisyonumuzca fiziki, teknik şartname, sipariş formu ve fatura/irsaliye evrakları doğrultusunda incelenmiştir. Yapılan muayene ve fonksiyon testleri neticesinde; ürün/hizmetin istenen kalite, nitelik, adet ve standartlara <strong>TAM VE EKSİKSİZ UYGUN OLDUĞU</strong> tespit edilmiş olup, kesin kabulü oy birliği ile onaylanmıştır.
+          </div>
+
+          <!-- Signatures Box Grid -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; text-align: center; margin-top: 2rem;">
+            <div style="border: 1px solid #cbd5e1; padding: 12px 8px; border-radius: 4px; min-height: 110px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a;">BİRİM YETKİLİSİ / KULLANICI</div>
+              <div style="font-size: 0.78rem; color: #64748b;" id="ir-sign-unit-name">Taşınır Kayıt / Bölüm Bşk.</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1.5rem;">İmza / Kaşe</div>
+            </div>
+            <div style="border: 1px solid #cbd5e1; padding: 12px 8px; border-radius: 4px; min-height: 110px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a;">SATINALMA UZMANI</div>
+              <div style="font-size: 0.78rem; color: #64748b;" id="ir-sign-staff-name">Satınalma Sorumlusu</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1.5rem;">İmza / Kaşe</div>
+            </div>
+            <div style="border: 1px solid #cbd5e1; padding: 12px 8px; border-radius: 4px; min-height: 110px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a;">SATINALMA MÜDÜRÜ</div>
+              <div style="font-size: 0.78rem; color: #64748b;">Komisyon Başkanı / Onay</div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1.5rem;">İmza / Kaşe</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions" style="justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 0.85rem;">
+        <button type="button" class="btn-secondary close-modal">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js?v=3.1"></script>
 </body>
 </html>

@@ -2583,8 +2583,10 @@ async init() {
         }
       }
       return `<div><span class="badge status-completed">✅ Tamamlandı</span>${ratingBadge}</div>`;
-    } else if (r.status === 'Reddedildi') {
-      return `<span class="badge status-rejected">❌ Reddedildi</span>`;
+    } else if (r.status === 'Reddedildi' || r.status === 'İptal') {
+      return `<span class="badge status-rejected">❌ ${r.status}</span>`;
+    } else if (r.status === 'Revize İstendi') {
+      return `<span class="badge status-revision" title="Birime eksik teknik şartname veya bilgi bildirildi, revize bekleniyor">⚠️ Revize İstendi</span>`;
     } else {
       if (r.orderBarcode || r.orderDate) {
         return `<span class="badge priority-yüksek" style="background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5);" title="Sipariş geçildi, teslimat bekleniyor">🚚 Sipariş Verildi</span>`;
@@ -2781,6 +2783,8 @@ async init() {
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-icon" onclick="App.openDocumentManager('request', '${r.id}', '#${r.requestBarcode || r.id} — ${r.subject?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
             <button class="btn-icon" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>
+            <button class="btn-icon" style="color:#ea580c;" onclick="App.openRevisionModal('${r.id}')" title="Birimden Revize / Eksik Şartname İste">⚠️</button>
+            <button class="btn-icon" style="color:#10b981;" onclick="App.openInspectionReport('${r.id}')" title="Muayene ve Kabul Tutanağı (PDF / Yazdır)">📄</button>
             ${isAdmin ? `<button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil (Sadece Yönetici)">🗑️</button>` : ''}
           </div>
         </td>
@@ -3084,6 +3088,8 @@ async init() {
           <div class="action-btns">
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" onclick="App.openEditModal('${r.id}')">Sipariş Gir / Güncelle</button>
+            <button class="btn-icon" style="color:#ea580c;" onclick="App.openRevisionModal('${r.id}')" title="Birimden Revize / Eksik Şartname İste">⚠️</button>
+            <button class="btn-icon" style="color:#10b981;" onclick="App.openInspectionReport('${r.id}')" title="Muayene ve Kabul Tutanağı (PDF / Yazdır)">📄</button>
             ${isAdmin ? `<button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil (Sadece Yönetici)">🗑️</button>` : ''}
           </div>
         </td>
@@ -3499,6 +3505,16 @@ async init() {
           <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.65rem; color: var(--text-main);">${req.subject}</div>
           <div style="font-size: 0.92rem; color: var(--text-main); white-space: pre-wrap; line-height: 1.6; border-top: 1px solid var(--border-color); padding-top: 0.65rem;">${req.description || 'Açıklama veya not girilmemiş.'}</div>
         </div>
+
+        <!-- Action Quick Buttons (Revize İste & Muayene Kabul) -->
+        <div style="margin-top: 1.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end;">
+          <button type="button" class="btn-secondary" style="color: #ea580c; border-color: #ea580c; font-size: 0.82rem; padding: 0.45rem 0.85rem;" onclick="App.closeModal('modal-view-details'); App.openRevisionModal('${req.id}')">
+            <span>⚠️</span> Birimden Revize / Şartname İste
+          </button>
+          <button type="button" class="btn-secondary" style="color: #10b981; border-color: #10b981; font-size: 0.82rem; padding: 0.45rem 0.85rem;" onclick="App.openInspectionReport('${req.id}')">
+            <span>📄</span> Muayene ve Kabul Tutanağı (PDF)
+          </button>
+        </div>
       `;
     }
 
@@ -3510,6 +3526,135 @@ async init() {
       };
     }
     this.openModal('modal-view-details');
+  },
+
+  // ----------------------------------------------------
+  // ⚠️ REVISION REQUEST HANDLERS (BİRİMDEN REVİZE İSTE)
+  // ----------------------------------------------------
+  openRevisionModal(requestId) {
+    const req = this.state.requests.find(r => String(r.id) === String(requestId));
+    if (!req) {
+      this.showToast(`Talep (#${requestId}) bulunamadı.`, "error");
+      return;
+    }
+
+    document.getElementById('rev-request-id').value = req.id;
+    document.getElementById('rev-barcode-label').innerText = `#${req.requestBarcode || req.id}`;
+    document.getElementById('rev-unit-label').innerText = req.unit || '-';
+    document.getElementById('rev-subject-label').innerText = req.subject || '-';
+    document.getElementById('rev-notes').value = '';
+
+    this.openModal('modal-request-revision');
+  },
+
+  async handleRevisionSubmit(e) {
+    if (e) e.preventDefault();
+    const reqId = document.getElementById('rev-request-id')?.value;
+    const notes = document.getElementById('rev-notes')?.value.trim();
+
+    if (!reqId || !notes) {
+      this.showToast("Lütfen birime iletilecek revize gerekçesini yazınız.", "warning");
+      return;
+    }
+
+    const req = this.state.requests.find(r => String(r.id) === String(reqId));
+    if (!req) {
+      this.showToast("Talep kaydı bulunamadı.", "error");
+      return;
+    }
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const userTitle = this.state.currentUser ? this.state.currentUser.name : 'Satınalma Uzmanı';
+
+    req.status = 'Revize İstendi';
+    req.description = (req.description ? req.description + '\n\n' : '') + `[⚠️ REVİZE İSTENDİ - ${dateStr} (${userTitle})]:\n${notes}`;
+
+    this.showToast("Revize talebi kaydediliyor ve birime bildirim gönderiliyor...", "info", "⏳");
+
+    try {
+      const res = await this.apiSync('requests', 'PUT', req);
+      if (res && res.error) {
+        this.showToast(res.error, "error");
+        return;
+      }
+
+      this.logAction('Revize İstendi', `Talep #${req.requestBarcode || req.id} - ${req.unit}: ${notes.substring(0, 60)}...`);
+      this.showToast("Revize isteği birime başarıyla bildirildi!", "success", "✉️");
+      this.closeModal('modal-request-revision');
+      this.render();
+    } catch (err) {
+      console.error('handleRevisionSubmit error:', err);
+      this.showToast("Kayıt sırasında hata oluştu: " + err.message, "error");
+    }
+  },
+
+  // ----------------------------------------------------
+  // 📄 OFFICIAL INSPECTION & ACCEPTANCE REPORT HANDLERS
+  // ----------------------------------------------------
+  openInspectionReport(requestId) {
+    const req = this.state.requests.find(r => String(r.id) === String(requestId));
+    if (!req) {
+      this.showToast(`Talep (#${requestId}) bulunamadı.`, "error");
+      return;
+    }
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const todayStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`;
+
+    document.getElementById('ir-unit').innerText = req.unit || '-';
+    document.getElementById('ir-barcode').innerText = `#${req.requestBarcode || req.id}`;
+    document.getElementById('ir-subject').innerText = req.subject || '-';
+    document.getElementById('ir-supplier').innerText = req.supplier || 'Belirtilmedi';
+    document.getElementById('ir-type').innerText = req.purchaseType === 'HIZMET' ? '🛠️ Hizmet Alımı' : '📦 Mal Alımı';
+    document.getElementById('ir-order-barcode').innerText = req.orderBarcode || '-';
+    document.getElementById('ir-order-date').innerText = req.orderDate || req.arrivalDate || todayStr;
+    document.getElementById('ir-inspection-date').innerText = todayStr;
+    
+    const amt = req.actualAmount > 0 ? req.actualAmount : req.estimatedAmount || 0;
+    document.getElementById('ir-amount').innerText = amt > 0 ? this.formatMoney(amt, req.currency || 'TRY', 2) : '-';
+
+    document.getElementById('ir-sign-unit-name').innerText = `${req.unit} Yetkilisi`;
+    document.getElementById('ir-sign-staff-name').innerText = req.assignedTo && req.assignedTo !== 'Henüz Atanmadı' ? req.assignedTo : 'Satınalma Sorumlusu';
+
+    this.openModal('modal-inspection-report');
+  },
+
+  printInspectionReport() {
+    const sheet = document.getElementById('inspection-report-sheet');
+    if (!sheet) return;
+
+    const printWin = window.open('', '_blank', 'width=900,height=800');
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Muayene ve Kabul Tutanağı - Piri Reis Üniversitesi</title>
+        <style>
+          @page { size: A4 portrait; margin: 15mm 20mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #fff; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10pt; }
+          th, td { border: 1px solid #64748b; padding: 8px 10px; }
+          .header-bg { background-color: #f1f5f9; font-weight: bold; }
+          @media print {
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        ${sheet.innerHTML}
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 750);
+          };
+        <\/script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
   },
 
   viewContractDetails(contractId) {
