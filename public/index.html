@@ -392,6 +392,20 @@
 
       <!-- 🔔 NOTIFICATIONS & ALARM CENTER VIEW -->
       <section id="view-notifications" class="view-section" style="display: none;">
+        <div class="card-header" style="margin-bottom: 1.25rem;">
+          <div>
+            <h3>🔔 Bildirim Merkezi & Sistem Akıllı Uyarıları</h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
+              Sözleşme vadeleri, teminat bitişleri, fatura ödemeleri ve 14 günden fazla bekleyen taleplerin anlık alarm merkezi
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-secondary" id="btn-mark-all-notifications-read">
+              <span>✅</span> Tümünü Okundu İşaretle
+            </button>
+          </div>
+        </div>
+
         <div class="grid-4" style="margin-bottom: 1.5rem;">
           <div class="glass-card kpi-card notif-filter-kpi active" data-notif-filter="ALL" style="cursor: pointer;">
             <div class="kpi-icon red">🔔</div>
@@ -428,26 +442,34 @@
         </div>
 
         <!-- Notification Filter Toolbar -->
-        <div class="filter-bar">
+        <div class="filter-bar" style="gap: 0.75rem; flex-wrap: wrap;">
+          <select class="filter-select" id="filter-notif-category" style="min-width: 220px; font-weight: 600;">
+            <option value="ALL">📋 Tüm Bildirim Kategorileri</option>
+            <option value="GUARANTEE">🛡️ Teminat Mektupları</option>
+            <option value="CONTRACT">📑 Sözleşmeler</option>
+            <option value="INVOICE">🧾 Faturalar</option>
+            <option value="REQUEST">📋 Talepler (14+ Gün SLA)</option>
+          </select>
+
           <div style="display:flex; gap:0.4rem; flex-wrap:wrap;" id="notif-category-tabs">
             <button class="btn-secondary active-date-tab notif-cat-btn" data-category="ALL" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
               Tümü
             </button>
             <button class="btn-secondary notif-cat-btn" data-category="GUARANTEE" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
-              🛡️ Teminat Mektupları (<span id="notif-count-guarantee">0</span>)
+              🛡️ Teminat (<span id="notif-count-guarantee">0</span>)
             </button>
             <button class="btn-secondary notif-cat-btn" data-category="CONTRACT" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
-              📑 Sözleşmeler (<span id="notif-count-contract">0</span>)
+              📑 Sözleşme (<span id="notif-count-contract">0</span>)
             </button>
             <button class="btn-secondary notif-cat-btn" data-category="INVOICE" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
-              🧾 Faturalar (<span id="notif-count-invoice">0</span>)
+              🧾 Fatura (<span id="notif-count-invoice">0</span>)
             </button>
             <button class="btn-secondary notif-cat-btn" data-category="REQUEST" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
-              📋 Talepler (<span id="notif-count-request">0</span>)
+              📋 Talep (<span id="notif-count-request">0</span>)
             </button>
           </div>
 
-          <div class="search-input-box" style="min-width:220px;">
+          <div class="search-input-box" style="min-width:220px; margin-left: auto;">
             <span class="search-icon">🔍</span>
             <input type="text" id="filter-notif-search" placeholder="Bildirimlerde ara...">
           </div>
@@ -796,36 +818,6 @@
             <tbody></tbody>
           </table>
         </div>
-      </section>
-
-      <!-- 4.5 NOTIFICATIONS CENTER VIEW (BİLDİRİM MERKEZİ SAYFASI) -->
-      <section id="view-notifications" class="view-section" style="display: none;">
-        <div class="card-header" style="margin-bottom: 1.5rem;">
-          <div>
-            <h3>🔔 Bildirim Merkezi & Sistem Akıllı Uyarıları</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted);">Sözleşme vadeleri, teminat bitişleri, ödeme uyarıları ve SLA sınırı aşan kritik taleplerin tüm detaylı geçmişi</p>
-          </div>
-          <div style="display: flex; gap: 0.5rem;">
-            <button class="btn-secondary" id="btn-mark-all-notifications-read">
-              <span>✅</span> Tümünü Okundu İşaretle
-            </button>
-          </div>
-        </div>
-
-        <!-- Notification Filter Bar -->
-        <div class="filter-bar">
-          <select class="filter-select" id="filter-notif-category">
-            <option value="ALL">Tüm Bildirim Kategorileri</option>
-            <option value="UNREAD">🔴 Okunmamış Bildirimler</option>
-            <option value="SLA">🚨 SLA & Geciken Talepler</option>
-            <option value="CONTRACT">📑 Sözleşme Bitiş Uyarıları</option>
-            <option value="GUARANTEE">🛡️ Teminat Mektubu Vadeleri</option>
-            <option value="INVOICE">🧾 Fatura Ödeme Zamanları</option>
-          </select>
-        </div>
-
-        <!-- Notification Cards Container -->
-        <div id="notifications-full-list" style="display: flex; flex-direction: column; gap: 1rem;"></div>
       </section>
 
       <!-- 5. CONTRACT MANAGEMENT VIEW (YENİ) -->

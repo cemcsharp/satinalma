@@ -1010,9 +1010,21 @@ async init() {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.notif-cat-btn').forEach(b => b.classList.remove('active-date-tab'));
         btn.classList.add('active-date-tab');
-        this.state.notifCategory = btn.getAttribute('data-category') || 'ALL';
+        const cat = btn.getAttribute('data-category') || 'ALL';
+        this.state.notifCategory = cat;
+        const catSelect = document.getElementById('filter-notif-category');
+        if (catSelect) catSelect.value = cat;
         this.renderNotificationsView();
       });
+    });
+
+    document.getElementById('filter-notif-category')?.addEventListener('change', (e) => {
+      const cat = e.target.value || 'ALL';
+      this.state.notifCategory = cat;
+      document.querySelectorAll('.notif-cat-btn').forEach(b => {
+        b.classList.toggle('active-date-tab', (b.getAttribute('data-category') || 'ALL') === cat);
+      });
+      this.renderNotificationsView();
     });
 
     document.getElementById('filter-notif-search')?.addEventListener('input', (e) => {
@@ -1967,13 +1979,35 @@ async init() {
     if (elCInv) elCInv.innerText = countInv;
     if (elCReq) elCReq.innerText = countReq;
 
+    // Update Category Dropdown Option Counts & Sync Selected Value
+    const catSelect = document.getElementById('filter-notif-category');
+    if (catSelect) {
+      catSelect.value = this.state.notifCategory || 'ALL';
+      const optGuar = catSelect.querySelector('option[value="GUARANTEE"]');
+      const optCont = catSelect.querySelector('option[value="CONTRACT"]');
+      const optInv = catSelect.querySelector('option[value="INVOICE"]');
+      const optReq = catSelect.querySelector('option[value="REQUEST"]');
+      const optAll = catSelect.querySelector('option[value="ALL"]');
+
+      if (optAll) optAll.innerText = `📋 Tüm Bildirim Kategorileri (${countTotal})`;
+      if (optGuar) optGuar.innerText = `🛡️ Teminat Mektupları (${countGuar})`;
+      if (optCont) optCont.innerText = `📑 Sözleşmeler (${countCont})`;
+      if (optInv) optInv.innerText = `🧾 Faturalar (${countInv})`;
+      if (optReq) optReq.innerText = `📋 Talepler (14+ Gün SLA: ${countReq})`;
+    }
+
+    // Sync button active classes
+    document.querySelectorAll('.notif-cat-btn').forEach(b => {
+      b.classList.toggle('active-date-tab', (b.getAttribute('data-category') || 'ALL') === (this.state.notifCategory || 'ALL'));
+    });
+
     // Filter by Level KPI (ALL, CRITICAL, WARNING, INFO)
     let filtered = allNotifs;
     if (this.state.notifFilter && this.state.notifFilter !== 'ALL') {
       filtered = filtered.filter(n => n.level === this.state.notifFilter);
     }
 
-    // Filter by Category Tab (ALL, GUARANTEE, CONTRACT, INVOICE, REQUEST)
+    // Filter by Category Tab / Dropdown (ALL, GUARANTEE, CONTRACT, INVOICE, REQUEST)
     if (this.state.notifCategory && this.state.notifCategory !== 'ALL') {
       filtered = filtered.filter(n => n.category === this.state.notifCategory);
     }
