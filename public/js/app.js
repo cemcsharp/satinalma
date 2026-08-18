@@ -8616,7 +8616,7 @@ async init() {
     }
   },
 
-  showToast(message, type = 'info', icon = null) {
+  showToast(message, type = 'info', icon = null, duration = 3500) {
     const container = document.getElementById('toast-container');
     if (!container) {
       console.log(`[Toast ${type}]: ${message}`);
@@ -8636,16 +8636,41 @@ async init() {
     toastEl.innerHTML = `
       <div class="toast-icon">${toastIcon}</div>
       <div class="toast-message">${message}</div>
+      <button type="button" class="toast-close" title="Bildirimi Kapat" aria-label="Kapat">&times;</button>
     `;
+
+    const closeToast = () => {
+      if (toastEl.dataset.closing) return;
+      toastEl.dataset.closing = 'true';
+      toastEl.style.animation = 'fadeOutToast 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+      setTimeout(() => {
+        if (toastEl.parentNode) toastEl.parentNode.removeChild(toastEl);
+      }, 250);
+    };
+
+    // Close immediately on click close button or tap on toast
+    const closeBtn = toastEl.querySelector('.toast-close');
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeToast();
+    });
+
+    toastEl.addEventListener('click', () => {
+      closeToast();
+    });
 
     container.appendChild(toastEl);
 
-    setTimeout(() => {
-      toastEl.style.animation = 'fadeOutToast 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards';
-      setTimeout(() => {
-        if (toastEl.parentNode) toastEl.parentNode.removeChild(toastEl);
-      }, 300);
-    }, 4000);
+    // Auto dismiss with hover-pause support
+    let dismissTimer = setTimeout(closeToast, duration);
+
+    toastEl.addEventListener('mouseenter', () => {
+      clearTimeout(dismissTimer);
+    });
+
+    toastEl.addEventListener('mouseleave', () => {
+      dismissTimer = setTimeout(closeToast, 1200);
+    });
   },
 
   showConfirm(title, message, onConfirm, icon = '⚠️') {
