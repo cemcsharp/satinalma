@@ -426,12 +426,15 @@ async init() {
   },
 
   async handleLogin(e) {
-    e.preventDefault();
+    if (e) {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+    }
     const selectEl = document.getElementById('login-screen-user-select');
     const selectedVal = selectEl?.value;
     const passInput = document.getElementById('login-screen-password')?.value || '';
     const errMsg = document.getElementById('login-error-msg');
-    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const submitBtn = document.querySelector('#form-login-screen button[type="submit"]');
 
     if (!selectedVal) {
       if (errMsg) {
@@ -636,8 +639,25 @@ async init() {
     // Portal Search Input Listener
     document.getElementById('portal-search-input')?.addEventListener('input', (e) => this.handlePortalSearch(e.target.value));
 
-    // Login Form Submit
-    document.getElementById('form-login-screen')?.addEventListener('submit', (e) => this.handleLogin(e));
+    // Login Form Submit & Mobile Enter Key Support
+    const loginForm = document.getElementById('form-login-screen');
+    if (loginForm) {
+      loginForm.addEventListener('submit', (e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        this.handleLogin(e);
+        return false;
+      });
+    }
+
+    const loginPass = document.getElementById('login-screen-password');
+    if (loginPass) {
+      loginPass.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.handleLogin(e);
+        }
+      });
+    }
 
     // Logout Button
     document.getElementById('btn-logout')?.addEventListener('click', () => this.handleLogout());
