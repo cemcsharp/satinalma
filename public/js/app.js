@@ -530,18 +530,21 @@ async init() {
       if (!isNaN(reqId)) {
         this.switchView('requests');
         setTimeout(() => this.viewRequestDetails(reqId), 150);
+        history.replaceState(null, null, window.location.pathname + window.location.search);
       }
     } else if (hash.startsWith('#contract/')) {
       const contractId = parseInt(hash.replace('#contract/', ''));
       if (!isNaN(contractId)) {
         this.switchView('contracts');
         setTimeout(() => this.viewContractDetails(contractId), 150);
+        history.replaceState(null, null, window.location.pathname + window.location.search);
       }
     } else if (hash.startsWith('#invoice/')) {
       const invoiceId = parseInt(hash.replace('#invoice/', ''));
       if (!isNaN(invoiceId)) {
         this.switchView('invoices');
         setTimeout(() => this.viewInvoiceDetails(invoiceId), 150);
+        history.replaceState(null, null, window.location.pathname + window.location.search);
       }
     }
   },
@@ -8842,6 +8845,9 @@ async init() {
       document.getElementById(modalId)?.classList.remove('active');
     } else {
       document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+    }
+    if (window.location.hash && (window.location.hash.startsWith('#request/') || window.location.hash.startsWith('#contract/') || window.location.hash.startsWith('#invoice/'))) {
+      history.replaceState(null, null, window.location.pathname + window.location.search);
     }
   },
 
