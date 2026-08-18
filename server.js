@@ -1221,7 +1221,15 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const userRes = await pool.query('SELECT id, name, title, role, "isActive", password, email FROM users WHERE id = $1', [parseInt(userId, 10)]);
+      let userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE id = $1';
+      let queryParams = [parseInt(userId, 10) || 0];
+
+      if (String(userId).toLowerCase() === 'exec' || String(userId).toLowerCase() === 'executive') {
+        userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE role = \'EXECUTIVE\' LIMIT 1';
+        queryParams = [];
+      }
+
+      const userRes = await pool.query(userQuery, queryParams);
       if (userRes.rowCount === 0) {
         res.writeHead(401);
         res.end(JSON.stringify({ error: 'Kullanıcı bulunamadı.' }));
@@ -2613,16 +2621,16 @@ async function initDatabaseSchema() {
           ['Cem TUR', 'Satınalma Mdr. Yrd.', 'ADMIN', true, hashPassword('123456')]
         );
       }
+    }
 
-      // Ensure Kurumsal Yönetim (EXECUTIVE) user exists
-      const execUserRes = await pool.query("SELECT id FROM users WHERE role = 'EXECUTIVE' OR name ILIKE '%Kurumsal Yönetim%'");
-      if (execUserRes.rowCount === 0) {
-        await pool.query(
-          'INSERT INTO users (name, title, role, "isActive", password, email) VALUES ($1, $2, $3, $4, $5, $6)',
-          ['Kurumsal Yönetim', 'Üst Yönetim & İzleme', 'EXECUTIVE', true, hashPassword('123456'), 'yonetim@pirireis.edu.tr']
-        );
-        console.log('👑 Kurumsal Yönetim (EXECUTIVE) kullanıcısı başarıyla veritabanına eklendi!');
-      }
+    // Ensure Yönetici (EXECUTIVE) user exists in database on every startup
+    const execUserRes = await pool.query("SELECT id FROM users WHERE role = 'EXECUTIVE' OR name ILIKE '%Yönetici%' OR name ILIKE '%Kurumsal Yönetim%'");
+    if (execUserRes.rowCount === 0) {
+      await pool.query(
+        'INSERT INTO users (name, title, role, "isActive", password, email) VALUES ($1, $2, $3, $4, $5, $6)',
+        ['Yönetici', 'Üst Yönetim & İzleme', 'EXECUTIVE', true, hashPassword('123456'), 'yonetim@pirireis.edu.tr']
+      );
+      console.log('👑 Yönetici (EXECUTIVE) kullanıcısı başarıyla veritabanına eklendi!');
     }
   } catch (err) {
     console.error('Veritabanı ilklendirme hatası:', err.message);

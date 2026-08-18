@@ -453,10 +453,11 @@ async init() {
     }
 
     try {
+      const parsedId = parseInt(selectedVal, 10);
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: parseInt(selectedVal, 10), password: passInput })
+        body: JSON.stringify({ userId: isNaN(parsedId) ? selectedVal : parsedId, password: passInput })
       });
 
       const data = await res.json();
