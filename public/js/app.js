@@ -297,7 +297,6 @@ async init() {
 
   populateYearSelect() {
     // Akademik yılı Ağustos 1 başlangıç - Temmuz 31 bitiş olarak hesapla
-    // Bugünün tarihine ve verilerdeki tüm yıllara göre selector'ü otomatik doldur
     const yearSelect = document.getElementById('global-year-select');
     if (!yearSelect) return;
 
@@ -319,10 +318,13 @@ async init() {
     // Sıralı, benzersiz liste
     const sortedYears = Array.from(existingYears).sort((a, b) => b.localeCompare(a));
 
-    const currentVal = yearSelect.value;
+    const currentVal = this.state.selectedYear || yearSelect.value || currentAcademicYear;
     yearSelect.innerHTML = '<option value="ALL">Tüm Yıllar</option>' +
-      sortedYears.map(y => `<option value="${y}"${y === (this.state.selectedYear || currentAcademicYear) ? ' selected' : ''}>${y}</option>`).join('');
+      sortedYears.map(y => `<option value="${y}"${y === currentVal ? ' selected' : ''}>${y}</option>`).join('');
     
+    if (currentVal && Array.from(yearSelect.options).some(o => o.value === currentVal)) {
+      yearSelect.value = currentVal;
+    }
     this.state.selectedYear = yearSelect.value;
   },
 
@@ -332,31 +334,43 @@ async init() {
     unitSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
+      const prevVal = el.value;
       const isFilter = id.startsWith('filter') || id.startsWith('select');
       el.innerHTML = isFilter ? '<option value="ALL">Tüm Birimler</option>' : '<option value="">Birim Seçin</option>';
       this.state.units.forEach(u => {
         const uName = typeof u === 'object' ? u.name : u;
         el.innerHTML += `<option value="${uName}">${uName}</option>`;
       });
+      if (prevVal && Array.from(el.options).some(o => o.value === prevVal)) {
+        el.value = prevVal;
+      }
     });
 
     // Populate user dropdowns
     const filterPersonEl = document.getElementById('filter-person');
     if (filterPersonEl) {
+      const prevPerson = filterPersonEl.value;
       filterPersonEl.innerHTML = '<option value="ALL">Tüm Personel (Aktif + Pasif)</option>';
       this.state.users.forEach(u => {
         const statusLabel = u.isActive !== false ? '' : ' (Pasif)';
         filterPersonEl.innerHTML += `<option value="${u.name}">${u.name}${statusLabel}</option>`;
       });
+      if (prevPerson && Array.from(filterPersonEl.options).some(o => o.value === prevPerson)) {
+        filterPersonEl.value = prevPerson;
+      }
     }
 
     const delegateFromEl = document.getElementById('delegate-from-person');
     if (delegateFromEl) {
+      const prevDelFrom = delegateFromEl.value;
       delegateFromEl.innerHTML = '<option value="ALL">Tüm Açık Talepler</option>' +
         '<option value="Henüz Atanmadı">⏳ Henüz Atanmamış (Havuzdaki Talepler)</option>';
       this.state.users.filter(u => u.isActive !== false).forEach(u => {
         delegateFromEl.innerHTML += `<option value="${u.name}">👤 ${u.name} (${u.title})</option>`;
       });
+      if (prevDelFrom && Array.from(delegateFromEl.options).some(o => o.value === prevDelFrom)) {
+        delegateFromEl.value = prevDelFrom;
+      }
     }
 
     // Active personnel only for assignments
@@ -365,6 +379,7 @@ async init() {
     assignSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
+      const prevAssign = el.value;
       if (id === 'nr-assigned-to') {
         el.innerHTML = '<option value="Henüz Atanmadı">⏳ Henüz Atanmadı (Havuzda Bekleyen)</option>';
       } else {
@@ -373,6 +388,9 @@ async init() {
       activeUsers.forEach(u => {
         el.innerHTML += `<option value="${u.name}">${u.name} (${u.title})</option>`;
       });
+      if (prevAssign && Array.from(el.options).some(o => o.value === prevAssign)) {
+        el.value = prevAssign;
+      }
     });
 
     // Populate regulation dropdowns
@@ -380,12 +398,16 @@ async init() {
     regSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
+      const prevReg = el.value;
       el.innerHTML = '<option value="">Yönetmelik Maddesi (Opsiyonel)</option>';
       this.state.regulations.forEach(r => {
         const rName = typeof r === 'object' ? r.name : r;
         const val = rName.toString().replace('Madde ', '');
         el.innerHTML += `<option value="${val}">Madde ${val}</option>`;
       });
+      if (prevReg && Array.from(el.options).some(o => o.value === prevReg)) {
+        el.value = prevReg;
+      }
     });
   },
 
@@ -1361,9 +1383,6 @@ async init() {
 
   switchView(viewName) {
     this.toggleMobileSidebar(true);
-    if (this.state.currentView && this.state.currentView !== viewName) {
-      this.resetPageFilters();
-    }
     this.state.currentView = viewName;
     localStorage.setItem('activeView', viewName);
     
