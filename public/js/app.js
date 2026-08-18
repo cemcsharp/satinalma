@@ -363,30 +363,44 @@ async init() {
     const delegateFromEl = document.getElementById('delegate-from-person');
     if (delegateFromEl) {
       const prevDelFrom = delegateFromEl.value;
+      const unassignedCount = (this.state.requests || []).filter(r => (!r.assignedTo || r.assignedTo === 'Henüz Atanmadı') && r.status === 'Açık').length;
       delegateFromEl.innerHTML = '<option value="ALL">Tüm Açık Talepler</option>' +
-        '<option value="Henüz Atanmadı">⏳ Henüz Atanmamış (Havuzdaki Talepler)</option>';
+        `<option value="Henüz Atanmadı">⏳ Henüz Atanmamış (${unassignedCount} Talep Havuzda)</option>`;
       this.state.users.filter(u => u.isActive !== false).forEach(u => {
-        delegateFromEl.innerHTML += `<option value="${u.name}">👤 ${u.name} (${u.title})</option>`;
+        const openCount = (this.state.requests || []).filter(r => r.assignedTo === u.name && r.status === 'Açık').length;
+        delegateFromEl.innerHTML += `<option value="${u.name}">👤 ${u.name} (${openCount} Açık İş)</option>`;
       });
       if (prevDelFrom && Array.from(delegateFromEl.options).some(o => o.value === prevDelFrom)) {
         delegateFromEl.value = prevDelFrom;
       }
     }
 
-    // Active personnel only for assignments
+    // Active personnel only for assignments with LIVE WORKLOAD INDICATORS (🟢 Müsait / 🟡 Yoğun / 🔴 Kapasite Dolu)
     const activeUsers = this.state.users.filter(u => u.isActive !== false);
+    const maxQuota = parseInt(this.state.settings?.maxOpenRequestsPerUser || 15);
     const assignSelects = ['nr-assigned-to', 'er-assigned-to', 'delegate-to-person', 'cm-assigned-to', 'bulk-delegate-person'];
+    
     assignSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       const prevAssign = el.value;
-      if (id === 'nr-assigned-to') {
+      if (id === 'nr-assigned-to' || id === 'er-assigned-to') {
         el.innerHTML = '<option value="Henüz Atanmadı">⏳ Henüz Atanmadı (Havuzda Bekleyen)</option>';
       } else {
         el.innerHTML = '<option value="">Aktif Personel Seçin</option>';
       }
       activeUsers.forEach(u => {
-        el.innerHTML += `<option value="${u.name}">${u.name} (${u.title})</option>`;
+        const openCount = (this.state.requests || []).filter(r => r.assignedTo === u.name && r.status === 'Açık').length;
+        let badge = '🟢 Müsait';
+        let style = '';
+        if (openCount >= maxQuota) {
+          badge = '🔴 Kapasite Dolu';
+          style = 'color: #ef4444; font-weight: 700;';
+        } else if (openCount >= Math.floor(maxQuota * 0.65)) {
+          badge = '🟡 Yoğun';
+          style = 'color: #d97706;';
+        }
+        el.innerHTML += `<option value="${u.name}" style="${style}">${u.name} (${openCount}/${maxQuota} Açık İş - ${badge})</option>`;
       });
       if (prevAssign && Array.from(el.options).some(o => o.value === prevAssign)) {
         el.value = prevAssign;
@@ -957,6 +971,7 @@ async init() {
     document.getElementById('form-invoice-manage')?.addEventListener('submit', (e) => this.handleSaveInvoice(e));
     document.getElementById('form-tender-manage')?.addEventListener('submit', (e) => this.handleSaveTender(e));
     document.getElementById('form-smtp-settings')?.addEventListener('submit', (e) => this.saveSmtpSettings(e));
+    document.getElementById('form-workload-settings')?.addEventListener('submit', (e) => this.saveWorkloadSettings(e));
     document.getElementById('form-vendor-rating')?.addEventListener('submit', (e) => this.saveVendorRating(e));
 
     // Notification Center Event Listeners
@@ -1475,6 +1490,7 @@ async init() {
     if (viewName === 'settings') {
       this.fetchBackups();
       this.fetchSmtpSettings();
+      this.renderWorkloadSettingsUI();
     }
 
     if (viewName === 'supplier-analysis' || viewName === 'vendor-profile') {
@@ -2955,14 +2971,14 @@ async init() {
       p.score = (p.open * 2) + (p.critical * 3) + (p.high * 2) + p.total;
     });
 
+    const maxQuota = parseInt(this.state.settings?.maxOpenRequestsPerUser || 15);
+
     const cardsContainer = document.getElementById('workload-cards-container');
     if (cardsContainer) {
       cardsContainer.innerHTML = Object.values(personMap).map(p => {
-        const savingStr = p.savings >= 1000000 
-          ? (p.savings / 1000000).toFixed(2) + 'M ₺' 
-          : p.savings >= 1000 
-            ? (p.savings / 1000).toFixed(1) + 'k ₺' 
-            : p.savings.toLocaleString('tr-TR') + ' ₺';
+        const quotaPct = Math.min(100, Math.round((p.open / maxQuota) * 100));
+        let barColor = p.open >= maxQuota ? '#ef4444' : (p.open >= Math.floor(maxQuota * 0.65) ? '#f59e0b' : '#10b981');
+        let statusBadge = p.open >= maxQuota ? '🔴 Kapasite Dolu' : (p.open >= Math.floor(maxQuota * 0.65) ? '🟡 Yoğun' : '🟢 Müsait');
 
         return `
           <div class="workload-card">
@@ -2977,13 +2993,23 @@ async init() {
               </div>
             </div>
 
+            <div style="margin: 0.65rem 0 0.85rem 0; padding: 0.5rem 0.65rem; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; font-weight:700; margin-bottom:0.35rem;">
+                <span style="color:var(--text-muted);">Açık İş Kotası: ${p.open}/${maxQuota}</span>
+                <span style="color:${barColor}; font-size:0.72rem;">${statusBadge}</span>
+              </div>
+              <div style="width:100%; height:6px; background:rgba(148,163,184,0.2); border-radius:3px; overflow:hidden;">
+                <div style="width:${quotaPct}%; height:100%; background:${barColor}; border-radius:3px; transition:width 0.3s ease;"></div>
+              </div>
+            </div>
+
             <div class="workload-stats">
               <div class="stat-box">
                 <h5>${p.total}</h5>
                 <p>Toplam</p>
               </div>
               <div class="stat-box">
-                <h5 style="color:var(--status-open);">${p.open}</h5>
+                <h5 style="color:${barColor};">${p.open}</h5>
                 <p>Açık</p>
               </div>
               <div class="stat-box">
@@ -5238,6 +5264,24 @@ async init() {
 
     const ids = selectedChks.map(c => parseInt(c.getAttribute('data-id')));
 
+    // Personel Kota Kontrolü
+    const maxQuota = parseInt(this.state.settings?.maxOpenRequestsPerUser || 15);
+    const enforceQuota = this.state.settings?.enforceQuota !== false;
+
+    if (targetPerson !== 'Henüz Atanmadı' && enforceQuota) {
+      const currentOpen = (this.state.requests || []).filter(r => r.assignedTo === targetPerson && r.status === 'Açık' && !ids.includes(r.id)).length;
+      const openToAssign = ids.filter(id => {
+        const r = this.state.requests.find(req => req.id === id);
+        return r && r.status === 'Açık';
+      }).length;
+      const remainingQuota = Math.max(0, maxQuota - currentOpen);
+
+      if (currentOpen + openToAssign > maxQuota) {
+        this.showToast(`⚠️ '${targetPerson}' personelinin kalan açık iş kotası (${remainingQuota} adet) yetersiz! (Mevcut Açık: ${currentOpen}/${maxQuota}, Devredilmek İstenen: ${openToAssign})`, "warning", "⚠️");
+        return;
+      }
+    }
+
     this.showConfirm("Toplu Talep Devretme", `Seçilen ${ids.length} adet talebi '${targetPerson}' isimli personele devretmek istediğinize emin misiniz?`, async () => {
       for (const id of ids) {
         const r = this.state.requests.find(req => req.id === id);
@@ -7073,6 +7117,51 @@ async init() {
   },
 
   // ----------------------------------------------------
+  // ⚖️ WORKLOAD & CAPACITY (WIP QUOTA) SETTINGS
+  // ----------------------------------------------------
+  renderWorkloadSettingsUI() {
+    const quotaInput = document.getElementById('setting-max-open-requests');
+    const enforceChk = document.getElementById('setting-enforce-quota');
+    if (quotaInput) {
+      quotaInput.value = this.state.settings?.maxOpenRequestsPerUser || 15;
+    }
+    if (enforceChk) {
+      enforceChk.checked = this.state.settings?.enforceQuota !== false;
+    }
+  },
+
+  async saveWorkloadSettings(e) {
+    if (e) e.preventDefault();
+    const maxQuota = parseInt(document.getElementById('setting-max-open-requests')?.value, 10) || 15;
+    const enforceQuota = document.getElementById('setting-enforce-quota')?.checked !== false;
+
+    if (!this.state.settings) this.state.settings = {};
+    this.state.settings.maxOpenRequestsPerUser = maxQuota;
+    this.state.settings.enforceQuota = enforceQuota;
+
+    try {
+      await this.authFetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'maxOpenRequestsPerUser', value: maxQuota })
+      });
+      await this.authFetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'enforceQuota', value: enforceQuota })
+      });
+
+      this.logAction('Kapasite Ayarları Güncellendi', `Kişi Başı Maksimum Kota: ${maxQuota}, Blokaj: ${enforceQuota ? 'Aktif' : 'Pasif'}`);
+      this.showToast(`Personel açık talep kotası (${maxQuota}) başarıyla kaydedildi!`, 'success', '⚖️');
+      this.populateDropdowns();
+      this.render();
+    } catch (err) {
+      console.error(err);
+      this.showToast('Kapasite ayarları kaydedilemedi.', 'error');
+    }
+  },
+
+  // ----------------------------------------------------
   // 🗄️ BACKUP & RESTORE CLIENT MANAGEMENT
   // ----------------------------------------------------
   async renderBackupsTableSettings() {
@@ -8602,7 +8691,7 @@ async init() {
     const subject = document.getElementById('nr-subject').value.trim();
     const desc = document.getElementById('nr-description').value.trim();
     const unit = document.getElementById('nr-unit').value;
-    const assigned = document.getElementById('nr-assigned-to').value || 'Henüz Atanmadı';
+    let assigned = document.getElementById('nr-assigned-to').value || 'Henüz Atanmadı';
     const priority = document.getElementById('nr-priority').value;
     const purchaseType = document.getElementById('nr-purchase-type')?.value || 'MAL';
     const reg = document.getElementById('nr-regulation').value;
@@ -8638,6 +8727,18 @@ async init() {
       this.showToast("Lütfen geçerli bir 'Tahmini / Bütçe Tutarı' giriniz (0'dan büyük olmalıdır)!", "warning", "⚠️");
       document.getElementById('nr-estimated-amount')?.focus();
       return;
+    }
+
+    // Personel Kota ve Kapasite Kontrolü
+    const maxQuota = parseInt(this.state.settings?.maxOpenRequestsPerUser || 15);
+    const enforceQuota = this.state.settings?.enforceQuota !== false;
+
+    if (assigned && assigned !== 'Henüz Atanmadı') {
+      const openCount = (this.state.requests || []).filter(r => r.assignedTo === assigned && r.status === 'Açık').length;
+      if (openCount >= maxQuota && enforceQuota) {
+        this.showToast(`⚠️ '${assigned}' personeli maksimum açık iş kotasına (${openCount}/${maxQuota}) ulaştığından talep 'Henüz Atanmadı (Havuzda Bekleyen)' olarak açıldı.`, "warning", "⚠️");
+        assigned = 'Henüz Atanmadı';
+      }
     }
 
     const newReq = {
@@ -8943,6 +9044,18 @@ async init() {
       this.showToast("Lütfen geçerli bir 'Tahmini / Bütçe Tutarı' giriniz (0'dan büyük olmalıdır)!", "warning", "⚠️");
       document.getElementById('er-estimated-amount')?.focus();
       return;
+    }
+
+    // Personel Atama Kotası Kontrolü (Açık talep başka bir personele devrediliyorsa)
+    const maxQuota = parseInt(this.state.settings?.maxOpenRequestsPerUser || 15);
+    const enforceQuota = this.state.settings?.enforceQuota !== false;
+    if (status === 'Açık' && assignedTo && assignedTo !== 'Henüz Atanmadı' && assignedTo !== req.assignedTo) {
+      const openCount = (this.state.requests || []).filter(r => r.assignedTo === assignedTo && r.status === 'Açık' && r.id !== req.id).length;
+      if (openCount >= maxQuota && enforceQuota) {
+        this.showToast(`⚠️ '${assignedTo}' personeli maksimum açık iş kotasına (${openCount}/${maxQuota}) ulaşmıştır! Lütfen müsait bir personel seçiniz veya talebi havuzda bekletiniz.`, "warning", "⚠️");
+        document.getElementById('er-assigned-to')?.focus();
+        return;
+      }
     }
 
     // 2. Siparişe Dönüştürme ve Sipariş Bilgileri Zorunluluk Kontrolleri
