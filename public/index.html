@@ -1041,49 +1041,52 @@
       <section id="view-invoices" class="view-section" style="display: none;">
         <div class="card-header" style="margin-bottom: 1.5rem;">
           <div>
-            <h3>🧾 Fatura Takip ve Haftalık Ödeme Listesi</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted);">Muhasebeye teslim edilen faturalar, vadesi gelen ödemeler ve haftalık nakit akış planı</p>
+            <h3>🧾 Fatura Takip ve Muhasebe Teslim Tutanağı</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Faturaların sisteme kaydı, muhasebeye teslim tutanakları, vadesi gelen ödemeler ve nakit akışı</p>
           </div>
-          <div style="display: flex; gap: 0.5rem;">
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn-primary" id="btn-open-add-invoice" style="background: var(--accent-primary);">
+              <span>➕</span> Yeni Fatura Kaydı
+            </button>
+            <button class="btn-primary" id="btn-invoice-handover" style="background: #4f46e5; border-color: #4338ca;">
+              <span>📄</span> Muhasebeye Teslim Et & Tutanak Yazdır
+            </button>
             <button class="btn-secondary" id="btn-export-weekly-payments">
               <span>📥</span> Haftalık Liste (Excel)
-            </button>
-            <button class="btn-primary" id="btn-open-add-invoice">
-              <span>➕</span> Yeni Fatura Kaydı
             </button>
           </div>
         </div>
 
         <!-- Invoice KPI Cards -->
         <div class="grid-4">
-          <div class="glass-card kpi-card">
+          <div class="glass-card kpi-card" id="card-inv-kpi-total" style="cursor: pointer;">
             <div class="kpi-icon blue">🧾</div>
             <div class="kpi-data">
               <h3 id="invoice-kpi-total">0 ₺</h3>
               <p>Toplam Kayıtlı Fatura</p>
-              <div class="kpi-sub">Tüm Muhasebe Faturaları</div>
+              <div class="kpi-sub">Tüm Kurum Faturaları</div>
             </div>
           </div>
 
-          <div class="glass-card kpi-card">
-            <div class="kpi-icon yellow">⚡</div>
+          <div class="glass-card kpi-card" id="card-inv-kpi-pending" style="cursor: pointer;">
+            <div class="kpi-icon yellow">📥</div>
             <div class="kpi-data">
-              <h3 id="invoice-kpi-this-week">0 ₺</h3>
-              <p>Bu Hafta Vadesi Gelenler</p>
-              <div class="kpi-sub">Haftalık Nakit İhtiyacı</div>
+              <h3 id="invoice-kpi-pending">0 ₺</h3>
+              <p>Teslim Bekleyenler</p>
+              <div class="kpi-sub" style="color:#d97706;">Satınalmada (Teslim Edilmedi)</div>
             </div>
           </div>
 
-          <div class="glass-card kpi-card">
-            <div class="kpi-icon red">⚠️</div>
+          <div class="glass-card kpi-card" id="card-inv-kpi-delivered" style="cursor: pointer;">
+            <div class="kpi-icon purple" style="background: rgba(99, 102, 241, 0.15); color: #6366f1;">📤</div>
             <div class="kpi-data">
-              <h3 id="invoice-kpi-overdue">0 ₺</h3>
-              <p>Gecikmiş Ödemeler</p>
-              <div class="kpi-sub" style="color:var(--status-rejected);">Vadesi Geçen Faturalar</div>
+              <h3 id="invoice-kpi-delivered">0 ₺</h3>
+              <p>Muhasebeye Teslim Edildi</p>
+              <div class="kpi-sub" style="color:#4f46e5;">Ödeme / Onay Sürecinde</div>
             </div>
           </div>
 
-          <div class="glass-card kpi-card">
+          <div class="glass-card kpi-card" id="card-inv-kpi-paid" style="cursor: pointer;">
             <div class="kpi-icon green">✅</div>
             <div class="kpi-data">
               <h3 id="invoice-kpi-paid">0 ₺</h3>
@@ -1093,11 +1096,17 @@
           </div>
         </div>
 
-        <!-- Smart Date Filter Toolbar for Weekly Payment Schedule -->
+        <!-- Smart Date Filter Toolbar for Weekly Payment Schedule & Handover -->
         <div class="filter-bar">
           <div style="display:flex; gap:0.4rem; flex-wrap:wrap;" id="invoice-date-tabs">
             <button class="btn-secondary active-date-tab" data-period="ALL" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
               Tüm Faturalar
+            </button>
+            <button class="btn-secondary" data-period="PENDING_DELIVERY" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:#f59e0b; color:#d97706; font-weight:700;">
+              📥 Teslim Bekleyenler (Satınalmada)
+            </button>
+            <button class="btn-secondary" data-period="DELIVERED" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:#6366f1; color:#4f46e5; font-weight:700;">
+              📤 Muhasebeye Teslim Edilenler
             </button>
             <button class="btn-secondary" data-period="THIS_WEEK" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:var(--status-open);">
               ⚡ Bu Hafta Vadesi Gelenler
@@ -1119,7 +1128,7 @@
           </div>
 
           <select class="filter-select" id="filter-invoice-status">
-            <option value="ALL">Tüm Durumlar</option>
+            <option value="ALL">Tüm Ödeme Durumları</option>
             <option value="Ödeme Bekliyor">⏳ Ödeme Bekliyor</option>
             <option value="Gecikmede">🔴 Gecikmede</option>
             <option value="Ödendi">🟢 Ödendi</option>
@@ -1138,14 +1147,16 @@
           <table class="custom-table" id="table-invoices">
             <thead>
               <tr>
+                <th style="width: 36px; text-align: center;"><input type="checkbox" id="chk-select-all-invoices" title="Tümünü Seç / Kaldır"></th>
                 <th>Fatura No</th>
-                <th>Tedarikçi</th>
+                <th>Tedarikçi Firma</th>
                 <th>Fatura Tarihi</th>
                 <th>Vade Tarihi</th>
-                <th>Kalan Gün / Durum</th>
+                <th>Kalan Gün / Vade</th>
                 <th>Fatura Tutarı</th>
+                <th>Muhasebe Teslimi</th>
                 <th>Ödeme Durumu</th>
-                <th>İlişkili Talep/Sözleşme</th>
+                <th>İlişkili Talep/Sipariş</th>
                 <th>İşlemler</th>
               </tr>
             </thead>
@@ -3754,6 +3765,121 @@
 
       <div class="form-actions" style="justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 0.85rem;">
         <button type="button" class="btn-secondary close-modal">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 10: Official Invoice Handover Protocol to Accounting (FATURA TESLİM VE TESELLÜM TUTANAĞI) -->
+  <div id="modal-invoice-handover" class="modal-overlay">
+    <div class="modal-content" style="max-width: 920px; max-height: 94vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h3>🧾 Fatura Teslim ve Tesellüm Bordrosu (Muhasebe Devir Tutanağı)</h3>
+        <div style="display: flex; gap: 0.5rem; margin-left: auto; margin-right: 0.5rem;">
+          <button type="button" class="btn-primary" onclick="App.printInvoiceHandover()" style="padding: 0.4rem 0.9rem; font-size: 0.82rem; background: #0284c7; border-color: #0369a1;">
+            <span>🖨️</span> Tutanağı Yazdır / PDF
+          </button>
+          <button type="button" class="btn-primary" onclick="App.confirmInvoiceHandoverAction()" style="padding: 0.4rem 0.9rem; font-size: 0.82rem; background: #16a34a; border-color: #15803d;">
+            <span>✅</span> Muhasebeye Teslim Edildi Olarak Kaydet
+          </button>
+        </div>
+        <button class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 1.25rem 0.5rem; overflow-y: auto; flex: 1;">
+        <div id="invoice-handover-sheet" class="inspection-sheet" style="background: #ffffff; color: #0f172a; padding: 2rem 2.25rem; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.08); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <!-- Handover Header -->
+          <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+            <div style="font-size: 1.1rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #0f172a;">T.C. PİRİ REİS ÜNİVERSİTESİ REKTÖRLÜĞÜ</div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: #1e3a8a; margin-top: 2px;">SATINALMA MÜDÜRLÜĞÜ</div>
+            <div style="font-size: 1.2rem; font-weight: 900; color: #0f172a; margin-top: 8px; letter-spacing: 0.02em; text-decoration: underline;">FATURA TESLİM VE TESELLÜM BORDROSU</div>
+          </div>
+
+          <!-- Metadata Grid Table -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.25rem; font-size: 0.88rem;">
+            <tbody>
+              <tr>
+                <td style="border: 1px solid #94a3b8; padding: 6px 10px; font-weight: 700; background: #f1f5f9; width: 22%;">Bordro / Tutanak No:</td>
+                <td style="border: 1px solid #94a3b8; padding: 6px 10px; font-family: monospace; font-weight: 700; color: #1e3a8a; width: 28%;" id="ih-protocol-no">FTT-20260818-01</td>
+                <td style="border: 1px solid #94a3b8; padding: 6px 10px; font-weight: 700; background: #f1f5f9; width: 22%;">Teslim Tarihi & Saat:</td>
+                <td style="border: 1px solid #94a3b8; padding: 6px 10px; width: 28%;" id="ih-delivery-datetime">18.08.2026 14:00</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #94a3b8; padding: 6px 10px; font-weight: 700; background: #f1f5f9;">Teslim Eden Birim:</td>
+                <td style="border: 1px solid #94a3b8; padding: 6px 10px; font-weight: 600;">Satınalma Müdürlüğü</td>
+                <td style="border: 1px solid #94a3b8; padding: 6px 10px; font-weight: 700; background: #f1f5f9;">Teslim Alan Birim:</td>
+                <td style="border: 1px solid #94a3b8; padding: 6px 10px; font-weight: 600;">Muhasebe ve Finans Müdürlüğü</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Invoices Itemized Table -->
+          <div style="margin-bottom: 1rem;">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin-bottom: 0.4rem;">
+              📋 TESLİM EDİLEN FATURALAR LİSTESİ
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.84rem;" id="table-handover-sheet-items">
+              <thead>
+                <tr style="background: #f1f5f9;">
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; width: 35px; text-align: center;">S.No</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: left;">Fatura No</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: left;">Tedarikçi Firma</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center;">Fatura Tarihi</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center;">Vade Tarihi</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: left;">İlişkili Talep/Sipariş</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: right; width: 130px;">Tutar</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-handover-sheet-items">
+                <!-- Dynamically populated rows -->
+              </tbody>
+              <tfoot>
+                <tr style="background: #f8fafc; font-weight: 800;">
+                  <td colspan="6" style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: right;" id="ih-total-count-label">Toplam: 0 Adet Fatura</td>
+                  <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: right; color: #166534; font-size: 0.95rem; font-family: monospace;" id="ih-total-amount">0,00 ₺</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Legal Handover Declaration Text -->
+          <div style="border: 1px solid #94a3b8; background: #f8fafc; padding: 12px 16px; border-radius: 4px; margin-bottom: 1.5rem; line-height: 1.6; font-size: 0.85rem; text-align: justify;">
+            <strong>TESLİM VE TESELLÜM BEYANI:</strong><br>
+            Yukarıdaki listede fatura numarası, tedarikçi bilgisi, tutarı ve ekleri dökümlenen toplam <strong id="ih-legal-count">0</strong> adet fatura; muayene, kabul ve satın alma süreçleri tamamlanmış olarak muhasebeleştirilmek, tahakkuk ve ödeme işlemlerine esas olmak üzere Satınalma Müdürlüğü tarafından Muhasebe ve Finans Müdürlüğü'ne <strong>eksiksiz ve asıl nüshalarıyla</strong> teslim edilmiş ve teslim alınmıştır.
+          </div>
+
+          <!-- Mutual Signatures (Teslim Eden & Teslim Alan) -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; text-align: center; margin-top: 1.5rem;">
+            <div style="border: 1.5px solid #94a3b8; padding: 14px 10px; border-radius: 4px; min-height: 120px; display: flex; flex-direction: column; justify-content: space-between; background: #fafafa;">
+              <div>
+                <div style="font-weight: 800; font-size: 0.9rem; color: #0f172a;">TESLİM EDEN</div>
+                <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">Satınalma Müdürlüğü Yetkilisi</div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e3a8a; margin-top: 6px;" id="ih-sign-sender-name">Cem TUR</div>
+              </div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1.5rem;">Tarih / İmza / Kaşe</div>
+            </div>
+
+            <div style="border: 1.5px solid #94a3b8; padding: 14px 10px; border-radius: 4px; min-height: 120px; display: flex; flex-direction: column; justify-content: space-between; background: #fafafa;">
+              <div>
+                <div style="font-weight: 800; font-size: 0.9rem; color: #0f172a;">TESLİM ALAN</div>
+                <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">Muhasebe ve Finans Müdürlüğü Yetkilisi</div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e3a8a; margin-top: 6px;">Muhasebe / Finans Sorumlusu</div>
+              </div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1.5rem;">Tarih / İmza / Kaşe</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions" style="justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 0.85rem;">
+        <button type="button" class="btn-secondary close-modal">İptal / Kapat</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn-primary" onclick="App.printInvoiceHandover()" style="background: #0284c7; border-color: #0369a1;">
+            <span>🖨️</span> Yazdır / PDF İndir
+          </button>
+          <button type="button" class="btn-primary" onclick="App.confirmInvoiceHandoverAction()" style="background: #16a34a; border-color: #15803d;">
+            <span>✅</span> Muhasebeye Teslim Edildi Olarak Kaydet
+          </button>
+        </div>
       </div>
     </div>
   </div>

@@ -830,6 +830,54 @@ async init() {
       });
     });
 
+    // Invoice Handover Protocol Button
+    document.getElementById('btn-invoice-handover')?.addEventListener('click', () => this.openInvoiceHandoverModal());
+
+    // Invoice Select All Checkbox
+    document.getElementById('chk-select-all-invoices')?.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      document.querySelectorAll('.chk-select-invoice').forEach(chk => chk.checked = isChecked);
+      this._onInvoiceCheckboxChange();
+    });
+
+    // Invoice Clickable KPI Cards
+    document.getElementById('card-inv-kpi-total')?.addEventListener('click', () => {
+      document.querySelectorAll('#invoice-date-tabs button').forEach(b => b.classList.remove('active-date-tab'));
+      document.querySelector('#invoice-date-tabs button[data-period="ALL"]')?.classList.add('active-date-tab');
+      this.state.invoiceDatePeriod = 'ALL';
+      const statusSelect = document.getElementById('filter-invoice-status');
+      if (statusSelect) statusSelect.value = 'ALL';
+      this.renderInvoices();
+      this.showToast("Tüm kurum faturaları listelendi.", "info", "🧾");
+    });
+
+    document.getElementById('card-inv-kpi-pending')?.addEventListener('click', () => {
+      document.querySelectorAll('#invoice-date-tabs button').forEach(b => b.classList.remove('active-date-tab'));
+      document.querySelector('#invoice-date-tabs button[data-period="PENDING_DELIVERY"]')?.classList.add('active-date-tab');
+      this.state.invoiceDatePeriod = 'PENDING_DELIVERY';
+      const statusSelect = document.getElementById('filter-invoice-status');
+      if (statusSelect) statusSelect.value = 'ALL';
+      this.renderInvoices();
+      this.showToast("Satınalmada bekleyen (henüz teslim edilmemiş) faturalar filtrelendi.", "info", "📥");
+    });
+
+    document.getElementById('card-inv-kpi-delivered')?.addEventListener('click', () => {
+      document.querySelectorAll('#invoice-date-tabs button').forEach(b => b.classList.remove('active-date-tab'));
+      document.querySelector('#invoice-date-tabs button[data-period="DELIVERED"]')?.classList.add('active-date-tab');
+      this.state.invoiceDatePeriod = 'DELIVERED';
+      const statusSelect = document.getElementById('filter-invoice-status');
+      if (statusSelect) statusSelect.value = 'ALL';
+      this.renderInvoices();
+      this.showToast("Muhasebeye teslim edilmiş faturalar filtrelendi.", "info", "📤");
+    });
+
+    document.getElementById('card-inv-kpi-paid')?.addEventListener('click', () => {
+      const statusSelect = document.getElementById('filter-invoice-status');
+      if (statusSelect) statusSelect.value = 'Ödendi';
+      this.renderInvoices();
+      this.showToast("Ödenen faturalar filtrelendi.", "success", "✅");
+    });
+
     // Unit Analysis Select
     document.getElementById('select-unit-analysis')?.addEventListener('change', () => {
       this.renderUnitAnalysis();
@@ -4703,7 +4751,7 @@ async init() {
     this.openModal('modal-view-details');
   },
 
-  // 6. INVOICES & WEEKLY PAYMENT SCHEDULE RENDERER (FATURA & HAFTALIK ÖDEME LİSTESİ)
+  // 6. INVOICES & HANDOVER PROTOCOL & WEEKLY PAYMENT SCHEDULE RENDERER
   renderInvoices() {
     let invoices = this.state.invoices || [];
 
@@ -4711,7 +4759,7 @@ async init() {
       invoices = invoices.filter(i => i.academicYear === this.state.selectedYear || !i.academicYear);
     }
 
-    const searchText = document.getElementById('filter-invoice-search')?.value.toLowerCase() || '';
+    const searchText = document.getElementById('filter-invoice-search')?.value.toLowerCase().trim() || '';
     const statusVal = document.getElementById('filter-invoice-status')?.value || 'ALL';
     const periodVal = this.state.invoiceDatePeriod || 'ALL';
 
@@ -4734,9 +4782,29 @@ async init() {
     const sundayNextWeek = new Date(sundayThisWeek);
     sundayNextWeek.setDate(sundayThisWeek.getDate() + 7);
 
-    // Apply Smart Date Period Filters
+    // Compute Overall KPI Totals before tab filtering
+    const totalAmountAll = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const paidAmount = invoices.filter(inv => inv.paymentStatus === 'Ödendi').reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const pendingDeliveryInvoices = invoices.filter(inv => !inv.accountingDeliveryDate && inv.paymentStatus !== 'Ödendi');
+    const pendingDeliveryTotal = pendingDeliveryInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const deliveredInvoices = invoices.filter(inv => inv.accountingDeliveryDate && inv.paymentStatus !== 'Ödendi');
+    const deliveredTotal = deliveredInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+
+    const elTotal = document.getElementById('invoice-kpi-total');
+    const elPending = document.getElementById('invoice-kpi-pending');
+    const elDelivered = document.getElementById('invoice-kpi-delivered');
+    const elPaid = document.getElementById('invoice-kpi-paid');
+
+    if (elTotal) elTotal.innerText = this.formatMoney(totalAmountAll, 'TRY', 2);
+    if (elPending) elPending.innerText = `${this.formatMoney(pendingDeliveryTotal, 'TRY', 2)} (${pendingDeliveryInvoices.length} Adet)`;
+    if (elDelivered) elDelivered.innerText = `${this.formatMoney(deliveredTotal, 'TRY', 2)} (${deliveredInvoices.length} Adet)`;
+    if (elPaid) elPaid.innerText = this.formatMoney(paidAmount, 'TRY', 2);
+
+    // Apply Smart Date & Delivery Period Filters
     invoices = invoices.filter(inv => {
-      if (statusVal !== 'ALL' && inv.paymentStatus !== statusVal) return false;
+      // Delivery & Status Tab Filters
+      if (periodVal === 'PENDING_DELIVERY' && (inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
+      if (periodVal === 'DELIVERED' && (!inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
 
       if (inv.dueDate) {
         const due = new Date(inv.dueDate);
@@ -4746,88 +4814,84 @@ async init() {
         if (periodVal === 'NEXT_WEEK' && (due < mondayNextWeek || due > sundayNextWeek)) return false;
         if (periodVal === 'OVERDUE' && (due >= today || inv.paymentStatus === 'Ödendi')) return false;
         if (periodVal === 'THIS_MONTH' && (due.getMonth() !== today.getMonth() || due.getFullYear() !== today.getFullYear())) return false;
+      } else if (['THIS_WEEK', 'NEXT_WEEK', 'OVERDUE', 'THIS_MONTH'].includes(periodVal)) {
+        return false;
       }
 
+      // Dropdown Status Filter
+      if (statusVal === 'Teslim Bekliyor' && (inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
+      else if (statusVal === 'Muhasebeye Teslim Edildi' && (!inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
+      else if (statusVal !== 'ALL' && !['Teslim Bekliyor', 'Muhasebeye Teslim Edildi'].includes(statusVal) && inv.paymentStatus !== statusVal) return false;
+
+      // Text Search
       if (searchText) {
         const mNo = inv.invoiceNo?.toLowerCase().includes(searchText);
         const mSupp = inv.supplier?.toLowerCase().includes(searchText);
         const mRel = inv.relatedBarcode?.toLowerCase().includes(searchText);
-        if (!mNo && !mSupp && !mRel) return false;
+        const mNotes = inv.notes?.toLowerCase().includes(searchText);
+        if (!mNo && !mSupp && !mRel && !mNotes) return false;
       }
       return true;
     });
-
-    // Compute KPI Totals
-    const totalAmountAll = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-    const paidAmount = invoices.filter(inv => inv.paymentStatus === 'Ödendi').reduce((sum, inv) => sum + (inv.amount || 0), 0);
-    
-    const thisWeekInvoices = (this.state.invoices || []).filter(inv => {
-      if (!inv.dueDate || inv.paymentStatus === 'Ödendi') return false;
-      const due = new Date(inv.dueDate);
-      due.setHours(0,0,0,0);
-      return due >= mondayThisWeek && due <= sundayThisWeek;
-    });
-    const thisWeekTotal = thisWeekInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-
-    const overdueInvoices = (this.state.invoices || []).filter(inv => {
-      if (!inv.dueDate || inv.paymentStatus === 'Ödendi') return false;
-      const due = new Date(inv.dueDate);
-      due.setHours(0,0,0,0);
-      return due < today;
-    });
-    const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-
-    document.getElementById('invoice-kpi-total').innerText = this.formatMoney(totalAmountAll, 'TRY', 2);
-    document.getElementById('invoice-kpi-this-week').innerText = this.formatMoney(thisWeekTotal, 'TRY', 2);
-    document.getElementById('invoice-kpi-overdue').innerText = this.formatMoney(overdueTotal, 'TRY', 2);
-    document.getElementById('invoice-kpi-paid').innerText = this.formatMoney(paidAmount, 'TRY', 2);
 
     const tbody = document.querySelector('#table-invoices tbody');
     if (!tbody) return;
 
     if (invoices.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun fatura bulunamadı.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun fatura bulunamadı.</td></tr>`;
+      this._onInvoiceCheckboxChange();
       return;
     }
 
     tbody.innerHTML = invoices.map(inv => {
-      const due = new Date(inv.dueDate);
-      due.setHours(0,0,0,0);
-      const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+      const due = inv.dueDate ? new Date(inv.dueDate) : null;
+      if (due) due.setHours(0,0,0,0);
+      const diffDays = due ? Math.ceil((due - today) / (1000 * 60 * 60 * 24)) : null;
 
       let dueBadge = '';
       if (inv.paymentStatus === 'Ödendi') {
         dueBadge = `<span class="badge status-completed">🟢 Tamamlandı</span>`;
-      } else if (diffDays < 0) {
-        dueBadge = `<span class="badge priority-kritik">🔴 ${Math.abs(diffDays)} Gün Gecikti</span>`;
-      } else if (diffDays === 0) {
-        dueBadge = `<span class="badge priority-yüksek">⚡ Bugün Vade!</span>`;
-      } else if (diffDays <= 7) {
-        dueBadge = `<span class="badge priority-yüksek">🟠 ${diffDays} Gün Kaldı</span>`;
+      } else if (diffDays !== null) {
+        if (diffDays < 0) dueBadge = `<span class="badge priority-kritik">🔴 ${Math.abs(diffDays)} Gün Gecikti</span>`;
+        else if (diffDays === 0) dueBadge = `<span class="badge priority-yüksek">⚡ Bugün Vade!</span>`;
+        else if (diffDays <= 7) dueBadge = `<span class="badge priority-yüksek">🟠 ${diffDays} Gün Kaldı</span>`;
+        else dueBadge = `<span class="badge status-open">🟢 ${diffDays} Gün</span>`;
       } else {
-        dueBadge = `<span class="badge status-open">🟢 ${diffDays} Gün</span>`;
+        dueBadge = `<span style="color:var(--text-muted); font-size:0.8rem;">-</span>`;
+      }
+
+      let deliveryBadge = '';
+      if (inv.accountingDeliveryDate) {
+        deliveryBadge = `<span class="badge" style="background:rgba(99,102,241,0.15); color:#4f46e5; font-weight:700; font-size:0.75rem;" title="Muhasebeye Teslim Tarihi: ${inv.accountingDeliveryDate}">📤 Teslim Edildi<br><small style="font-size:0.7rem; font-weight:normal; opacity:0.9;">${inv.accountingDeliveryDate}</small></span>`;
+      } else {
+        deliveryBadge = `<span class="badge" style="background:#fef3c7; color:#92400e; font-weight:700; font-size:0.75rem;">📥 Satınalmada (Bekliyor)</span>`;
       }
 
       let statusBadge = '';
       if (inv.paymentStatus === 'Ödendi') statusBadge = `<span class="badge status-completed">Ödendi</span>`;
-      else if (inv.paymentStatus === 'Gecikmede' || diffDays < 0) statusBadge = `<span class="badge priority-kritik">Gecikmede</span>`;
+      else if (inv.paymentStatus === 'Gecikmede' || (diffDays !== null && diffDays < 0)) statusBadge = `<span class="badge priority-kritik">Gecikmede</span>`;
       else statusBadge = `<span class="badge status-open">Ödeme Bekliyor</span>`;
 
       return `
         <tr>
+          <td style="text-align: center;">
+            <input type="checkbox" class="chk-select-invoice" data-id="${inv.id}" onchange="App._onInvoiceCheckboxChange()">
+          </td>
           <td><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${inv.invoiceNo}</span></td>
-          <td style="font-weight:600;">${inv.supplier}</td>
-          <td style="font-size:0.8rem; color:var(--text-muted);">${inv.invoiceDate}</td>
-          <td style="font-weight:700; font-size:0.85rem;">${inv.dueDate}</td>
-          <td>${dueBadge}</td>
-          <td style="font-weight:700; font-family:var(--font-mono); color:var(--status-completed);">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</td>
-          <td>${statusBadge}</td>
+          <td style="font-weight:600; min-width: 160px;">${inv.supplier}</td>
+          <td style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">${inv.invoiceDate || '-'}</td>
+          <td style="font-weight:700; font-size:0.85rem; white-space:nowrap;">${inv.dueDate || '-'}</td>
+          <td style="white-space:nowrap;">${dueBadge}</td>
+          <td style="font-weight:700; font-family:var(--font-mono); color:var(--status-completed); white-space:nowrap;">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</td>
+          <td style="white-space:nowrap;">${deliveryBadge}</td>
+          <td style="white-space:nowrap;">${statusBadge}</td>
           <td><span style="font-family:var(--font-mono); font-size:0.8rem; color:var(--accent-purple);">${inv.relatedBarcode || '-'}</span></td>
           <td>
             <div class="action-btns">
               <a href="#invoice/${inv.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'invoice', ${inv.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('invoice', '${inv.id}', 'Fatura #${inv.invoiceNo} — ${inv.supplier?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
               <button class="btn-icon" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>
+              ${!inv.accountingDeliveryDate ? `<button class="btn-icon" style="color:#4f46e5;" onclick="App.openInvoiceHandoverModal([${inv.id}])" title="Muhasebeye Teslim Et & Tutanak Yazdır">📤</button>` : ''}
               ${inv.paymentStatus !== 'Ödendi' ? `<button class="btn-icon" onclick="App.markInvoiceAsPaid(${inv.id})" title="Ödendi İşaretle">✅</button>` : ''}
               <button class="btn-icon" onclick="App.deleteInvoice(${inv.id})" title="Faturayı Sil">🗑️</button>
             </div>
@@ -4835,6 +4899,161 @@ async init() {
         </tr>
       `;
     }).join('');
+
+    this._onInvoiceCheckboxChange();
+  },
+
+  _onInvoiceCheckboxChange() {
+    const allChks = document.querySelectorAll('.chk-select-invoice');
+    const checkedChks = document.querySelectorAll('.chk-select-invoice:checked');
+    const selectAll = document.getElementById('chk-select-all-invoices');
+    if (selectAll) {
+      selectAll.checked = allChks.length > 0 && checkedChks.length === allChks.length;
+      selectAll.indeterminate = checkedChks.length > 0 && checkedChks.length < allChks.length;
+    }
+    const handoverBtn = document.getElementById('btn-invoice-handover');
+    if (handoverBtn) {
+      if (checkedChks.length > 0) {
+        handoverBtn.innerHTML = `<span>📄</span> Muhasebeye Teslim Et (${checkedChks.length} Fatura Seçili)`;
+      } else {
+        handoverBtn.innerHTML = `<span>📄</span> Muhasebeye Teslim Et & Tutanak Yazdır`;
+      }
+    }
+  },
+
+  openInvoiceHandoverModal(targetInvoiceIds = null) {
+    let ids = [];
+    if (Array.isArray(targetInvoiceIds) && targetInvoiceIds.length > 0) {
+      ids = targetInvoiceIds.map(id => parseInt(id));
+    } else {
+      const checkedChks = document.querySelectorAll('.chk-select-invoice:checked');
+      ids = Array.from(checkedChks).map(chk => parseInt(chk.getAttribute('data-id')));
+    }
+
+    // If still no invoices checked, check if there are pending delivery invoices
+    if (ids.length === 0) {
+      const pendingInvoices = (this.state.invoices || []).filter(i => !i.accountingDeliveryDate && i.paymentStatus !== 'Ödendi');
+      if (pendingInvoices.length > 0) {
+        ids = pendingInvoices.map(i => i.id);
+        this.showToast(`Seçim yapılmadığı için henüz teslim edilmemiş ${ids.length} adet fatura otomatik listelendi.`, "info", "ℹ️");
+      } else {
+        this.showToast("Lütfen muhasebeye teslim edilecek faturaları tablodan seçiniz.", "warning", "⚠️");
+        return;
+      }
+    }
+
+    const selectedInvoices = (this.state.invoices || []).filter(inv => ids.includes(parseInt(inv.id)));
+    if (selectedInvoices.length === 0) {
+      this.showToast("Seçilen faturalar bulunamadı.", "error");
+      return;
+    }
+
+    this.state._currentHandoverInvoiceIds = ids;
+
+    // Generate Protocol No: FTT-YYYYMMDD-HHMM
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`;
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const protocolCode = `FTT-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+
+    document.getElementById('ih-protocol-no').innerText = protocolCode;
+    document.getElementById('ih-delivery-datetime').innerText = `${dateStr} ${timeStr}`;
+    document.getElementById('ih-legal-count').innerText = selectedInvoices.length;
+    document.getElementById('ih-total-count-label').innerText = `Toplam: ${selectedInvoices.length} Adet Fatura`;
+
+    const currentUser = this.state.currentUser?.name || 'Satınalma Yetkilisi';
+    const sendEl = document.getElementById('ih-sign-sender-name');
+    if (sendEl) sendEl.innerText = currentUser;
+
+    // Calculate totals by currency
+    const totalsByCurrency = {};
+    selectedInvoices.forEach(inv => {
+      const curr = inv.currency || 'TRY';
+      totalsByCurrency[curr] = (totalsByCurrency[curr] || 0) + (inv.amount || 0);
+    });
+
+    const totalStrParts = Object.entries(totalsByCurrency).map(([curr, amt]) => this.formatMoney(amt, curr, 2));
+    document.getElementById('ih-total-amount').innerText = totalStrParts.join(' + ') || '0,00 ₺';
+
+    // Populate Handover Table
+    const tbody = document.getElementById('tbody-handover-sheet-items');
+    if (tbody) {
+      tbody.innerHTML = selectedInvoices.map((inv, idx) => `
+        <tr>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center; font-weight: 600;">${idx + 1}</td>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-family: monospace; font-weight: 700; color: #1e3a8a;">${inv.invoiceNo}</td>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-weight: 600;">${inv.supplier}</td>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center; font-size: 0.8rem;">${inv.invoiceDate || '-'}</td>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center; font-weight: 600; font-size: 0.8rem;">${inv.dueDate || '-'}</td>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-family: monospace; font-size: 0.8rem;">${inv.relatedBarcode || '-'}</td>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: right; font-weight: 700; font-family: monospace; color: #166534;">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</td>
+        </tr>
+      `).join('');
+    }
+
+    this.openModal('modal-invoice-handover');
+  },
+
+  printInvoiceHandover() {
+    const sheet = document.getElementById('invoice-handover-sheet');
+    if (!sheet) return;
+
+    const printWin = window.open('', '_blank', 'width=960,height=850');
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fatura Teslim ve Tesellüm Bordrosu - Piri Reis Üniversitesi</title>
+        <style>
+          @page { size: A4 portrait; margin: 15mm 15mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #fff; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 9.5pt; }
+          th, td { border: 1px solid #64748b; padding: 6px 8px; }
+          .header-bg { background-color: #f1f5f9; font-weight: bold; }
+          @media print {
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        ${sheet.innerHTML}
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+  },
+
+  async confirmInvoiceHandoverAction() {
+    const ids = this.state._currentHandoverInvoiceIds || [];
+    if (ids.length === 0) {
+      this.showToast("İşlenecek fatura bulunamadı.", "error");
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let updatedCount = 0;
+
+    for (const id of ids) {
+      const inv = (this.state.invoices || []).find(i => parseInt(i.id) === parseInt(id));
+      if (inv) {
+        inv.accountingDeliveryDate = todayStr;
+        await this.apiSync('invoices', 'PUT', inv);
+        updatedCount++;
+      }
+    }
+
+    const protocolNo = document.getElementById('ih-protocol-no')?.innerText || 'FTT';
+    this.logAction('Muhasebeye Fatura Teslimi', `${updatedCount} adet fatura muhasebeye teslim edildi (Bordro: ${protocolNo})`);
+
+    this.showToast(`${updatedCount} adet fatura başarıyla "Muhasebeye Teslim Edildi" olarak işlendi ve tutanak arşivlendi!`, "success", "✅");
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+    this.renderInvoices();
   },
 
   openInvoiceModal(invoiceId = null) {
