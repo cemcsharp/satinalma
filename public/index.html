@@ -2637,13 +2637,13 @@
           </div>
 
           <div class="form-group">
-            <label>Tahmini / Bütçe Tutarı</label>
-            <input type="text" inputmode="decimal" id="nr-estimated-amount" placeholder="ör: 100.000,00" oninput="App.onAmountInput(this, 'nr-currency')">
+            <label>Tahmini / Bütçe Tutarı <span class="required">*</span></label>
+            <input type="text" inputmode="decimal" id="nr-estimated-amount" placeholder="ör: 100.000,00" required oninput="App.onAmountInput(this, 'nr-currency')">
             <div id="nr-estimated-amount-preview" class="amount-live-preview"></div>
           </div>
 
           <div class="form-group">
-            <label>Para Birimi</label>
+            <label>Para Birimi <span class="required">*</span></label>
             <select id="nr-currency" onchange="App.onCurrencyChange('nr-currency', ['nr-estimated-amount'])">
               <option value="TRY" selected>TRY (₺)</option>
               <option value="USD">USD ($)</option>
@@ -2667,7 +2667,7 @@
 
   <!-- Modal 3: Edit Request / Order Entry -->
   <div class="modal-overlay" id="modal-edit-request">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 800px;">
       <div class="modal-header">
         <h3 id="edit-modal-title">✏️ Talep ve Sipariş Düzenle</h3>
         <button class="btn-close-modal close-modal">&times;</button>
@@ -2676,7 +2676,12 @@
       <form id="form-edit-request">
         <input type="hidden" id="er-id">
 
-        <div class="form-grid">
+        <!-- 📋 BÖLÜM 1: TALEP BİLGİLERİ -->
+        <div style="font-weight: 700; font-size: 0.95rem; color: var(--accent-primary); margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>📋</span> 1. Talep Genel Bilgileri
+        </div>
+
+        <div class="form-grid" style="margin-bottom: 1.25rem;">
           <div class="form-group">
             <label>Talep Barkodu <span class="required">*</span></label>
             <input type="text" id="er-request-barcode" placeholder="ör: 249001" required>
@@ -2693,35 +2698,8 @@
           </div>
 
           <div class="form-group">
-            <label>Alım Türü (Mal / Hizmet)</label>
-            <select id="er-purchase-type">
-              <option value="MAL" selected>📦 Mal Alımı (Ürün / Cihaz / Mobilya / Sarf)</option>
-              <option value="HIZMET">🛠️ Hizmet Alımı (Bakım / Temizlik / Yazılım)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Talep Durumu</label>
-            <select id="er-status">
-              <option value="Açık">🔵 Açık / Devam Eden</option>
-              <option value="Tamamlandı">✅ Tamamlandı</option>
-              <option value="Reddedildi">❌ Reddedildi</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Öncelik</label>
-            <select id="er-priority">
-              <option value="Orta">🟡 Orta</option>
-              <option value="Kritik">🔴 Kritik</option>
-              <option value="Yüksek">🟠 Yüksek</option>
-              <option value="Düşük">🟢 Düşük</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Talep Eden Birim</label>
-            <select id="er-unit"></select>
+            <label>Talep Eden Birim <span class="required">*</span></label>
+            <select id="er-unit" required></select>
           </div>
 
           <div class="form-group">
@@ -2730,34 +2708,31 @@
           </div>
 
           <div class="form-group">
-            <label>Sipariş Barkodu</label>
-            <input type="text" id="er-order-barcode" placeholder="ör: SIP-9921">
+            <label>Alım Türü (Mal / Hizmet) <span class="required">*</span></label>
+            <select id="er-purchase-type" required>
+              <option value="MAL" selected>📦 Mal Alımı (Ürün / Cihaz / Mobilya / Sarf)</option>
+              <option value="HIZMET">🛠️ Hizmet Alımı (Bakım / Temizlik / Yazılım)</option>
+            </select>
           </div>
 
           <div class="form-group">
-            <label>Sipariş Tarihi</label>
-            <input type="date" id="er-order-date">
+            <label>Öncelik <span class="required">*</span></label>
+            <select id="er-priority" required>
+              <option value="Orta">🟡 Orta</option>
+              <option value="Kritik">🔴 Kritik</option>
+              <option value="Yüksek">🟠 Yüksek</option>
+              <option value="Düşük">🟢 Düşük</option>
+            </select>
           </div>
 
           <div class="form-group">
-            <label>Tedarikçi Adı</label>
-            <input type="text" id="er-supplier" placeholder="ör: Kılıç Kırtasiye">
-          </div>
-
-          <div class="form-group">
-            <label>Tahmini / Bütçe Tutarı</label>
-            <input type="text" inputmode="decimal" id="er-estimated-amount" placeholder="ör: 100.000,00" oninput="App.onAmountInput(this, 'er-currency')">
+            <label>Tahmini / Bütçe Tutarı <span class="required">*</span></label>
+            <input type="text" inputmode="decimal" id="er-estimated-amount" placeholder="ör: 100.000,00" required oninput="App.onAmountInput(this, 'er-currency')">
             <div id="er-estimated-amount-preview" class="amount-live-preview"></div>
           </div>
 
           <div class="form-group">
-            <label>Gerçekleşen Tutar</label>
-            <input type="text" inputmode="decimal" id="er-actual-amount" placeholder="0,00" oninput="App.onAmountInput(this, 'er-currency', true)">
-            <div id="er-actual-amount-preview" class="amount-live-preview is-actual"></div>
-          </div>
-
-          <div class="form-group">
-            <label>Para Birimi</label>
+            <label>Para Birimi <span class="required">*</span></label>
             <select id="er-currency" onchange="App.onCurrencyChange('er-currency', ['er-estimated-amount', 'er-actual-amount'])">
               <option value="TRY">TRY (₺)</option>
               <option value="USD">USD ($)</option>
@@ -2766,13 +2741,55 @@
           </div>
 
           <div class="form-group">
-            <label>Yönetmelik Maddesi</label>
+            <label>Talep Durumu <span class="required">*</span></label>
+            <select id="er-status" required>
+              <option value="Açık">🔵 Açık / İşlemde</option>
+              <option value="Sipariş Verildi">🚚 Sipariş Verildi</option>
+              <option value="Tamamlandı">✅ Tamamlandı</option>
+              <option value="Revize İstendi">🟠 Revize İstendi</option>
+              <option value="Reddedildi">❌ Reddedildi</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 📦 BÖLÜM 2: SİPARİŞ & SATINALMA BİLGİLERİ -->
+        <div style="font-weight: 700; font-size: 0.95rem; color: #8b5cf6; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span>📦</span> 2. Sipariş & Satınalma Bilgileri (Siparişe Dönüştürme)
+          </div>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Siparişe dönüştürülürken zorunludur)</span>
+        </div>
+
+        <div class="form-grid" style="margin-bottom: 1.25rem;">
+          <div class="form-group">
+            <label>Sipariş Barkodu / No <span class="required" style="color:#ef4444;">*</span></label>
+            <input type="text" id="er-order-barcode" placeholder="ör: SIP-2026-0089">
+          </div>
+
+          <div class="form-group">
+            <label>Sipariş Tarihi <span class="required" style="color:#ef4444;">*</span></label>
+            <input type="date" id="er-order-date">
+          </div>
+
+          <div class="form-group">
+            <label>Tedarikçi Adı (Firma) <span class="required" style="color:#ef4444;">*</span></label>
+            <input type="text" id="er-supplier" placeholder="ör: ABC Bilişim Teknolojileri Ltd.">
+          </div>
+
+          <div class="form-group">
+            <label>Gerçekleşen Tutar <span class="required" style="color:#ef4444;">*</span></label>
+            <input type="text" inputmode="decimal" id="er-actual-amount" placeholder="0,00" oninput="App.onAmountInput(this, 'er-currency', true)">
+            <div id="er-actual-amount-preview" class="amount-live-preview is-actual"></div>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Yönetmelik Maddesi <span class="required" style="color:#ef4444;">*</span></label>
             <select id="er-regulation"></select>
           </div>
 
           <div class="form-group full-width">
-            <label>Açıklama / Güncelleme Notu</label>
-            <textarea id="er-description" rows="3"></textarea>
+            <label>Açıklama / Satınalma & Sipariş Notu</label>
+            <textarea id="er-description" rows="2" placeholder="Süreç ve siparişle ilgili ek açıklamalar..."></textarea>
           </div>
         </div>
 

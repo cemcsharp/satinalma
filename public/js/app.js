@@ -8359,10 +8359,10 @@ async init() {
 
   async handleNewRequest(e) {
     e.preventDefault();
-    const barcode = document.getElementById('nr-barcode').value;
+    const barcode = document.getElementById('nr-barcode').value.trim();
     const arrDate = document.getElementById('nr-arrival-date').value;
-    const subject = document.getElementById('nr-subject').value;
-    const desc = document.getElementById('nr-description').value;
+    const subject = document.getElementById('nr-subject').value.trim();
+    const desc = document.getElementById('nr-description').value.trim();
     const unit = document.getElementById('nr-unit').value;
     const assigned = document.getElementById('nr-assigned-to').value || 'Henüz Atanmadı';
     const priority = document.getElementById('nr-priority').value;
@@ -8370,6 +8370,37 @@ async init() {
     const reg = document.getElementById('nr-regulation').value;
     const estAmt = this.parseMoney(document.getElementById('nr-estimated-amount')?.value);
     const currency = document.getElementById('nr-currency')?.value || 'TRY';
+
+    if (!barcode) {
+      this.showToast("Lütfen 'Talep Barkodu' giriniz!", "warning", "⚠️");
+      document.getElementById('nr-barcode')?.focus();
+      return;
+    }
+    if (!arrDate) {
+      this.showToast("Lütfen 'Satınalmaya Geliş Tarihi' seçiniz!", "warning", "⚠️");
+      document.getElementById('nr-arrival-date')?.focus();
+      return;
+    }
+    if (!subject) {
+      this.showToast("Lütfen 'Talep Konusu' giriniz!", "warning", "⚠️");
+      document.getElementById('nr-subject')?.focus();
+      return;
+    }
+    if (!unit) {
+      this.showToast("Lütfen 'Talep Eden Birim' seçiniz!", "warning", "⚠️");
+      document.getElementById('nr-unit')?.focus();
+      return;
+    }
+    if (!purchaseType) {
+      this.showToast("Lütfen 'Alım Türü' seçiniz!", "warning", "⚠️");
+      document.getElementById('nr-purchase-type')?.focus();
+      return;
+    }
+    if (!estAmt || estAmt <= 0) {
+      this.showToast("Lütfen geçerli bir 'Tahmini / Bütçe Tutarı' giriniz (0'dan büyük olmalıdır)!", "warning", "⚠️");
+      document.getElementById('nr-estimated-amount')?.focus();
+      return;
+    }
 
     const newReq = {
       id: this.state.requests.length + 1,
@@ -8625,39 +8656,124 @@ async init() {
     const req = this.state.requests.find(r => r.id === id);
     if (!req) return;
 
-    if (document.getElementById('er-request-barcode')) {
-      req.requestBarcode = document.getElementById('er-request-barcode').value.trim();
+    const barcode = document.getElementById('er-request-barcode')?.value.trim();
+    const arrDate = document.getElementById('er-arrival-date')?.value;
+    const subject = document.getElementById('er-subject')?.value.trim();
+    const unit = document.getElementById('er-unit')?.value;
+    const purchaseType = document.getElementById('er-purchase-type')?.value || 'MAL';
+    const estAmt = this.parseMoney(document.getElementById('er-estimated-amount')?.value);
+    const status = document.getElementById('er-status')?.value || 'Açık';
+    const priority = document.getElementById('er-priority')?.value || 'Orta';
+    const assignedTo = document.getElementById('er-assigned-to')?.value || 'Henüz Atanmadı';
+    const currency = document.getElementById('er-currency')?.value || 'TRY';
+
+    // Sipariş alanları
+    const orderBarcode = document.getElementById('er-order-barcode')?.value.trim();
+    const orderDate = document.getElementById('er-order-date')?.value.trim();
+    const supplier = document.getElementById('er-supplier')?.value.trim();
+    const actualAmt = this.parseMoney(document.getElementById('er-actual-amount')?.value);
+    const regulation = document.getElementById('er-regulation')?.value.trim();
+    const desc = document.getElementById('er-description')?.value.trim();
+
+    // 1. Temel Talep Alanları Zorunluluk Kontrolleri
+    if (!barcode) {
+      this.showToast("Talep Barkodu zorunlu bir alandır!", "warning", "⚠️");
+      document.getElementById('er-request-barcode')?.focus();
+      return;
     }
-    if (document.getElementById('er-arrival-date')) {
-      const arrDate = document.getElementById('er-arrival-date').value;
-      req.arrivalDate = arrDate;
-      req.requestDate = arrDate;
-      req.academicYear = this.getAcademicYear(arrDate);
+    if (!arrDate) {
+      this.showToast("Satınalmaya Geliş Tarihi zorunlu bir alandır!", "warning", "⚠️");
+      document.getElementById('er-arrival-date')?.focus();
+      return;
     }
-    if (document.getElementById('er-subject')) {
-      req.subject = document.getElementById('er-subject').value.trim();
+    if (!subject) {
+      this.showToast("Talep Konusu zorunlu bir alandır!", "warning", "⚠️");
+      document.getElementById('er-subject')?.focus();
+      return;
     }
-    if (document.getElementById('er-priority')) {
-      req.priority = document.getElementById('er-priority').value;
+    if (!unit) {
+      this.showToast("Talep Eden Birim zorunlu bir alandır!", "warning", "⚠️");
+      document.getElementById('er-unit')?.focus();
+      return;
+    }
+    if (!purchaseType) {
+      this.showToast("Alım Türü (Mal / Hizmet) zorunlu bir alandır!", "warning", "⚠️");
+      document.getElementById('er-purchase-type')?.focus();
+      return;
+    }
+    if (!estAmt || estAmt <= 0) {
+      this.showToast("Lütfen geçerli bir 'Tahmini / Bütçe Tutarı' giriniz (0'dan büyük olmalıdır)!", "warning", "⚠️");
+      document.getElementById('er-estimated-amount')?.focus();
+      return;
     }
 
-    req.status = document.getElementById('er-status').value;
-    if (document.getElementById('er-unit')) req.unit = document.getElementById('er-unit').value;
-    req.assignedTo = document.getElementById('er-assigned-to').value;
-    req.orderBarcode = document.getElementById('er-order-barcode').value.trim();
-    req.orderDate = document.getElementById('er-order-date').value;
-    req.supplier = document.getElementById('er-supplier').value.trim();
-    const estAmt = this.parseMoney(document.getElementById('er-estimated-amount')?.value);
+    // 2. Siparişe Dönüştürme ve Sipariş Bilgileri Zorunluluk Kontrolleri
+    // Eğer durum 'Sipariş Verildi' veya 'Tamamlandı' yapılmışsa ya da sipariş alanlarından herhangi biri doldurulmuşsa:
+    const isOrderProcess = (status === 'Sipariş Verildi' || status === 'Tamamlandı') || 
+                           Boolean(orderBarcode || orderDate || supplier || (actualAmt && actualAmt > 0));
+
+    if (isOrderProcess) {
+      if (!purchaseType) {
+        this.showToast("Sipariş ve tedarikçi puanlaması için 'Alım Türü' zorunludur!", "warning", "⚠️");
+        document.getElementById('er-purchase-type')?.focus();
+        return;
+      }
+      if (!orderBarcode) {
+        this.showToast("Sipariş işlemi için 'Sipariş Barkodu / No' zorunlu bir alandır!", "warning", "⚠️");
+        document.getElementById('er-order-barcode')?.focus();
+        return;
+      }
+      if (!orderDate) {
+        this.showToast("Sipariş işlemi için 'Sipariş Tarihi' zorunlu bir alandır!", "warning", "⚠️");
+        document.getElementById('er-order-date')?.focus();
+        return;
+      }
+      if (!supplier) {
+        this.showToast("Sipariş işlemi için 'Tedarikçi Adı (Firma)' zorunlu bir alandır!", "warning", "⚠️");
+        document.getElementById('er-supplier')?.focus();
+        return;
+      }
+      if (!actualAmt || actualAmt <= 0) {
+        this.showToast("Sipariş işlemi için 'Gerçekleşen Tutar' zorunlu bir alandır (0'dan büyük olmalıdır)!", "warning", "⚠️");
+        document.getElementById('er-actual-amount')?.focus();
+        return;
+      }
+      if (!regulation || regulation === 'ALL' || regulation === '') {
+        this.showToast("Sipariş işlemi için 'Yönetmelik Maddesi' zorunlu bir alandır!", "warning", "⚠️");
+        document.getElementById('er-regulation')?.focus();
+        return;
+      }
+    }
+
+    req.requestBarcode = barcode;
+    req.arrivalDate = arrDate;
+    req.requestDate = arrDate;
+    req.academicYear = this.getAcademicYear(arrDate);
+    req.subject = subject;
+    req.unit = unit;
+    req.purchaseType = purchaseType;
+    req.priority = priority;
+    req.assignedTo = assignedTo;
     req.estimatedAmount = estAmt;
-    if (!req.budgetAmount) req.budgetAmount = estAmt;
-    req.actualAmount = this.parseMoney(document.getElementById('er-actual-amount')?.value);
-    req.currency = document.getElementById('er-currency').value;
-    if (document.getElementById('er-regulation')) req.regulation = document.getElementById('er-regulation').value;
-    req.description = document.getElementById('er-description').value.trim();
+    req.budgetAmount = estAmt;
+    req.currency = currency;
+    req.orderBarcode = orderBarcode || '';
+    req.orderDate = orderDate || '';
+    req.supplier = supplier || '';
+    req.actualAmount = actualAmt || 0;
+    req.regulation = regulation || '';
+    req.description = desc || '';
+
+    // Eğer tüm sipariş bilgileri eksiksiz girilmişse ve durum hala 'Açık' ise, otomatik 'Sipariş Verildi' yap
+    if (isOrderProcess && status === 'Açık') {
+      req.status = 'Sipariş Verildi';
+    } else {
+      req.status = status;
+    }
 
     await this.apiSync('requests', 'PUT', req);
 
-    this.showToast("Talep bilgileri başarıyla güncellendi!", "success");
+    this.showToast("Talep ve sipariş bilgileri başarıyla güncellendi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.populateYearSelect();
     this.render();
