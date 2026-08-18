@@ -187,19 +187,22 @@ async init() {
     const currentVal = loginSelect.value;
     
     const usersList = (this.state.users && this.state.users.length > 0) ? this.state.users : [
-      { id: 1, name: 'Cem TUR', title: 'Satınalma Mdr. Yrd.', isActive: true },
-      { id: 2, name: 'Merih AVCI', title: 'Satınalma Müdürü', isActive: true },
-      { id: 3, name: 'Gülsüm YILDIRIM', title: 'Satınalma Kd. Uz.', isActive: true },
-      { id: 4, name: 'Sultan MERİÇ', title: 'Satınalma Uzmanı', isActive: true },
-      { id: 5, name: 'Caner TÜRKMEN', title: 'IT Uzmanı', isActive: true },
-      { id: 6, name: 'Hilal AKYOL', title: 'Satınalma Asistanı', isActive: true }
+      { id: 1, name: 'Cem TUR', title: 'Satınalma Mdr. Yrd.', role: 'ADMIN', isActive: true },
+      { id: 2, name: 'Merih AVCI', title: 'Satınalma Müdürü', role: 'ADMIN', isActive: true },
+      { id: 3, name: 'Gülsüm YILDIRIM', title: 'Satınalma Kd. Uz.', role: 'USER', isActive: true },
+      { id: 4, name: 'Sultan MERİÇ', title: 'Satınalma Uzmanı', role: 'USER', isActive: true },
+      { id: 5, name: 'Caner TÜRKMEN', title: 'IT Uzmanı', role: 'USER', isActive: true },
+      { id: 6, name: 'Hilal AKYOL', title: 'Satınalma Asistanı', role: 'USER', isActive: true }
     ];
 
     const sortedUsers = [...usersList].sort((a,b) => (b.isActive?1:0) - (a.isActive?1:0));
     let html = '<option value="">-- Lütfen Personel Seçin --</option>';
     sortedUsers.forEach(u => {
       const statusLabel = u.isActive !== false ? '' : ' (Pasif/Ayrıldı)';
-      html += `<option value="${u.id}" ${String(u.id) === String(currentVal) ? 'selected' : ''}>${u.name} - ${u.title}${statusLabel}</option>`;
+      let roleIcon = '👤';
+      if (u.role === 'EXECUTIVE') roleIcon = '🏛️';
+      else if (u.role === 'ADMIN') roleIcon = '🛡️';
+      html += `<option value="${u.id}" ${String(u.id) === String(currentVal) ? 'selected' : ''}>${roleIcon} ${u.name} - ${u.title}${statusLabel}</option>`;
     });
     loginSelect.innerHTML = html;
   },
@@ -516,9 +519,29 @@ async init() {
     const user = this.state.currentUser;
     if (!user) return;
 
-    document.getElementById('user-avatar').innerText = user.name.split(' ').map(n=>n[0]).join('');
-    document.getElementById('user-name').innerText = user.name;
-    document.getElementById('user-role-label').innerText = `${user.title} (${user.role})`;
+    const isExec = user.role === 'EXECUTIVE';
+    if (isExec) {
+      document.body.classList.add('role-executive');
+    } else {
+      document.body.classList.remove('role-executive');
+    }
+
+    const execBadge = document.getElementById('badge-executive-banner');
+    if (execBadge) execBadge.style.display = isExec ? 'inline-flex' : 'none';
+
+    const avatarText = isExec ? '🏛️' : user.name.split(' ').map(n => n[0]).join('');
+    const avatarEl = document.getElementById('user-avatar');
+    if (avatarEl) avatarEl.innerText = avatarText;
+
+    const nameEl = document.getElementById('user-name');
+    if (nameEl) nameEl.innerText = user.name;
+
+    const roleEl = document.getElementById('user-role-label');
+    if (roleEl) {
+      if (isExec) roleEl.innerText = 'Üst Yönetim (İzleme Modu)';
+      else if (user.role === 'ADMIN') roleEl.innerText = `${user.title} (Yönetici)`;
+      else roleEl.innerText = `${user.title} (Uzman)`;
+    }
   },
 
   handleHashRoute() {
@@ -2968,6 +2991,7 @@ async init() {
     }
 
     const isAdmin = this.state.currentUser?.role === 'ADMIN';
+    const isExec = this.state.currentUser?.role === 'EXECUTIVE';
 
     tbody.innerHTML = pageRequests.map((r, i) => `
       <tr>
@@ -2988,10 +3012,10 @@ async init() {
           <div class="action-btns">
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-icon" onclick="App.openDocumentManager('request', '${r.id}', '#${r.requestBarcode || r.id} — ${r.subject?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
-            <button class="btn-icon" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>
-            <button class="btn-icon" style="color:#ea580c;" onclick="App.openRevisionModal('${r.id}')" title="Birimden Revize / Eksik Şartname İste">⚠️</button>
+            ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>` : ''}
+            ${!isExec ? `<button class="btn-icon" style="color:#ea580c;" onclick="App.openRevisionModal('${r.id}')" title="Birimden Revize / Eksik Şartname İste">⚠️</button>` : ''}
             <button class="btn-icon" style="color:#10b981;" onclick="App.openInspectionReport('${r.id}')" title="Muayene ve Kabul Tutanağı (PDF / Yazdır)">📄</button>
-            ${isAdmin ? `<button class="btn-icon" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil (Sadece Yönetici)">🗑️</button>` : ''}
+            ${isAdmin && !isExec ? `<button class="btn-icon btn-delete-action" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil (Sadece Yönetici)">🗑️</button>` : ''}
           </div>
         </td>
       </tr>
@@ -3331,6 +3355,7 @@ async init() {
 
   // 5. CONTRACT MANAGEMENT RENDERER (SÖZLEŞME TAKİP)
   renderContracts() {
+    const isExec = this.state.currentUser?.role === 'EXECUTIVE';
     let contracts = this.state.contracts || [];
 
     // Filter by academic year overlap (or show all if ALL)
@@ -3437,8 +3462,8 @@ async init() {
             <div class="action-btns">
               <a href="#contract/${c.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'contract', '${c.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('contract', '${c.id}', 'Sözleşme #${c.contractNo} — ${c.title?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
-              <button class="btn-icon" onclick="App.openContractModal('${c.id}')" title="Düzenle">✏️</button>
-              <button class="btn-icon" onclick="App.deleteContract('${c.id}')" title="Sözleşmeyi Sil">🗑️</button>
+              ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openContractModal('${c.id}')" title="Düzenle">✏️</button>` : ''}
+              ${!isExec ? `<button class="btn-icon btn-delete-action" onclick="App.deleteContract('${c.id}')" title="Sözleşmeyi Sil">🗑️</button>` : ''}
             </div>
           </td>
         </tr>
@@ -4197,6 +4222,7 @@ async init() {
 
   // 5.5 GUARANTEES MANAGER & RENDERER (TEMİNAT MEKTUPLARI YÖNETİMİ)
   renderGuarantees() {
+    const isExec = this.state.currentUser?.role === 'EXECUTIVE';
     const guarantees = this.state.guarantees || [];
     const searchText = document.getElementById('filter-guarantee-search')?.value.toLowerCase().trim() || '';
     const selectedStatus = document.getElementById('filter-guarantee-status')?.value || 'ALL';
@@ -4237,20 +4263,18 @@ async init() {
     const elRet = document.getElementById('guarantee-kpi-returned-count');
 
     if (elVol) elVol.innerText = this.formatMoney(totalVolume, 'TRY', 2);
-    if (elAct) elAct.innerText = activeCount;
-    if (elExp) elExp.innerText = expiringCount;
-    if (elRet) elRet.innerText = returnedCount;
+    if (elAct) elAct.innerText = `${activeCount} Adet`;
+    if (elExp) elExp.innerText = `${expiringCount} Adet`;
+    if (elRet) elRet.innerText = `${returnedCount} Adet`;
 
     // Filtering logic
     const filtered = guarantees.filter(g => {
       if (selectedStatus !== 'ALL') {
-        if (selectedStatus === 'EXPIRING') {
+        if (selectedStatus === 'EXPIRING_30') {
           if (!g.expiryDate) return false;
           const exp = new Date(g.expiryDate);
           exp.setHours(0,0,0,0);
-          if (!(exp >= today && exp <= thirtyDaysLater && g.status !== 'İade Edildi' && g.status !== 'Nakte Çevrildi')) {
-            return false;
-          }
+          if (exp < today || exp > thirtyDaysLater || g.status === 'İade Edildi' || g.status === 'Nakte Çevrildi') return false;
         } else if (g.status !== selectedStatus) {
           return false;
         }
@@ -4314,9 +4338,9 @@ async init() {
             <div class="action-btns" style="justify-content: center;">
               <button class="btn-icon" onclick="App.viewGuaranteeDetails('${g.id}')" title="Görüntüle">👁️</button>
               <button class="btn-icon" onclick="App.openDocumentManager('guarantee', '${g.id}', 'Teminat #${g.letterNo} — ${g.bankName?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
-              <button class="btn-icon" onclick="App.openGuaranteeModal('${g.id}')" title="Düzenle">✏️</button>
-              ${g.status !== 'İade Edildi' ? `<button class="btn-icon" onclick="App.returnGuaranteeToFirm('${g.id}')" title="Firmaya İade Et">↩️</button>` : ''}
-              <button class="btn-icon" onclick="App.deleteGuarantee('${g.id}')" title="Sil">🗑️</button>
+              ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openGuaranteeModal('${g.id}')" title="Düzenle">✏️</button>` : ''}
+              ${!isExec && g.status !== 'İade Edildi' ? `<button class="btn-icon" onclick="App.returnGuaranteeToFirm('${g.id}')" title="Firmaya İade Et">↩️</button>` : ''}
+              ${!isExec ? `<button class="btn-icon btn-delete-action" onclick="App.deleteGuarantee('${g.id}')" title="Sil">🗑️</button>` : ''}
             </div>
           </td>
         </tr>
@@ -4857,6 +4881,7 @@ async init() {
 
   // 6. INVOICES & HANDOVER PROTOCOL & WEEKLY PAYMENT SCHEDULE RENDERER
   renderInvoices() {
+    const isExec = this.state.currentUser?.role === 'EXECUTIVE';
     let invoices = this.state.invoices || [];
 
     if (this.state.selectedYear !== 'ALL') {
@@ -4994,10 +5019,10 @@ async init() {
             <div class="action-btns">
               <a href="#invoice/${inv.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'invoice', ${inv.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('invoice', '${inv.id}', 'Fatura #${inv.invoiceNo} — ${inv.supplier?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
-              <button class="btn-icon" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>
-              ${!inv.accountingDeliveryDate ? `<button class="btn-icon" style="color:#4f46e5;" onclick="App.openInvoiceHandoverModal([${inv.id}])" title="Muhasebeye Teslim Et & Tutanak Yazdır">📤</button>` : ''}
-              ${inv.paymentStatus !== 'Ödendi' ? `<button class="btn-icon" onclick="App.markInvoiceAsPaid(${inv.id})" title="Ödendi İşaretle">✅</button>` : ''}
-              <button class="btn-icon" onclick="App.deleteInvoice(${inv.id})" title="Faturayı Sil">🗑️</button>
+              ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>` : ''}
+              ${!isExec && !inv.accountingDeliveryDate ? `<button class="btn-icon btn-invoice-handover-action" style="color:#4f46e5;" onclick="App.openInvoiceHandoverModal([${inv.id}])" title="Muhasebeye Teslim Et & Tutanak Yazdır">📤</button>` : ''}
+              ${!isExec && inv.paymentStatus !== 'Ödendi' ? `<button class="btn-icon" onclick="App.markInvoiceAsPaid(${inv.id})" title="Ödendi İşaretle">✅</button>` : ''}
+              ${!isExec ? `<button class="btn-icon btn-delete-action" onclick="App.deleteInvoice(${inv.id})" title="Faturayı Sil">🗑️</button>` : ''}
             </div>
           </td>
         </tr>

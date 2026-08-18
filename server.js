@@ -1176,9 +1176,17 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ error: msg, code: 'UNAUTHORIZED' }));
   }
 
-  function sendForbidden(msg = 'Bu işlem için ADMIN (Yönetici) yetkisi gereklidir.') {
+  function sendForbidden(msg = 'Bu işlem için ADMIN (Satınalma Yöneticisi) yetkisi gereklidir.') {
     res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ error: msg, code: 'FORBIDDEN' }));
+  }
+
+  function isReadOnlyUser(user) {
+    return user && user.role === 'EXECUTIVE';
+  }
+
+  if (currentUser && isReadOnlyUser(currentUser) && method !== 'GET' && urlPath !== '/api/auth/logout') {
+    return sendForbidden('Yönetici (EXECUTIVE) hesabı güvenli salt-okunur (izleme) modundadır. Veri değiştirme yetkisi bulunmamaktadır.');
   }
 
   try {
@@ -2604,6 +2612,16 @@ async function initDatabaseSchema() {
           'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
           ['Cem TUR', 'Satınalma Mdr. Yrd.', 'ADMIN', true, hashPassword('123456')]
         );
+      }
+
+      // Ensure Kurumsal Yönetim (EXECUTIVE) user exists
+      const execUserRes = await pool.query("SELECT id FROM users WHERE role = 'EXECUTIVE' OR name ILIKE '%Kurumsal Yönetim%'");
+      if (execUserRes.rowCount === 0) {
+        await pool.query(
+          'INSERT INTO users (name, title, role, "isActive", password, email) VALUES ($1, $2, $3, $4, $5, $6)',
+          ['Kurumsal Yönetim', 'Üst Yönetim & İzleme', 'EXECUTIVE', true, hashPassword('123456'), 'yonetim@pirireis.edu.tr']
+        );
+        console.log('👑 Kurumsal Yönetim (EXECUTIVE) kullanıcısı başarıyla veritabanına eklendi!');
       }
     }
   } catch (err) {

@@ -3306,7 +3306,29 @@ th.sticky-col-left, th.sticky-col-right {
   }
 }
 
+/* 👑 Kurumsal Yönetici (EXECUTIVE - Read-Only) Role Rules */
+body.role-executive #btn-open-new-request,
+body.role-executive #btn-open-add-contract,
+body.role-executive #btn-open-add-guarantee,
+body.role-executive #btn-open-add-invoice,
+body.role-executive #btn-open-add-tender,
+body.role-executive #btn-open-bulk-modal,
+body.role-executive #btn-import-excel,
+body.role-executive #btn-backup-now,
+body.role-executive #btn-restore-backup,
+body.role-executive #btn-save-rates,
+body.role-executive #btn-save-rates-custom,
+body.role-executive #btn-vp-rate-now,
+body.role-executive li[data-view="delegation"],
+body.role-executive li[data-view="settings"],
+body.role-executive .btn-delete-action,
+body.role-executive .btn-edit-action,
+body.role-executive .chk-invoice-item,
+body.role-executive #chk-select-all-invoices,
+body.role-executive .btn-invoice-handover-action {
+  display: none !important;
+}
 
-
-
-
+body.role-executive .badge-executive-mode {
+  display: inline-flex !important;
+}
