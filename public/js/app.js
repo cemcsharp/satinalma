@@ -1117,13 +1117,34 @@ async init() {
     // Filter for Activity Logs
     document.getElementById('filter-log-search')?.addEventListener('input', () => this.renderActivityLogs());
 
-    // Filters for Supplier Analysis
+    // Filters for Supplier Analysis & Clickable KPI Cards
     ['filter-supplier-search', 'filter-supplier-unit', 'filter-supplier-tier', 'filter-supplier-sort'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener('input', () => this.renderSupplierAnalysis());
         el.addEventListener('change', () => this.renderSupplierAnalysis());
       }
+    });
+
+    document.getElementById('card-supp-kpi-total')?.addEventListener('click', () => {
+      const tierSelect = document.getElementById('filter-supplier-tier');
+      if (tierSelect) tierSelect.value = 'ALL';
+      this.renderSupplierAnalysis();
+      this.showToast('Tüm aktif tedarikçiler listelendi.', 'info', '🏢');
+    });
+
+    document.getElementById('card-supp-kpi-gold')?.addEventListener('click', () => {
+      const tierSelect = document.getElementById('filter-supplier-tier');
+      if (tierSelect) tierSelect.value = 'GOLD';
+      this.renderSupplierAnalysis();
+      this.showToast('Stratejik / Gold Tier tedarikçiler filtrelendi.', 'success', '🌟');
+    });
+
+    document.getElementById('card-supp-kpi-risk')?.addEventListener('click', () => {
+      const tierSelect = document.getElementById('filter-supplier-tier');
+      if (tierSelect) tierSelect.value = 'RISK';
+      this.renderSupplierAnalysis();
+      this.showToast('Gözetim altındaki ve riskli tedarikçiler filtrelendi.', 'warning', '⚠️');
     });
 
     // 🏢 360 Vendor Profile Actions
@@ -5680,6 +5701,67 @@ async init() {
       suppMap[sName].spend += spend;
       totalSpendAll += spend;
     });
+
+    const allSuppliersList = Object.keys(suppMap);
+    const totalSuppCount = allSuppliersList.length;
+    let totalScoreSum = 0;
+    let ratedSuppCount = 0;
+    let goldCount = 0;
+    let riskCount = 0;
+
+    allSuppliersList.forEach(sName => {
+      const score = this.getVendorScore(sName);
+      if (score && score.count > 0) {
+        totalScoreSum += parseFloat(score.overall || 0);
+        ratedSuppCount++;
+        const tier = this.getVendorTier(score.overall, score.count);
+        if (tier.key === 'GOLD') goldCount++;
+        if (tier.key === 'RISK' || tier.key === 'BLACKLIST') riskCount++;
+      }
+    });
+
+    const avgScore = ratedSuppCount > 0 ? (totalScoreSum / ratedSuppCount).toFixed(1) : '5.0';
+
+    // Pareto 80/20 Harcama Konsantrasyonu Hesabı
+    const allBySpend = Object.entries(suppMap).sort((a, b) => b[1].spend - a[1].spend);
+    let cumulativeSpend = 0;
+    let paretoSuppCount = 0;
+    for (const [_, data] of allBySpend) {
+      cumulativeSpend += data.spend;
+      paretoSuppCount++;
+      if (totalSpendAll > 0 && (cumulativeSpend / totalSpendAll) >= 0.80) {
+        break;
+      }
+    }
+    const paretoPct = totalSpendAll > 0 ? ((cumulativeSpend / totalSpendAll) * 100).toFixed(0) : 0;
+
+    // Render KPI Elements
+    const elTotal = document.getElementById('supp-kpi-total');
+    const elTotalSpend = document.getElementById('supp-kpi-total-spend');
+    const elGold = document.getElementById('supp-kpi-gold');
+    const elGoldSub = document.getElementById('supp-kpi-gold-sub');
+    const elAvg = document.getElementById('supp-kpi-avg-score');
+    const elAvgSub = document.getElementById('supp-kpi-avg-sub');
+    const elRisk = document.getElementById('supp-kpi-risk');
+    const elRiskSub = document.getElementById('supp-kpi-risk-sub');
+    const elParetoText = document.getElementById('supp-pareto-text');
+
+    if (elTotal) elTotal.innerText = `${totalSuppCount} Firma`;
+    if (elTotalSpend) elTotalSpend.innerText = `Toplam: ${this.formatMoney(totalSpendAll, 'TRY', 0)}`;
+    if (elGold) elGold.innerText = `${goldCount} Firma`;
+    if (elGoldSub) elGoldSub.innerText = `${totalSuppCount > 0 ? Math.round((goldCount / totalSuppCount) * 100) : 0}% Stratejik Ortak`;
+    if (elAvg) elAvg.innerText = `${avgScore} / 5.0 ⭐`;
+    if (elAvgSub) elAvgSub.innerText = `${ratedSuppCount} Değerlendirilen Firma`;
+    if (elRisk) elRisk.innerText = `${riskCount} Firma`;
+    if (elRiskSub) elRiskSub.innerText = riskCount > 0 ? '⚠️ Gözetim & Alarm' : '✅ Riskli Firma Yok';
+
+    if (elParetoText) {
+      if (totalSuppCount > 0 && totalSpendAll > 0) {
+        elParetoText.innerHTML = `Üniversite toplam harcamasının <strong>%${paretoPct}</strong>'si ilk <strong>${paretoSuppCount}</strong> ana tedarikçide toplanmıştır (Toplam <strong>${totalSuppCount}</strong> firma içerisinden).`;
+      } else {
+        elParetoText.innerText = 'Henüz harcama kaydı bulunmuyor.';
+      }
+    }
 
     let sortedSupp = Object.entries(suppMap);
 

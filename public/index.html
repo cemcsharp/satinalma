@@ -1405,6 +1405,54 @@
         <!-- Supplier Risk & Performance Alerts Container -->
         <div id="supplier-risk-alerts-container" style="margin-bottom: 1.25rem;"></div>
 
+        <!-- 🏭 Executive Supplier Analysis KPI Cards -->
+        <div class="grid-4" style="margin-bottom: 1.25rem;">
+          <div class="glass-card kpi-card" id="card-supp-kpi-total" style="cursor: pointer;" title="Tüm tedarikçileri listele">
+            <div class="kpi-icon blue">🏢</div>
+            <div class="kpi-data">
+              <h3 id="supp-kpi-total">0 Firma</h3>
+              <p>Aktif Tedarikçi</p>
+              <div class="kpi-sub" id="supp-kpi-total-spend">Toplam: 0,00 ₺</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card" id="card-supp-kpi-gold" style="cursor: pointer;" title="Sadece Gold Tier stratejik tedarikçileri filtrele">
+            <div class="kpi-icon green">🌟</div>
+            <div class="kpi-data">
+              <h3 id="supp-kpi-gold" style="color: #10b981;">0 Firma</h3>
+              <p style="color: #10b981; font-weight: 700;">Stratejik / Gold Tier</p>
+              <div class="kpi-sub" id="supp-kpi-gold-sub">4.5+ Üstün Memnuniyet</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card" id="card-supp-kpi-avg">
+            <div class="kpi-icon yellow">⭐</div>
+            <div class="kpi-data">
+              <h3 id="supp-kpi-avg-score" style="color: #f59e0b;">0.0 / 5.0</h3>
+              <p>Ortalama Karne Puanı</p>
+              <div class="kpi-sub" id="supp-kpi-avg-sub">Kurumsal Değerlendirme</div>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-card" id="card-supp-kpi-risk" style="cursor: pointer;" title="Riskli ve gözetim altındaki tedarikçileri filtrele">
+            <div class="kpi-icon red">⚠️</div>
+            <div class="kpi-data">
+              <h3 id="supp-kpi-risk" style="color: var(--status-rejected);">0 Firma</h3>
+              <p style="color: var(--status-rejected); font-weight: 700;">Riskli / Gözetim</p>
+              <div class="kpi-sub" id="supp-kpi-risk-sub">Düşük Puan / Alarm</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pareto 80/20 & Dependency Insights Banner -->
+        <div id="supp-pareto-banner" style="background: rgba(30, 58, 138, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); padding: 0.75rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--text-main); flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.2rem;">💡</span>
+            <span id="supp-pareto-text">Tedarikçi bağımlılık ve harcama konsantrasyonu hesaplanıyor...</span>
+          </div>
+          <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: var(--accent-primary); font-weight: 700; font-size: 0.75rem;">Pareto 80/20 Analizi</span>
+        </div>
+
         <div class="glass-card">
           <div class="card-header">
             <div>
