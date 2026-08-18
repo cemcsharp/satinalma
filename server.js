@@ -252,33 +252,6 @@ function readBody(req, maxBytes = 100 * 1024 * 1024) {
   });
 }
 
-function fetchTCMBRates() {
-  return new Promise((resolve, reject) => {
-    https.get('https://www.tcmb.gov.tr/kurlar/today.xml', (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const usdMatch = data.match(/<Currency[^>]*CurrencyCode="USD"[^>]*>[\s\S]*?<ForexSelling>([\d.,]+)<\/ForexSelling>/);
-          const eurMatch = data.match(/<Currency[^>]*CurrencyCode="EUR"[^>]*>[\s\S]*?<ForexSelling>([\d.,]+)<\/ForexSelling>/);
-
-          const usd = usdMatch ? parseFloat(usdMatch[1].replace(',', '.')) : null;
-          const eur = eurMatch ? parseFloat(eurMatch[1].replace(',', '.')) : null;
-
-          const now = new Date();
-          const pad = (n) => String(n).padStart(2, '0');
-          const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-
-          resolve({ success: true, USD: usd, EUR: eur, lastUpdated: dateStr });
-        } catch (e) {
-          reject(e);
-        }
-      });
-      res.on('error', reject);
-    }).on('error', reject);
-  });
-}
-
 async function getTableData(tableName) {
   if (tableName === 'users') {
     // Şifre alanını ASLA API ile açık olarak döndürme
@@ -372,22 +345,98 @@ setInterval(async () => {
 }, 60 * 60 * 1000);
 
 // ----------------------------------------------------
-// 💱 TCMB CANLI DÖVİZ KURLARI SERVİSİ
+// 💱 CANLI DÖVİZ KURLARI SERVİSİ (TCMB & GLOBAL FX BACKUP)
 // ----------------------------------------------------
+function fetchJsonUrl(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+      timeout: 8000
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('Timeout')); });
+  });
+}
+
+async function fetchBackupRates() {
+  try {
+    const usdData = await fetchJsonUrl('https://open.er-api.com/v6/latest/USD');
+    const eurData = await fetchJsonUrl('https://open.er-api.com/v6/latest/EUR');
+    if (usdData && usdData.rates && usdData.rates.TRY && eurData && eurData.rates && eurData.rates.TRY) {
+      return {
+        USD: parseFloat(usdData.rates.TRY.toFixed(4)),
+        EUR: parseFloat(eurData.rates.TRY.toFixed(4)),
+        source: 'Global FX (Yedek Döviz Kaynağı)'
+      };
+    }
+  } catch (e) {
+    console.warn('Yedek döviz servisi hatası:', e.message);
+  }
+  return null;
+}
+
 async function fetchTCMBRates() {
   return new Promise((resolve) => {
-    https.get('https://www.tcmb.gov.tr/kurlar/today.xml', (res) => {
+    const options = {
+      hostname: 'www.tcmb.gov.tr',
+      path: '/kurlar/today.xml',
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/xml, text/xml, */*'
+      },
+      timeout: 10000
+    };
+
+    const req = https.request(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', async () => {
         try {
-          const usdMatch = data.match(/Currency Code="USD"[\s\S]*?<ForexSelling>([0-9.]+)<\/ForexSelling>/) ||
-                           data.match(/Currency Code="USD"[\s\S]*?<ForexBuying>([0-9.]+)<\/ForexBuying>/);
-          const eurMatch = data.match(/Currency Code="EUR"[\s\S]*?<ForexSelling>([0-9.]+)<\/ForexSelling>/) ||
-                           data.match(/Currency Code="EUR"[\s\S]*?<ForexBuying>([0-9.]+)<\/ForexBuying>/);
+          const extractRate = (xml, code) => {
+            const regexBlock = new RegExp(`<Currency[^>]+(?:CurrencyCode|Kod)=["']${code}["'][\\s\\S]*?<\\/Currency>`, 'i');
+            const blockMatch = xml.match(regexBlock);
+            if (!blockMatch) return null;
+            const block = blockMatch[0];
+            const rateMatch = block.match(/<ForexSelling>([0-9.,]+)<\/ForexSelling>/i) ||
+                              block.match(/<ForexBuying>([0-9.,]+)<\/ForexBuying>/i) ||
+                              block.match(/<BanknoteSelling>([0-9.,]+)<\/BanknoteSelling>/i);
+            if (!rateMatch) return null;
+            const num = parseFloat(rateMatch[1].replace(',', '.'));
+            return isNaN(num) ? null : num;
+          };
 
-          const usdRate = usdMatch ? parseFloat(usdMatch[1]) : 36.50;
-          const eurRate = eurMatch ? parseFloat(eurMatch[1]) : 39.80;
+          let usdRate = extractRate(data, 'USD');
+          let eurRate = extractRate(data, 'EUR');
+          let source = 'TCMB (Türkiye Cumhuriyet Merkez Bankası)';
+
+          if (!usdRate || !eurRate) {
+            const backup = await fetchBackupRates();
+            if (backup) {
+              usdRate = usdRate || backup.USD;
+              eurRate = eurRate || backup.EUR;
+              source = backup.source;
+            }
+          }
+
+          if (!usdRate || !eurRate) {
+            // DB'deki mevcut kurları al
+            const currentDbRates = await pool.query('SELECT currency, rate FROM rates').catch(() => ({ rows: [] }));
+            const map = {};
+            if (currentDbRates && currentDbRates.rows) {
+              currentDbRates.rows.forEach(r => map[r.currency] = parseFloat(r.rate));
+            }
+            usdRate = usdRate || map.USD || 47.89;
+            eurRate = eurRate || map.EUR || 55.54;
+          }
 
           const now = new Date();
           const pad = (n) => String(n).padStart(2, '0');
@@ -396,33 +445,92 @@ async function fetchTCMBRates() {
           await pool.query(`
             INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('USD', $1, $2)
             ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
-          `, [usdRate, dateStr]).catch(() => {});
+          `, [usdRate, dateStr]).catch(e => console.error('USD rate DB save err:', e.message));
 
           await pool.query(`
             INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('EUR', $1, $2)
             ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
-          `, [eurRate, dateStr]).catch(() => {});
+          `, [eurRate, dateStr]).catch(e => console.error('EUR rate DB save err:', e.message));
 
-          console.log(`💱 TCMB Canlı Kurları Güncellendi: USD=${usdRate} ₺, EUR=${eurRate} ₺ (${dateStr})`);
+          console.log(`💱 Canlı Kurlar Güncellendi: USD=${usdRate} ₺, EUR=${eurRate} ₺ (${dateStr}) [${source}]`);
 
           resolve({
             success: true,
             USD: usdRate,
             EUR: eurRate,
             lastUpdated: dateStr,
-            source: 'TCMB (Türkiye Cumhuriyet Merkez Bankası)'
+            source: source
           });
         } catch (err) {
-          console.error('TCMB XML ayrıştırma hatası:', err.message);
+          console.error('Kurlar ayrıştırma hatası:', err.message);
           resolve({ success: false, error: err.message });
         }
       });
-    }).on('error', (err) => {
-      console.error('TCMB bağlantı hatası:', err.message);
-      resolve({ success: false, error: err.message });
     });
+
+    req.on('timeout', async () => {
+      req.destroy();
+      console.warn('TCMB bağlantı zaman aşımı, yedek kaynağa geçiliyor...');
+      const backup = await fetchBackupRates();
+      if (backup) {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        await pool.query(`
+          INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('USD', $1, $2)
+          ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
+        `, [backup.USD, dateStr]).catch(() => {});
+        await pool.query(`
+          INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('EUR', $1, $2)
+          ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
+        `, [backup.EUR, dateStr]).catch(() => {});
+        resolve({
+          success: true,
+          USD: backup.USD,
+          EUR: backup.EUR,
+          lastUpdated: dateStr,
+          source: backup.source
+        });
+      } else {
+        resolve({ success: false, error: 'Merkez Bankası ve yedek döviz servisine bağlanılamadı.' });
+      }
+    });
+
+    req.on('error', async (err) => {
+      console.warn('TCMB bağlantı hatası:', err.message, 'yedek kaynağa geçiliyor...');
+      const backup = await fetchBackupRates();
+      if (backup) {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        await pool.query(`
+          INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('USD', $1, $2)
+          ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
+        `, [backup.USD, dateStr]).catch(() => {});
+        await pool.query(`
+          INSERT INTO rates (currency, rate, "lastUpdated") VALUES ('EUR', $1, $2)
+          ON CONFLICT (currency) DO UPDATE SET rate = $1, "lastUpdated" = $2
+        `, [backup.EUR, dateStr]).catch(() => {});
+        resolve({
+          success: true,
+          USD: backup.USD,
+          EUR: backup.EUR,
+          lastUpdated: dateStr,
+          source: backup.source
+        });
+      } else {
+        resolve({ success: false, error: err.message });
+      }
+    });
+
+    req.end();
   });
 }
+
+// Otomatik Kurları Periyodik Güncelle (Her 4 saatte bir)
+setInterval(() => {
+  fetchTCMBRates().catch(e => console.error('Otomatik kur güncelleme hatası:', e.message));
+}, 4 * 60 * 60 * 1000);
 
 // ----------------------------------------------------
 // 📧 SMTP HELPER FUNCTIONS
@@ -2509,6 +2617,11 @@ initDatabaseSchema().then(() => {
     console.log(' 🛡️ SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (Güvenli REST API)');
     console.log(` 🌐 Erişim: http://localhost:${PORT}/`);
     console.log('==========================================================');
+
+    // 💱 Otomatik Canlı Döviz Kurları (Sunucu açılışında 5 sn sonra çekilir)
+    setTimeout(() => {
+      fetchTCMBRates().catch(e => console.error('Başlangıç kur çekme hatası:', e.message));
+    }, 5000);
 
     // ⏳ Otomatik Sözleşme Vade & Bitiş Uyarı Motoru (Başlangıçta ve 12 saatte bir çalışır)
     setTimeout(() => {

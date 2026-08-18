@@ -1024,12 +1024,25 @@ async init() {
 
     // Save Currency Rates
     document.getElementById('btn-save-rates')?.addEventListener('click', async () => {
-      const usd = parseFloat(document.getElementById('setting-rate-usd').value) || 36.50;
-      const eur = parseFloat(document.getElementById('setting-rate-eur').value) || 39.80;
-      this.state.rates = { USD: usd, EUR: eur, lastUpdated: new Date().toLocaleString('tr-TR') };
+      const parseInputRate = (val, def) => {
+        if (!val) return def;
+        const clean = String(val).replace(',', '.').trim();
+        const n = parseFloat(clean);
+        return isNaN(n) || n <= 0 ? def : n;
+      };
+      const usdVal = document.getElementById('setting-rate-usd')?.value;
+      const eurVal = document.getElementById('setting-rate-eur')?.value;
+      const usd = parseInputRate(usdVal, 47.89);
+      const eur = parseInputRate(eurVal, 55.54);
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+      this.state.rates = { USD: usd, EUR: eur, lastUpdated: dateStr };
       await this.authFetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates: this.state.rates }) }).catch(e => console.error(e));
-      this.logAction('Döviz Kuru Güncellendi', `USD: ${usd} ₺, EUR: ${eur} ₺`);
-      this.showToast("Döviz kurları başarıyla güncellendi!", "success");
+      this.syncRatesInputUI();
+      this.logAction('Döviz Kuru Güncellendi', `USD: ${usd} ₺, EUR: ${eur} ₺ (${dateStr})`);
+      this.showToast(`Döviz kurları başarıyla güncellendi! (USD: ${usd} ₺, EUR: ${eur} ₺)`, "success");
       this.render();
     });
 
@@ -1211,42 +1224,42 @@ async init() {
   },
 
   async fetchTCMBRates() {
+    const btn = document.getElementById('btn-fetch-tcmb-rates');
     try {
-      const btn = document.getElementById('btn-fetch-tcmb-rates');
-      if (btn) btn.innerText = '⌛ Merkez Bankası\'na Bağlanılıyor...';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⌛</span> Kurlar Çekiliyor...';
+      }
 
       const res = await this.authFetch('/api/fetch-tcmb-rates');
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
+        if (data.success && (data.USD || data.EUR)) {
           this.state.rates = {
-            USD: data.USD,
-            EUR: data.EUR,
+            USD: parseFloat(data.USD),
+            EUR: parseFloat(data.EUR),
             lastUpdated: data.lastUpdated
           };
 
-          const usdInput = document.getElementById('setting-rate-usd');
-          const eurInput = document.getElementById('setting-rate-eur');
-          const dateLabel = document.getElementById('rate-last-updated');
-
-          if (usdInput) usdInput.value = data.USD;
-          if (eurInput) eurInput.value = data.EUR;
-          if (dateLabel) dateLabel.innerText = `TCMB Güncelleme: ${data.lastUpdated}`;
-
+          this.syncRatesInputUI();
           await this.authFetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates: this.state.rates }) }).catch(e => console.error(e));
-          this.logAction('TCMB Kurları Çekildi', `Merkez Bankası Satış Kurları -> USD: ${data.USD} ₺, EUR: ${data.EUR} ₺ (${data.lastUpdated})`);
-          this.showToast(`TCMB Kurları Başarıyla Çekildi! (USD: ${data.USD} ₺, EUR: ${data.EUR} ₺)`, "success", "🏛️");
+          this.logAction('Canlı Kurlar Çekildi', `${data.source || 'TCMB'} -> USD: ${data.USD} ₺, EUR: ${data.EUR} ₺ (${data.lastUpdated})`);
+          this.showToast(`Canlı Kurlar Güncellendi! (USD: ${data.USD} ₺, EUR: ${data.EUR} ₺) [${data.source || 'TCMB'}]`, "success", "🏛️");
           this.render();
         } else {
-          this.showToast("TCMB kurları alınırken bir hata oluştu: " + data.error, "error");
+          this.showToast("Kurlar alınırken bir hata oluştu: " + (data.error || 'Bilinmeyen hata'), "error");
         }
+      } else {
+        this.showToast("Döviz servisine bağlanılamadı (HTTP " + res.status + ")", "error");
       }
     } catch (err) {
       console.error("Error fetching TCMB rates:", err);
-      this.showToast("Merkez Bankası sunucusuna bağlanılamadı.", "error");
+      this.showToast("Merkez Bankası / döviz sunucusuna bağlanılamadı.", "error");
     } finally {
-      const btn = document.getElementById('btn-fetch-tcmb-rates');
-      if (btn) btn.innerHTML = '<span>⚡</span> TCMB\'den Kurları Otomatik Çek';
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡</span> TCMB\'den Kurları Otomatik Çek';
+      }
     }
   },
 
@@ -1462,6 +1475,7 @@ async init() {
     if (!this.state.isLoggedIn) return;
     this.populateDropdowns();
     this.renderNotifications();
+    this.syncRatesInputUI();
     const view = this.state.currentView;
     if (view === 'dashboard') this.renderDashboard();
     else if (view === 'requests') this.renderRequestsTable();
