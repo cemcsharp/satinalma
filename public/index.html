@@ -334,12 +334,12 @@
               <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 0.2rem;" id="radar-sub-contracts">30 gün içinde yenileme/bitiş</div>
             </div>
 
-            <div class="glass-card radar-pill" onclick="App.switchView('guarantees')" style="cursor: pointer; padding: 0.75rem 1rem; border-left: 4px solid #3b82f6;" title="Kasada tutulan aktif teminat mektupları">
+            <div class="glass-card radar-pill" onclick="App.switchView('workload')" style="cursor: pointer; padding: 0.75rem 1rem; border-left: 4px solid #06b6d4;" title="Personel kapasite durumu ve bekleyen atamalar">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.8rem; font-weight: 700; color: #2563eb;">🏦 Kasadaki Teminat Güvencesi</span>
-                <strong id="radar-count-guarantees" style="font-size: 1.05rem; color: #2563eb;">0 ₺</strong>
+                <span style="font-size: 0.8rem; font-weight: 700; color: #0891b2;">👥 Personel Kapasite & İş Yükü</span>
+                <strong id="radar-count-personnel-status" style="font-size: 1.05rem; color: #0891b2;">0 Müsait</strong>
               </div>
-              <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 0.2rem;" id="radar-sub-guarantees">0 Adet Teminat Mektubu</div>
+              <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 0.2rem;" id="radar-sub-personnel-status">Kapasite ve havuz durumu</div>
             </div>
 
             <div class="glass-card radar-pill" onclick="App.filterInvoicesByRadar('PENDING_DELIVERY')" style="cursor: pointer; padding: 0.75rem 1rem; border-left: 4px solid #8b5cf6;" title="Muhasebeye teslim bekleyen faturalar">
@@ -416,21 +416,35 @@
           </div>
         </div>
 
-        <!-- KATMAN 4: CANLI HAREKET AKIŞI & YÖNETİCİ HIZLI İŞLEM MASASI -->
+        <!-- KATMAN 4: SATINALMA EKİBİ PERFORMANS & YÖNETİCİ HIZLI İŞLEM MASASI -->
         <div class="grid-2" style="grid-template-columns: 2fr 1fr; gap: 1rem;">
-          <!-- 4.1 Son Sistem Hareketleri -->
+          <!-- 4.1 Satınalma Ekibi Canlı Performans & İş Yükü Masası -->
           <div class="glass-card">
             <div class="card-header">
               <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <div>
-                  <h3>📜 Canlı Sistem Hareketleri & Son İşlemler</h3>
-                  <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">Son işlenen talepler, siparişler ve fatura kayıtları</p>
+                  <h3>👥 Satınalma Ekibi Canlı Performans & İş Yükü</h3>
+                  <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">Uzmanların anlık kapasite durumu, tasarruf kazancı ve SLA tamamlama hızları</p>
                 </div>
-                <button class="btn-secondary" onclick="App.switchView('activity-logs')" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Tüm Loglar 🔗</button>
+                <button class="btn-secondary" onclick="App.switchView('workload')" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">İş Yükü & Delegasyon 🔗</button>
               </div>
             </div>
-            <div id="dashboard-recent-activity-list" style="display: flex; flex-direction: column; gap: 0.6rem;">
-              <!-- Dynamic recent activity stream -->
+            <div class="table-container" style="margin: 0.25rem 0 0 0;">
+              <table class="custom-table" id="table-dashboard-team">
+                <thead>
+                  <tr>
+                    <th>Uzman</th>
+                    <th>Açık İş & Doluluk</th>
+                    <th>Tamamlanan</th>
+                    <th>Tasarruf (Saving)</th>
+                    <th>Ort. Hız (SLA)</th>
+                    <th style="text-align:right;">Detay</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-team-performance-tbody">
+                  <!-- Dynamic staff performance rows -->
+                </tbody>
+              </table>
             </div>
           </div>
 

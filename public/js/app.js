@@ -2713,27 +2713,29 @@ async init() {
       return diff > 0 && diff <= 30;
     }).length;
 
-    let activeGuaranteesVolume = 0;
-    let activeGuaranteesCount = 0;
-    guarantees.forEach(g => {
-      if (g.status === 'Aktif' || g.status === 'Vadesi Yaklaşan') {
-        activeGuaranteesVolume += (g.amount || 0);
-        activeGuaranteesCount++;
-      }
+    const operationalUsers = (this.state.users || []).filter(u => u.isActive !== false && u.role !== 'EXECUTIVE');
+    const maxQuota = parseInt(this.state.settings?.maxOpenRequestsPerUser || 15);
+    let availableCount = 0;
+    let fullCount = 0;
+    operationalUsers.forEach(u => {
+      const openCount = requests.filter(r => r.assignedTo === u.name && r.status === 'Açık').length;
+      if (openCount >= maxQuota) fullCount++;
+      else availableCount++;
     });
+    const unassignedPoolCount = requests.filter(r => (!r.assignedTo || r.assignedTo === 'Henüz Atanmadı') && r.status === 'Açık').length;
 
     const pendingHandoverInvoicesCount = invoices.filter(i => !i.accountingDeliveryDate).length;
 
     const elRadarOverdue = document.getElementById('radar-count-overdue');
     const elRadarContracts = document.getElementById('radar-count-contracts');
-    const elRadarGuarantees = document.getElementById('radar-count-guarantees');
-    const elRadarGuaranteesSub = document.getElementById('radar-sub-guarantees');
+    const elRadarPersonnel = document.getElementById('radar-count-personnel-status');
+    const elRadarPersonnelSub = document.getElementById('radar-sub-personnel-status');
     const elRadarInvoices = document.getElementById('radar-count-invoices');
 
     if (elRadarOverdue) elRadarOverdue.innerText = overdueDemandsCount;
     if (elRadarContracts) elRadarContracts.innerText = expiringContractsCount;
-    if (elRadarGuarantees) elRadarGuarantees.innerText = this.formatMoney(activeGuaranteesVolume, 'TRY', 0);
-    if (elRadarGuaranteesSub) elRadarGuaranteesSub.innerText = `${activeGuaranteesCount} Adet Teminat Mektubu`;
+    if (elRadarPersonnel) elRadarPersonnel.innerText = `${availableCount} Müsait / ${fullCount} Dolu`;
+    if (elRadarPersonnelSub) elRadarPersonnelSub.innerText = `${operationalUsers.length} Aktif Uzman • ${unassignedPoolCount} Havuzda`;
     if (elRadarInvoices) elRadarInvoices.innerText = pendingHandoverInvoicesCount;
 
     // --- KATMAN 3: GÖRSEL ANALİTİK & GRAFİKLER ---
@@ -2741,8 +2743,8 @@ async init() {
     this.renderDashboardCategoryDonut(requests);
     this.renderDashboardTopRankings(requests, totalSpendTRY);
 
-    // --- KATMAN 4: CANLI HAREKET AKIŞI ---
-    this.renderDashboardRecentActivities();
+    // --- KATMAN 4: SATINALMA EKİBİ PERFORMANS & İŞ YÜKÜ MASASI ---
+    this.renderDashboardTeamPerformance(requests, operationalUsers, maxQuota);
   },
 
   renderDashboardFinancialTrend(requests) {
@@ -2934,45 +2936,95 @@ async init() {
     }
   },
 
-  renderDashboardRecentActivities() {
-    const container = document.getElementById('dashboard-recent-activity-list');
-    if (!container) return;
+  renderDashboardTeamPerformance(requests, operationalUsers, maxQuota) {
+    const tbody = document.getElementById('dashboard-team-performance-tbody');
+    if (!tbody) return;
 
-    const logs = (this.state.logs || []).slice(0, 5);
-    if (logs.length === 0) {
-      const recentReqs = (this.state.requests || []).slice(0, 5);
-      container.innerHTML = recentReqs.map(r => `
-        <div class="dashboard-activity-row">
-          <div class="dashboard-activity-icon">📋</div>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">#${r.requestBarcode || r.id} — ${r.subject}</div>
-            <div style="font-size:0.75rem; color:var(--text-muted);">${r.unit} | Sorumlu: ${r.assignedTo || 'Atanmadı'}</div>
-          </div>
-          <span class="badge status-${r.status === 'Tamamlandı' ? 'completed' : 'open'}" style="font-size:0.72rem;">${r.status}</span>
-        </div>
-      `).join('');
+    if (!operationalUsers || operationalUsers.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Aktif uzman personeli bulunamadı.</td></tr>';
       return;
     }
 
-    container.innerHTML = logs.map(l => {
-      let icon = '📜';
-      if ((l.action || '').includes('Talep')) icon = '📋';
-      else if ((l.action || '').includes('Sözleşme')) icon = '📑';
-      else if ((l.action || '').includes('Fatura')) icon = '💳';
-      else if ((l.action || '').includes('Teminat')) icon = '🏦';
-      else if ((l.action || '').includes('Giriş')) icon = '🔐';
+    const teamRows = operationalUsers.map(u => {
+      const uReqs = requests.filter(r => r.assignedTo === u.name);
+      const openCount = uReqs.filter(r => r.status === 'Açık').length;
+      const completedCount = uReqs.filter(r => r.status === 'Tamamlandı').length;
+
+      let uSavings = 0;
+      let totalDays = 0;
+      let measuredCount = 0;
+
+      uReqs.forEach(r => {
+        const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+        const actAmt = parseFloat(r.actualAmount) || 0;
+        if (initAmt > actAmt && actAmt > 0) {
+          uSavings += (initAmt - actAmt);
+        }
+
+        const dStartStr = r.arrivalDate || r.requestDate;
+        const dEndStr = r.orderDate;
+        if (dStartStr && dEndStr) {
+          const dStart = new Date(dStartStr);
+          const dEnd = new Date(dEndStr);
+          if (!isNaN(dStart.getTime()) && !isNaN(dEnd.getTime()) && dEnd >= dStart) {
+            totalDays += Math.ceil((dEnd - dStart) / (1000 * 60 * 60 * 24));
+            measuredCount++;
+          }
+        }
+      });
+
+      const avgDays = measuredCount > 0 ? (totalDays / measuredCount).toFixed(1) : '-';
+      const capPct = Math.min(100, Math.round((openCount / maxQuota) * 100));
+
+      let badgeClass = 'status-completed';
+      let badgeLabel = '🟢 Müsait';
+      let barColor = '#10b981';
+      if (openCount >= maxQuota) {
+        badgeClass = 'priority-kritik';
+        badgeLabel = '🔴 Dolu';
+        barColor = '#ef4444';
+      } else if (openCount >= Math.floor(maxQuota * 0.65)) {
+        badgeClass = 'priority-orta';
+        badgeLabel = '🟡 Yoğun';
+        barColor = '#f59e0b';
+      }
 
       return `
-        <div class="dashboard-activity-row">
-          <div class="dashboard-activity-icon">${icon}</div>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${l.action}</div>
-            <div style="font-size:0.75rem; color:var(--text-muted);">${l.user || 'Sistem'} • ${l.details || ''}</div>
-          </div>
-          <span style="font-size:0.72rem; color:var(--text-muted); white-space:nowrap;">${l.timestamp || ''}</span>
-        </div>
+        <tr style="cursor:pointer;" onclick="App.openPersonnelSavingsDetailView('${u.name.replace(/'/g, "\\'")}')" title="Detaylı performans ve tasarruf raporunu inceleyin">
+          <td>
+            <div style="font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:0.4rem;">
+              <span>👤 ${u.name}</span>
+            </div>
+            <div style="font-size:0.73rem; color:var(--text-muted);">${u.title || 'Satınalma Uzmanı'}</div>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; justify-content:space-between; font-size:0.78rem; margin-bottom:0.25rem;">
+              <strong>${openCount} / ${maxQuota} İş</strong>
+              <span class="badge ${badgeClass}" style="font-size:0.68rem; padding:0.1rem 0.35rem;">${badgeLabel}</span>
+            </div>
+            <div style="height:6px; background:var(--bg-hover, rgba(0,0,0,0.06)); border-radius:999px; overflow:hidden;">
+              <div style="height:100%; width:${capPct}%; background:${barColor}; border-radius:999px;"></div>
+            </div>
+          </td>
+          <td>
+            <span class="badge status-completed" style="font-weight:700;">✅ ${completedCount}</span>
+          </td>
+          <td>
+            <strong style="color:var(--status-completed); font-size:0.85rem;">${this.formatMoney(uSavings, 'TRY', 0)}</strong>
+          </td>
+          <td>
+            <span style="font-weight:600; font-size:0.82rem;">⚡ ${avgDays} ${avgDays !== '-' ? 'Gün' : ''}</span>
+          </td>
+          <td style="text-align:right;">
+            <button class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.55rem;" onclick="event.stopPropagation(); App.openPersonnelSavingsDetailView('${u.name.replace(/'/g, "\\'")}')">
+              Detay 🔍
+            </button>
+          </td>
+        </tr>
       `;
     }).join('');
+
+    tbody.innerHTML = teamRows;
   },
 
   filterRequestsByRadar(type) {
