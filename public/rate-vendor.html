@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tedarikçi & Malzeme Değerlendirmesi — Piri Reis Üniversitesi</title>
+  <link rel="icon" type="image/png" href="/img/logo.png">
+  <link rel="apple-touch-icon" href="/img/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -49,9 +51,12 @@
 
     .header-banner {
       background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
-      padding: 1.75rem 1.5rem;
+      padding: 1.5rem;
       color: #ffffff;
       border-bottom: 3px solid var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
     }
     .header-banner .uni-tag {
       font-size: 0.75rem;
@@ -283,8 +288,11 @@
 
   <div class="container">
     <div class="header-banner">
-      <div class="uni-tag">PİRİ REİS ÜNİVERSİTESİ — SATINALMA MÜDÜRLÜĞÜ</div>
-      <h1 id="page-main-title">⭐ Tedarikçi Memnuniyet Değerlendirmesi</h1>
+      <img src="/img/logo.png" alt="Piri Reis Üniversitesi" style="width: 48px; height: 48px; object-fit: contain; border-radius: 50%; background: #ffffff; padding: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+      <div>
+        <div class="uni-tag">PİRİ REİS ÜNİVERSİTESİ — SATINALMA MÜDÜRLÜĞÜ</div>
+        <h1 id="page-main-title">⭐ Tedarikçi Memnuniyet Değerlendirmesi</h1>
+      </div>
     </div>
 
     <!-- Rating Form View -->
