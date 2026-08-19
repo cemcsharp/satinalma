@@ -5165,12 +5165,15 @@ async init() {
     const sundayNextWeek = new Date(sundayThisWeek);
     sundayNextWeek.setDate(sundayThisWeek.getDate() + 7);
 
+    const isDelivered = (inv) => Boolean(inv.accountingDeliveryDate && inv.accountingDeliveryDate !== 'null' && String(inv.accountingDeliveryDate).trim() !== '');
+
     // Compute Overall KPI Totals before tab filtering
     const totalAmountAll = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-    const paidAmount = invoices.filter(inv => inv.paymentStatus === 'Ödendi').reduce((sum, inv) => sum + (inv.amount || 0), 0);
-    const pendingDeliveryInvoices = invoices.filter(inv => !inv.accountingDeliveryDate && inv.paymentStatus !== 'Ödendi');
+    const paidInvoices = invoices.filter(inv => inv.paymentStatus === 'Ödendi');
+    const paidAmount = paidInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const pendingDeliveryInvoices = invoices.filter(inv => !isDelivered(inv));
     const pendingDeliveryTotal = pendingDeliveryInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-    const deliveredInvoices = invoices.filter(inv => inv.accountingDeliveryDate && inv.paymentStatus !== 'Ödendi');
+    const deliveredInvoices = invoices.filter(inv => isDelivered(inv));
     const deliveredTotal = deliveredInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
 
     const elTotal = document.getElementById('invoice-kpi-total');
@@ -5181,12 +5184,13 @@ async init() {
     if (elTotal) elTotal.innerText = `${this.formatMoney(totalAmountAll, 'TRY', 2)} (${invoices.length} Fatura)`;
     if (elPending) elPending.innerText = `${this.formatMoney(pendingDeliveryTotal, 'TRY', 2)} (${pendingDeliveryInvoices.length} Adet)`;
     if (elDelivered) elDelivered.innerText = `${this.formatMoney(deliveredTotal, 'TRY', 2)} (${deliveredInvoices.length} Adet)`;
-    if (elPaid) elPaid.innerText = this.formatMoney(paidAmount, 'TRY', 2);
+    if (elPaid) elPaid.innerText = `${this.formatMoney(paidAmount, 'TRY', 2)} (${paidInvoices.length} Adet)`;
 
     // Apply Delivery Tab Filters
     invoices = invoices.filter(inv => {
-      if (periodVal === 'PENDING_DELIVERY' && (inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
-      if (periodVal === 'DELIVERED' && (!inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
+      const delivered = isDelivered(inv);
+      if (periodVal === 'PENDING_DELIVERY' && delivered) return false;
+      if (periodVal === 'DELIVERED' && !delivered) return false;
 
       // Due Period Filter
       if (duePeriodVal !== 'ALL') {
@@ -5201,16 +5205,14 @@ async init() {
       }
 
       // Dropdown Status Filter
-      if (statusVal === 'Teslim Bekliyor' && (inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
-      else if (statusVal === 'Muhasebeye Teslim Edildi' && (!inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
-      else if (statusVal !== 'ALL' && !['Teslim Bekliyor', 'Muhasebeye Teslim Edildi'].includes(statusVal) && inv.paymentStatus !== statusVal) return false;
+      if (statusVal !== 'ALL' && inv.paymentStatus !== statusVal) return false;
 
       // Text Search
       if (searchText) {
-        const mNo = inv.invoiceNo?.toLowerCase().includes(searchText);
-        const mSupp = inv.supplier?.toLowerCase().includes(searchText);
-        const mRel = inv.relatedBarcode?.toLowerCase().includes(searchText);
-        const mNotes = (inv.notes || inv.description || '')?.toLowerCase().includes(searchText);
+        const mNo = (inv.invoiceNo || '').toLowerCase().includes(searchText);
+        const mSupp = (inv.supplier || '').toLowerCase().includes(searchText);
+        const mRel = (inv.relatedBarcode || '').toLowerCase().includes(searchText);
+        const mNotes = ((inv.notes || '') + ' ' + (inv.description || '')).toLowerCase().includes(searchText);
         if (!mNo && !mSupp && !mRel && !mNotes) return false;
       }
       return true;
@@ -5242,8 +5244,9 @@ async init() {
         dueBadge = `<span style="color:var(--text-muted); font-size:0.75rem;">-</span>`;
       }
 
+      const delivered = isDelivered(inv);
       let deliveryBadge = '';
-      if (inv.accountingDeliveryDate) {
+      if (delivered) {
         deliveryBadge = `<span class="badge" style="background:rgba(99,102,241,0.15); color:#4f46e5; font-weight:700; font-size:0.75rem;" title="Muhasebeye Teslim Tarihi: ${inv.accountingDeliveryDate}">📤 Teslim Edildi<br><small style="font-size:0.7rem; font-weight:normal; opacity:0.9;">${inv.accountingDeliveryDate}</small></span>`;
       } else {
         deliveryBadge = `<span class="badge" style="background:#fef3c7; color:#92400e; font-weight:700; font-size:0.75rem;">📥 Satınalmada (Bekliyor)</span>`;
@@ -5282,7 +5285,8 @@ async init() {
               <a href="#invoice/${inv.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'invoice', ${inv.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('invoice', '${inv.id}', 'Fatura #${inv.invoiceNo} — ${inv.supplier?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
               ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>` : ''}
-              ${!isExec && !inv.accountingDeliveryDate ? `<button class="btn-icon btn-invoice-handover-action" style="color:#4f46e5;" onclick="App.openInvoiceHandoverModal([${inv.id}])" title="Muhasebeye Teslim Et & Tutanak Yazdır">📤</button>` : ''}
+              ${!isExec && !delivered ? `<button class="btn-icon btn-invoice-handover-action" style="color:#4f46e5;" onclick="App.openInvoiceHandoverModal([${inv.id}])" title="Muhasebeye Teslim Et & Tutanak Yazdır">📤</button>` : ''}
+              ${!isExec && delivered ? `<button class="btn-icon" style="color:#f59e0b;" onclick="App.revertInvoiceHandover(${inv.id})" title="Teslimatı Geri Al (Satınalmaya Döndür)">↩️</button>` : ''}
               ${!isExec && inv.paymentStatus !== 'Ödendi' ? `<button class="btn-icon" onclick="App.markInvoiceAsPaid(${inv.id})" title="Ödendi İşaretle">✅</button>` : ''}
               ${!isExec ? `<button class="btn-icon btn-delete-action" onclick="App.deleteInvoice(${inv.id})" title="Faturayı Sil">🗑️</button>` : ''}
             </div>
@@ -5292,6 +5296,30 @@ async init() {
     }).join('');
 
     this._onInvoiceCheckboxChange();
+  },
+
+  setInvoiceDeliveryTab(period) {
+    this.state.invoiceDatePeriod = period;
+    document.querySelectorAll('#invoice-date-tabs button').forEach(b => {
+      if (b.getAttribute('data-period') === period) {
+        b.classList.add('active-date-tab');
+      } else {
+        b.classList.remove('active-date-tab');
+      }
+    });
+    this.renderInvoices();
+  },
+
+  async revertInvoiceHandover(invoiceId) {
+    const inv = (this.state.invoices || []).find(i => String(i.id) === String(invoiceId));
+    if (!inv) return;
+
+    this.showConfirm("Teslimatı Geri Al", `Fatura #${inv.invoiceNo} teslimat durumu iptal edilip tekrar "Satınalmada (Bekliyor)" olarak işaretlensin mi?`, async () => {
+      inv.accountingDeliveryDate = null;
+      await this.apiSync('invoices', 'PUT', inv);
+      this.showToast(`Fatura #${inv.invoiceNo} tekrar Satınalmada (Bekliyor) durumuna alındı.`, "info", "↩️");
+      this.renderInvoices();
+    }, '↩️');
   },
 
   _onInvoiceCheckboxChange() {
@@ -5432,7 +5460,7 @@ async init() {
     let updatedCount = 0;
 
     for (const id of ids) {
-      const inv = (this.state.invoices || []).find(i => parseInt(i.id) === parseInt(id));
+      const inv = (this.state.invoices || []).find(i => String(i.id) === String(id));
       if (inv) {
         inv.accountingDeliveryDate = todayStr;
         await this.apiSync('invoices', 'PUT', inv);
@@ -5443,9 +5471,9 @@ async init() {
     const protocolNo = document.getElementById('ih-protocol-no')?.innerText || 'FTT';
     this.logAction('Muhasebeye Fatura Teslimi', `${updatedCount} adet fatura muhasebeye teslim edildi (Bordro: ${protocolNo})`);
 
-    this.showToast(`${updatedCount} adet fatura başarıyla "Muhasebeye Teslim Edildi" olarak işlendi ve tutanak arşivlendi!`, "success", "✅");
+    this.showToast(`${updatedCount} adet fatura başarıyla "Muhasebeye Teslim Edildi" olarak işlendi!`, "success", "📤");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-    this.renderInvoices();
+    this.setInvoiceDeliveryTab('DELIVERED');
   },
 
   openInvoiceModal(invoiceId = null) {
