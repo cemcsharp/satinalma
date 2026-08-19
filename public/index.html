@@ -569,9 +569,13 @@
 
           <select class="filter-select" id="filter-status">
             <option value="ALL">Tüm Durumlar</option>
-            <option value="Açık">🔵 Açık / Devam Eden</option>
+            <option value="Açık">🔵 Açık / İşlemde</option>
+            <option value="Rektörlük Onayında">🏛️ Rektörlük Onayında</option>
+            <option value="Sözleşme Aşamasında">📑 Sözleşme Aşamasında</option>
+            <option value="Sipariş Verildi">🚚 Sipariş Verildi</option>
             <option value="OVERDUE_14">🚨 14+ Gün Gecikenler (SLA)</option>
             <option value="Tamamlandı">✅ Tamamlandı</option>
+            <option value="Revize İstendi">⚠️ Revize İstendi</option>
             <option value="Reddedildi">❌ Reddedildi</option>
           </select>
 
@@ -802,9 +806,13 @@
 
           <select class="filter-select" id="filter-my-status">
             <option value="ALL">Tüm Durumlar</option>
-            <option value="Açık">🔵 Açık / Devam Eden</option>
+            <option value="Açık">🔵 Açık / İşlemde</option>
+            <option value="Rektörlük Onayında">🏛️ Rektörlük Onayında</option>
+            <option value="Sözleşme Aşamasında">📑 Sözleşme Aşamasında</option>
+            <option value="Sipariş Verildi">🚚 Sipariş Verildi</option>
             <option value="OVERDUE_14">🚨 14+ Gün Gecikenler (SLA)</option>
             <option value="Tamamlandı">✅ Tamamlandı</option>
+            <option value="Revize İstendi">⚠️ Revize İstendi</option>
             <option value="Reddedildi">❌ Reddedildi</option>
           </select>
 
@@ -2746,6 +2754,16 @@
           </div>
 
           <div class="form-group">
+            <label>Talep Durumu <span class="required">*</span></label>
+            <select id="nr-status" required>
+              <option value="Açık" selected>🔵 Açık / İşlemde</option>
+              <option value="Rektörlük Onayında">🏛️ Rektörlük Onayında</option>
+              <option value="Sözleşme Aşamasında">📑 Sözleşme Aşamasında</option>
+              <option value="Sipariş Verildi">🚚 Sipariş Verildi</option>
+            </select>
+          </div>
+
+          <div class="form-group">
             <label>Öncelik <span class="required">*</span></label>
             <select id="nr-priority" required>
               <option value="Orta" selected>🟡 Orta</option>
@@ -2871,9 +2889,11 @@
             <label>Talep Durumu <span class="required">*</span></label>
             <select id="er-status" required>
               <option value="Açık">🔵 Açık / İşlemde</option>
+              <option value="Rektörlük Onayında">🏛️ Rektörlük Onayında</option>
+              <option value="Sözleşme Aşamasında">📑 Sözleşme Aşamasında</option>
               <option value="Sipariş Verildi">🚚 Sipariş Verildi</option>
               <option value="Tamamlandı">✅ Tamamlandı</option>
-              <option value="Revize İstendi">🟠 Revize İstendi</option>
+              <option value="Revize İstendi">⚠️ Revize İstendi</option>
               <option value="Reddedildi">❌ Reddedildi</option>
             </select>
           </div>

@@ -650,10 +650,28 @@ async init() {
       }
 
       resultsBox.innerHTML = matches.map(r => {
-        let orderStatusText = '🚚 İşlemde / Sipariş Sürecinde';
-        if (r.status === 'Tamamlandı') orderStatusText = '✅ Tamamlandı / Kapatıldı';
-        else if (r.status === 'Reddedildi' || r.status === 'İptal') orderStatusText = '❌ İptal Edildi';
-        else if (r.orderBarcode) orderStatusText = `🚚 Sipariş Verildi (#${r.orderBarcode})`;
+        let orderStatusText = '🔵 İşlemde / Teklif Aşamasında';
+        let statusBadgeHtml = `<span class="badge status-open">${r.status || 'Açık'}</span>`;
+
+        if (r.status === 'Tamamlandı') {
+          orderStatusText = '✅ Tamamlandı / Kapatıldı';
+          statusBadgeHtml = `<span class="badge status-completed">✅ Tamamlandı</span>`;
+        } else if (r.status === 'Reddedildi' || r.status === 'İptal') {
+          orderStatusText = '❌ İptal Edildi';
+          statusBadgeHtml = `<span class="badge status-rejected">❌ ${r.status}</span>`;
+        } else if (r.status === 'Revize İstendi') {
+          orderStatusText = '⚠️ Revize / Şartname Bekleniyor';
+          statusBadgeHtml = `<span class="badge status-revision">⚠️ Revize İstendi</span>`;
+        } else if (r.status === 'Rektörlük Onayında') {
+          orderStatusText = '🏛️ Rektörlük / Üst Yönetim Onayında';
+          statusBadgeHtml = `<span class="badge status-rektorluk">🏛️ Rektörlük Onayında</span>`;
+        } else if (r.status === 'Sözleşme Aşamasında') {
+          orderStatusText = '📑 Sözleşme Hazırlık & Hukuk Aşamasında';
+          statusBadgeHtml = `<span class="badge status-sozlesme">📑 Sözleşme Aşamasında</span>`;
+        } else if (r.status === 'Sipariş Verildi' || r.orderBarcode) {
+          orderStatusText = `🚚 Sipariş Verildi ${r.orderBarcode ? '(#' + r.orderBarcode + ')' : ''}`;
+          statusBadgeHtml = `<span class="badge status-siparis">🚚 Sipariş Verildi</span>`;
+        }
 
         const expertUser = (this.state.users || []).find(u => u.name === r.assignedTo);
         const expertPhone = expertUser?.phone || (r.assignedTo === 'Merih AVCI' ? '1101' : r.assignedTo === 'Cem TUR' ? '1102' : r.assignedTo === 'Gülsüm YILDIRIM' ? '1103' : r.assignedTo === 'Sultan MERİÇ' ? '1104' : r.assignedTo === 'Şimal ERDEM' ? '1105' : '1106');
@@ -665,7 +683,7 @@ async init() {
               <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary); font-size: 1rem;">
                 Barkod #${r.requestBarcode || r.id}
               </span>
-              <span class="badge status-${r.status?.toLowerCase()}">${r.status || 'Açık'}</span>
+              ${statusBadgeHtml}
             </div>
             <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); margin-bottom: 0.5rem; line-height: 1.4;">${r.subject}</div>
             <div style="font-size: 0.8rem; color: var(--text-muted); display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-bottom: 0.2rem; background: var(--bg-card); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
@@ -1679,7 +1697,7 @@ async init() {
       const today = new Date();
       today.setHours(0,0,0,0);
       const overdueCount = this.getFilteredRequests().filter(r => {
-        if (r.assignedTo !== currentPersonName || r.status !== 'Açık') return false;
+        if (r.assignedTo !== currentPersonName || r.status === 'Tamamlandı' || r.status === 'Reddedildi' || r.status === 'İptal') return false;
         const arrDt = new Date(r.arrivalDate || r.requestDate);
         arrDt.setHours(0,0,0,0);
         const diff = Math.max(0, Math.ceil((today - arrDt) / (1000 * 60 * 60 * 24)));
@@ -2914,7 +2932,7 @@ async init() {
 
     container.innerHTML = operationalUsers.map(u => {
       const uReqs = requests.filter(r => r.assignedTo === u.name);
-      const openCount = uReqs.filter(r => r.status === 'Açık').length;
+      const openCount = uReqs.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal').length;
       let uSavings = 0;
       uReqs.forEach(r => {
         const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
@@ -2962,7 +2980,7 @@ async init() {
   renderDashboardAlarms(requests, contracts, invoices, today) {
     // 1. Geciken Talepler (14+ Gün)
     const overdueDemandsCount = requests.filter(r => {
-      if (r.status !== 'Açık') return false;
+      if (r.status === 'Tamamlandı' || r.status === 'Reddedildi' || r.status === 'İptal') return false;
       const dStr = r.arrivalDate || r.requestDate;
       if (!dStr) return false;
       const dStart = new Date(dStr);
@@ -3084,15 +3102,19 @@ async init() {
       return `<span class="badge status-rejected">❌ ${r.status}</span>`;
     } else if (r.status === 'Revize İstendi') {
       return `<span class="badge status-revision" title="Birime eksik teknik şartname veya bilgi bildirildi, revize bekleniyor">⚠️ Revize İstendi</span>`;
+    } else if (r.status === 'Rektörlük Onayında') {
+      return `<span class="badge status-rektorluk" title="Rektörlük / Üst Yönetim Onayında">🏛️ Rektörlük Onayında</span>`;
+    } else if (r.status === 'Sözleşme Aşamasında') {
+      return `<span class="badge status-sozlesme" title="Sözleşme Hazırlık & Hukuk Aşamasında">📑 Sözleşme Aşamasında</span>`;
+    } else if (r.status === 'Sipariş Verildi' || r.orderBarcode || r.orderDate) {
+      return `<span class="badge status-siparis" title="Sipariş geçildi, teslimat bekleniyor">🚚 Sipariş Verildi</span>`;
     } else {
-      if (r.orderBarcode || r.orderDate) {
-        return `<span class="badge priority-yüksek" style="background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5);" title="Sipariş geçildi, teslimat bekleniyor">🚚 Sipariş Verildi</span>`;
-      } else if (r._diffDays >= 14) {
+      if (r._diffDays >= 14) {
         return `<span class="badge badge-sla-overdue" title="14 günden fazla süredir işlem bekliyor!">🚨 ${r._diffDays} Gün (SLA Gecikmede)</span>`;
       } else if (r._diffDays >= 8) {
         return `<span class="badge priority-yüksek">🟠 ${r._diffDays} Gün Bekliyor</span>`;
       } else {
-        return `<span class="badge status-open">🔵 Açık / Teklif Aşamasında</span>`;
+        return `<span class="badge status-open">🔵 Açık / İşlemde</span>`;
       }
     }
   },
@@ -3188,9 +3210,9 @@ async init() {
 
     // Update Request Management KPI Totals
     const reqTotal = allFilteredRequests.length;
-    const reqOpen = allFilteredRequests.filter(r => r.status === 'Açık').length;
+    const reqOpen = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal').length;
     const reqCompleted = allFilteredRequests.filter(r => r.status === 'Tamamlandı').length;
-    const reqOverdue = allFilteredRequests.filter(r => r.status === 'Açık' && r._diffDays >= 14).length;
+    const reqOverdue = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal' && r._diffDays >= 14).length;
 
     const elReqTotal = document.getElementById('req-kpi-total');
     const elReqOpen = document.getElementById('req-kpi-open');
@@ -3214,7 +3236,7 @@ async init() {
     requests = requests.filter(r => {
 
       if (statusVal === 'OVERDUE_14') {
-        if (r.status !== 'Açık' || r._diffDays < 14) return false;
+        if (r.status === 'Tamamlandı' || r.status === 'Reddedildi' || r.status === 'İptal' || r._diffDays < 14) return false;
       } else if (statusVal !== 'ALL' && r.status !== statusVal) {
         return false;
       }
@@ -3318,9 +3340,9 @@ async init() {
       if (personMap[pName]) {
         const p = personMap[pName];
         p.total++;
-        if (r.status === 'Açık') p.open++;
+        if (r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal') p.open++;
         if (r.status === 'Tamamlandı') p.completed++;
-        if (r.status === 'Reddedildi') p.rejected++;
+        if (r.status === 'Reddedildi' || r.status === 'İptal') p.rejected++;
         if (r.priority === 'Kritik') p.critical++;
         if (r.priority === 'Yüksek') p.high++;
 
@@ -3435,7 +3457,7 @@ async init() {
     const unitVal = document.getElementById('filter-delegation-unit')?.value || 'ALL';
     const priorityVal = document.getElementById('filter-delegation-priority')?.value || 'ALL';
 
-    let filtered = requests.filter(r => r.status === 'Açık');
+    let filtered = requests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal');
 
     if (fromPerson !== 'ALL') {
       filtered = filtered.filter(r => (r.assignedTo || 'Henüz Atanmadı') === fromPerson);
@@ -3524,9 +3546,9 @@ async init() {
 
     // Update KPI Card Totals
     const myTotal = allMyRequests.length;
-    const myOpen = allMyRequests.filter(r => r.status === 'Açık').length;
+    const myOpen = allMyRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal').length;
     const myCompleted = allMyRequests.filter(r => r.status === 'Tamamlandı').length;
-    const myOverdue = allMyRequests.filter(r => r.status === 'Açık' && r._diffDays >= 14).length;
+    const myOverdue = allMyRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal' && r._diffDays >= 14).length;
 
     const elTotal = document.getElementById('my-kpi-total');
     const elOpen = document.getElementById('my-kpi-open');
@@ -3548,7 +3570,7 @@ async init() {
 
     requests = requests.filter(r => {
       if (statusVal === 'OVERDUE_14') {
-        if (r.status !== 'Açık' || r._diffDays < 14) return false;
+        if (r.status === 'Tamamlandı' || r.status === 'Reddedildi' || r.status === 'İptal' || r._diffDays < 14) return false;
       } else if (statusVal !== 'ALL' && r.status !== statusVal) {
         return false;
       }
@@ -9323,7 +9345,7 @@ async init() {
       priority: priority,
       purchaseType: purchaseType,
       regulation: reg,
-      status: 'Açık',
+      status: document.getElementById('nr-status')?.value || 'Açık',
       estimatedAmount: estAmt,
       budgetAmount: estAmt,
       actualAmount: 0,
@@ -9349,6 +9371,9 @@ async init() {
     const todayStr = new Date().toISOString().split('T')[0];
     const dateInput = document.getElementById('nr-arrival-date');
     if (dateInput) dateInput.value = todayStr;
+
+    const statusSelect = document.getElementById('nr-status');
+    if (statusSelect) statusSelect.value = 'Açık';
 
     const assignedSelect = document.getElementById('nr-assigned-to');
     if (assignedSelect) assignedSelect.value = 'Henüz Atanmadı';
