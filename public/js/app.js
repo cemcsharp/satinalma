@@ -92,8 +92,10 @@ async init() {
           document.getElementById('app').style.display = 'flex';
           this.updateUserProfileCard();
           await this.fetchInitialData();
-          const savedView = localStorage.getItem('activeView') || 'dashboard';
-          this.switchView(savedView);
+          const hashView = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+          const validViews = ['dashboard', 'requests', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
+          const savedView = (hashView && validViews.includes(hashView)) ? hashView : (localStorage.getItem('activeView') || 'dashboard');
+          this.switchView(savedView, true);
           this.handleHashRoute();
           return;
         }
@@ -577,26 +579,28 @@ async init() {
     const hash = window.location.hash;
     if (!hash) return;
 
-    if (hash.startsWith('#request/')) {
-      const reqId = parseInt(hash.replace('#request/', ''));
+    if (hash.startsWith('#request/') || hash.startsWith('#/request/')) {
+      const reqId = parseInt(hash.replace(/^#\/?request\//, ''));
       if (!isNaN(reqId)) {
-        this.switchView('requests');
+        this.switchView('requests', true);
         setTimeout(() => this.viewRequestDetails(reqId), 150);
-        history.replaceState(null, null, window.location.pathname + window.location.search);
       }
-    } else if (hash.startsWith('#contract/')) {
-      const contractId = parseInt(hash.replace('#contract/', ''));
+    } else if (hash.startsWith('#contract/') || hash.startsWith('#/contract/')) {
+      const contractId = parseInt(hash.replace(/^#\/?contract\//, ''));
       if (!isNaN(contractId)) {
-        this.switchView('contracts');
+        this.switchView('contracts', true);
         setTimeout(() => this.viewContractDetails(contractId), 150);
-        history.replaceState(null, null, window.location.pathname + window.location.search);
       }
-    } else if (hash.startsWith('#invoice/')) {
-      const invoiceId = parseInt(hash.replace('#invoice/', ''));
+    } else if (hash.startsWith('#invoice/') || hash.startsWith('#/invoice/')) {
+      const invoiceId = parseInt(hash.replace(/^#\/?invoice\//, ''));
       if (!isNaN(invoiceId)) {
-        this.switchView('invoices');
+        this.switchView('invoices', true);
         setTimeout(() => this.viewInvoiceDetails(invoiceId), 150);
-        history.replaceState(null, null, window.location.pathname + window.location.search);
+      }
+    } else if (hash.startsWith('#/')) {
+      const viewName = hash.replace(/^#\//, '').split('/')[0];
+      if (viewName && viewName !== this.state.currentView) {
+        this.switchView(viewName, true);
       }
     }
   },
@@ -689,6 +693,30 @@ async init() {
   },
 
   bindEvents() {
+    // 🌐 Tarayıcı Geri / İleri (Back / Forward) ve Sağ Tık Geri Desteği (SPA History Engine)
+    window.addEventListener('popstate', (e) => {
+      // Açık modal varsa önce modalı kapat
+      const openModals = document.querySelectorAll('.modal');
+      let closedAny = false;
+      openModals.forEach(m => {
+        if (m.style.display === 'block' || m.style.display === 'flex') {
+          m.style.display = 'none';
+          closedAny = true;
+        }
+      });
+
+      if (e.state && e.state.view) {
+        this.switchView(e.state.view, true);
+      } else {
+        const hash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+        if (hash && hash !== '') {
+          this.switchView(hash, true);
+        } else {
+          this.switchView('dashboard', true);
+        }
+      }
+    });
+
     window.addEventListener('hashchange', () => this.handleHashRoute());
 
     // Portal Search Input Listener
@@ -1552,12 +1580,20 @@ async init() {
     if (document.getElementById('filter-logs-user')) document.getElementById('filter-logs-user').value = 'ALL';
   },
 
-  switchView(viewName) {
+  switchView(viewName, fromHistory = false) {
     // Restrict Settings view to ADMIN only
     if (viewName === 'settings' && this.state.currentUser?.role !== 'ADMIN') {
       this.showToast('Ayarlar sayfasına erişim sadece Satınalma Yöneticisi (ADMIN) yetkisine açıktır.', 'warning', '🔒');
       this.switchView('dashboard');
       return;
+    }
+
+    // Push browser history state for back/forward navigation
+    if (!fromHistory && window.history && window.history.pushState) {
+      const targetHash = `#/${viewName}`;
+      if (window.location.hash !== targetHash) {
+        window.history.pushState({ view: viewName }, '', targetHash);
+      }
     }
 
     this.toggleMobileSidebar(true);
