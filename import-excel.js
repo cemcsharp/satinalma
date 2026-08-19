@@ -192,7 +192,8 @@ async function importExcel() {
       await client.query('INSERT INTO regulations (name) VALUES ($1) ON CONFLICT DO NOTHING', [reg]);
     }
 
-    console.log('📥 Talepler veritabanına aktarılıyor...');
+    console.log('📥 Talepler tablosu temizlenip güncel Excel verileri aktarılıyor...');
+    await client.query('TRUNCATE TABLE requests RESTART IDENTITY CASCADE');
     let importedCount = 0;
     for (const req of requests) {
       const keys = Object.keys(req);
