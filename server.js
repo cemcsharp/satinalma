@@ -2229,10 +2229,10 @@ const server = http.createServer(async (req, res) => {
         if (method === 'DELETE' && parts[2]) {
           const id = parseInt(parts[2], 10);
 
-          // Talep silme yetkisi sadece ADMIN kullanıcılar içindir
-          if (table === 'requests' && currentUser?.role !== 'ADMIN') {
+          // Talep ve kullanıcı silme yetkisi sadece ADMIN kullanıcılar içindir
+          if ((table === 'requests' || table === 'users') && currentUser?.role !== 'ADMIN') {
             res.writeHead(403);
-            res.end(JSON.stringify({ error: 'Talep silme işlemi sadece Yönetici (ADMIN) yetkisine sahip kullanıcılar tarafından yapılabilir.' }));
+            res.end(JSON.stringify({ error: 'Bu silme işlemi sadece Satınalma Yöneticisi (ADMIN) yetkisine sahip kullanıcılar tarafından yapılabilir.' }));
             return;
           }
 
@@ -2621,16 +2621,6 @@ async function initDatabaseSchema() {
           ['Cem TUR', 'Satınalma Mdr. Yrd.', 'ADMIN', true, hashPassword('123456')]
         );
       }
-    }
-
-    // Ensure Yönetici (EXECUTIVE) user exists in database on every startup
-    const execUserRes = await pool.query("SELECT id FROM users WHERE role = 'EXECUTIVE' OR name ILIKE '%Yönetici%' OR name ILIKE '%Kurumsal Yönetim%'");
-    if (execUserRes.rowCount === 0) {
-      await pool.query(
-        'INSERT INTO users (name, title, role, "isActive", password, email) VALUES ($1, $2, $3, $4, $5, $6)',
-        ['Yönetici', 'Üst Yönetim & İzleme', 'EXECUTIVE', true, hashPassword('123456'), 'yonetim@pirireis.edu.tr']
-      );
-      console.log('👑 Yönetici (EXECUTIVE) kullanıcısı başarıyla veritabanına eklendi!');
     }
   } catch (err) {
     console.error('Veritabanı ilklendirme hatası:', err.message);

@@ -62,14 +62,7 @@
           <div class="form-group" style="margin-bottom: 1.1rem;">
             <label style="font-size:0.8rem; font-weight:700;">Personel Seçin</label>
             <select id="login-screen-user-select" name="userSelect" autocomplete="off" required>
-              <option value="">-- Lütfen Personel Seçin --</option>
-              <option value="exec">🏛️ Yönetici - Üst Yönetim & İzleme</option>
-              <option value="1">🛡️ Cem TUR - Satınalma Mdr. Yrd.</option>
-              <option value="2">🛡️ Merih AVCI - Satınalma Müdürü</option>
-              <option value="3">👤 Gülsüm YILDIRIM - Satınalma Kd. Uz.</option>
-              <option value="4">👤 Sultan MERİÇ - Satınalma Uzmanı</option>
-              <option value="5">👤 Caner TÜRKMEN - IT Uzmanı</option>
-              <option value="6">👤 Hilal AKYOL - Satınalma Asistanı</option>
+              <option value="">-- Lütfen Personel / Yönetici Seçin --</option>
             </select>
           </div>
 
@@ -2634,16 +2627,23 @@
         </div>
 
         <div class="form-group" style="margin-bottom: 1rem;">
-          <label>Sistem Rolü <span class="required">*</span></label>
+          <label>Sistem Rolü & Yetki Düzeyi <span class="required">*</span></label>
           <select id="um-role">
-            <option value="STAFF">STAFF (Satınalma Personeli)</option>
-            <option value="ADMIN">ADMIN (Satınalma Müdürü / Yrd.)</option>
+            <option value="STAFF">👤 Satınalma Uzmanı (Standart Operasyon Yetkisi)</option>
+            <option value="ADMIN">🛡️ Satınalma Yöneticisi (Tam Yetki, Silme & Ayarlar)</option>
+            <option value="EXECUTIVE">🏛️ Yönetici / Üst Yönetim (İzleme & Raporlama Modu)</option>
           </select>
+          <small style="display:block; margin-top:0.35rem; font-size:0.75rem; color:var(--text-muted); line-height: 1.4;">
+            • <strong>Satınalma Uzmanı:</strong> Talep, sipariş, fatura, sözleşme ve teminat işlemlerini yürütür.<br>
+            • <strong>Satınalma Yöneticisi:</strong> Personel yönetimi, silme, ayarlar ve tüm operasyona tam yetkilidir.<br>
+            • <strong>Yönetici (Üst Yönetim):</strong> Tüm üniversite verilerini ve analizleri inceler, Excel/PDF indirebilir; veri değiştiremez/silemez.
+          </small>
         </div>
 
         <div class="form-group" style="margin-bottom: 1rem;">
-          <label>Giriş Şifresi <span class="required">*</span></label>
-          <input type="text" id="um-password" required placeholder="ör: 123">
+          <label>Giriş Şifresi</label>
+          <input type="text" id="um-password" placeholder="Şifre belirleyin (Boş bırakılırsa: 123456)">
+          <small id="um-password-help" style="font-size:0.73rem; color:var(--text-muted); display:block; margin-top:0.2rem;">Mevcut personeli düzenlerken şifreyi korumak için boş bırakabilirsiniz.</small>
         </div>
 
         <div class="form-group" style="margin-bottom: 1rem;">

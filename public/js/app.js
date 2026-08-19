@@ -195,8 +195,14 @@ async init() {
       { id: 6, name: 'Hilal AKYOL', title: 'Satınalma Asistanı', role: 'USER', isActive: true }
     ];
 
-    const sortedUsers = [...usersList].sort((a,b) => (b.isActive?1:0) - (a.isActive?1:0));
-    let html = '<option value="">-- Lütfen Personel Seçin --</option>';
+    const sortedUsers = [...usersList].sort((a,b) => {
+      if ((b.isActive !== false ? 1 : 0) !== (a.isActive !== false ? 1 : 0)) {
+        return (b.isActive !== false ? 1 : 0) - (a.isActive !== false ? 1 : 0);
+      }
+      return (a.id || 0) - (b.id || 0);
+    });
+
+    let html = '<option value="">-- Lütfen Personel / Yönetici Seçin --</option>';
     sortedUsers.forEach(u => {
       const statusLabel = u.isActive !== false ? '' : ' (Pasif/Ayrıldı)';
       let roleIcon = '👤';
@@ -7117,19 +7123,28 @@ async init() {
     if (tbody) {
       tbody.innerHTML = this.state.users.map(u => {
         const isActive = u.isActive !== false;
+        let roleBadge = '<span class="badge priority-orta">👤 Satınalma Uzmanı</span>';
+        if (u.role === 'ADMIN') {
+          roleBadge = '<span class="badge priority-kritik">🛡️ Satınalma Yöneticisi (ADMIN)</span>';
+        } else if (u.role === 'EXECUTIVE') {
+          roleBadge = '<span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:700; border:1px solid rgba(245,158,11,0.35);">🏛️ Üst Yönetim (EXECUTIVE)</span>';
+        }
         return `
           <tr>
-            <td style="font-weight:700;">${u.name}</td>
-            <td>${u.title}</td>
-            <td><span class="badge priority-${u.role === 'ADMIN' ? 'kritik' : 'orta'}">${u.role}</span></td>
+            <td>
+              <div style="font-weight:700;">${u.name}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">${u.email || '-'}</div>
+            </td>
+            <td style="font-weight:600;">${u.title}</td>
+            <td>${roleBadge}</td>
             <td><span class="badge status-${isActive ? 'active' : 'passive'}">${isActive ? '🟢 Aktif' : '🔴 Pasif (Ayrıldı)'}</span></td>
             <td>
               <div class="action-btns">
-                <button class="btn-icon" onclick="App.openUserModal(${u.id})" title="Düzenle / Şifre Değiştir">✏️</button>
+                <button class="btn-icon" onclick="App.openUserModal(${u.id})" title="Düzenle / Rol & Şifre Değiştir">✏️</button>
                 <button class="btn-icon" onclick="App.toggleUserStatus(${u.id})" title="${isActive ? 'Pasif Yap' : 'Aktif Yap'}">
                   ${isActive ? '🔴' : '🟢'}
                 </button>
-                <button class="btn-icon" onclick="App.deleteUser(${u.id})" title="Sil">🗑️</button>
+                <button class="btn-icon" onclick="App.deleteUser(${u.id})" title="Kullanıcıyı Sil">🗑️</button>
               </div>
             </td>
           </tr>
@@ -8618,16 +8633,19 @@ async init() {
       document.getElementById('um-name').value = u.name;
       document.getElementById('um-title').value = u.title;
       document.getElementById('um-role').value = u.role || 'STAFF';
-      document.getElementById('um-password').value = u.password || '123';
+      document.getElementById('um-password').value = '';
+      document.getElementById('um-password').placeholder = 'Mevcut şifreyi korumak için boş bırakın';
       if (document.getElementById('um-phone')) document.getElementById('um-phone').value = u.phone || '';
       if (document.getElementById('um-email')) document.getElementById('um-email').value = u.email || '';
       document.getElementById('um-is-active').value = (u.isActive !== false).toString();
-      document.getElementById('user-modal-title').innerText = `✏️ Personel Düzenle (${u.name})`;
+      document.getElementById('user-modal-title').innerText = `✏️ Kullanıcı / Personel Düzenle (${u.name})`;
     } else {
       document.getElementById('um-id').value = '';
       document.getElementById('form-user-manage').reset();
-      document.getElementById('um-password').value = '123';
-      document.getElementById('user-modal-title').innerText = '➕ Yeni Personel Ekle';
+      document.getElementById('um-role').value = 'STAFF';
+      document.getElementById('um-password').value = '';
+      document.getElementById('um-password').placeholder = 'Şifre belirleyin (Boşsa: 123456)';
+      document.getElementById('user-modal-title').innerText = '➕ Yeni Kullanıcı / Personel Ekle';
     }
     this.openModal('modal-user-form');
   },
@@ -8638,7 +8656,7 @@ async init() {
     const name = document.getElementById('um-name').value.trim();
     const title = document.getElementById('um-title').value.trim();
     const role = document.getElementById('um-role').value;
-    const password = document.getElementById('um-password').value.trim() || '123';
+    const passwordInput = document.getElementById('um-password').value.trim();
     const phone = document.getElementById('um-phone')?.value.trim() || '';
     const email = document.getElementById('um-email')?.value.trim() || '';
     const isActive = document.getElementById('um-is-active').value === 'true';
@@ -8649,10 +8667,14 @@ async init() {
         u.name = name;
         u.title = title;
         u.role = role;
-        u.password = password;
         u.phone = phone;
         u.email = email;
         u.isActive = isActive;
+        if (passwordInput !== '') {
+          u.password = passwordInput;
+        } else {
+          delete u.password; // boşsa mevcut şifreyi koru
+        }
         await this.apiSync('users', 'PUT', u);
       }
     } else {
@@ -8662,7 +8684,7 @@ async init() {
         name: name,
         title: title,
         role: role,
-        password: password,
+        password: passwordInput || '123456',
         phone: phone,
         email: email,
         isActive: isActive
@@ -8672,7 +8694,7 @@ async init() {
       this.state.users.push(newUser);
     }
 
-    this.showToast("Personel bilgileri başarıyla kaydedildi!", "success");
+    this.showToast("Kullanıcı bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     this.populateLoginDropdown();
     this.populateDropdowns();
