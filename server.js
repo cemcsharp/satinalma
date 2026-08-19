@@ -2622,6 +2622,27 @@ async function initDatabaseSchema() {
         );
       }
     }
+
+    // 🛡️ YÖNETİCİ VE ÜST YÖNETİM ROLLERİNİ GARANTİ ALTINA AL
+    await pool.query(`
+      UPDATE users 
+      SET role = 'ADMIN', title = COALESCE(NULLIF(title, ''), 'Satınalma Mdr. Yrd.')
+      WHERE (LOWER(name) LIKE '%cem%' OR LOWER(name) LIKE '%türkmen%') AND role != 'ADMIN'
+    `).catch(() => {});
+
+    await pool.query(`
+      UPDATE users 
+      SET role = 'ADMIN', title = COALESCE(NULLIF(title, ''), 'Satınalma Şube Müdürü')
+      WHERE LOWER(name) LIKE '%merih%' AND role != 'ADMIN'
+    `).catch(() => {});
+
+    const execCheck = await pool.query("SELECT id FROM users WHERE role = 'EXECUTIVE' LIMIT 1").catch(() => ({ rowCount: 0 }));
+    if (execCheck.rowCount === 0) {
+      await pool.query(
+        'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
+        ['Rektörlük / Üst Yönetim', 'Rektörlük & Genel Sekreterlik', 'EXECUTIVE', true, hashPassword('123456')]
+      ).catch(() => {});
+    }
   } catch (err) {
     console.error('Veritabanı ilklendirme hatası:', err.message);
   }

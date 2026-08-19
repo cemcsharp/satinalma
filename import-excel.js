@@ -165,11 +165,28 @@ async function importExcel() {
     }
 
     for (const usr of usersSet) {
+      let role = 'STAFF';
+      let title = 'Satınalma Uzmanı';
+      const usrLower = usr.toLowerCase();
+      if (usrLower.includes('cem') || usrLower.includes('türkmen')) {
+        role = 'ADMIN';
+        title = 'Satınalma Mdr. Yrd.';
+      } else if (usrLower.includes('merih')) {
+        role = 'ADMIN';
+        title = 'Satınalma Şube Müdürü';
+      }
+
       await client.query(
         'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
-        [usr, 'Satınalma Uzmanı', 'STAFF', true, '123456']
+        [usr, title, role, true, '123456']
       );
     }
+
+    // Üst Yönetim (Executive) kullanıcısını otomatik ekle
+    await client.query(
+      'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
+      ['Rektörlük / Üst Yönetim', 'Rektörlük & Genel Sekreterlik', 'EXECUTIVE', true, '123456']
+    );
 
     for (const reg of regulationsSet) {
       await client.query('INSERT INTO regulations (name) VALUES ($1) ON CONFLICT DO NOTHING', [reg]);
