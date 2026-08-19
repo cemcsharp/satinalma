@@ -3301,6 +3301,106 @@ async init() {
     }
   },
 
+  renderDashboardMonthlyTrend(requests) {
+    const months = ['Eyl', 'Eki', 'Kas', 'Ara', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu'];
+    const monthlyCounts = Array(12).fill(0);
+    const monthlySpend = Array(12).fill(0);
+
+    requests.forEach(r => {
+      const dStr = r.arrivalDate || r.requestDate;
+      if (dStr) {
+        let m = -1;
+        if (dStr.includes('-')) m = parseInt(dStr.split('-')[1]) - 1;
+        else if (dStr.includes('.')) m = parseInt(dStr.split('.')[1]) - 1;
+        if (m >= 0 && m < 12) {
+          const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
+          monthlyCounts[acadIdx]++;
+          monthlySpend[acadIdx] += (parseFloat(r.actualAmount) || parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0);
+        }
+      }
+    });
+
+    this.createOrUpdateChart('chart-monthly-trend', 'line', {
+      labels: months,
+      datasets: [
+        {
+          label: 'Açılan Talep Sayısı',
+          data: monthlyCounts,
+          borderColor: '#8b5cf6',
+          backgroundColor: 'rgba(139, 92, 246, 0.12)',
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointBackgroundColor: '#8b5cf6',
+          yAxisID: 'y'
+        }
+      ]
+    }, {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11, weight: '600' } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${ctx.raw} Talep`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          beginAtZero: true,
+          grid: { color: 'rgba(0, 0, 0, 0.05)' },
+          ticks: { font: { size: 10 }, precision: 0 }
+        }
+      }
+    });
+  },
+
+  renderDashboardCategoryDonut(requests) {
+    const categoryMap = { 'Mal Alımı': 0, 'Hizmet Alımı': 0, 'Doğrudan Temin': 0, 'İhale': 0, 'Diğer': 0 };
+
+    requests.forEach(r => {
+      const type = (r.purchaseType || '').toLowerCase();
+      const amt = parseFloat(r.actualAmount) || parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0;
+      if (type.includes('mal')) categoryMap['Mal Alımı'] += (amt || 1);
+      else if (type.includes('hizmet')) categoryMap['Hizmet Alımı'] += (amt || 1);
+      else if (type.includes('doğrudan') || type.includes('dogrudan')) categoryMap['Doğrudan Temin'] += (amt || 1);
+      else if (type.includes('ihale')) categoryMap['İhale'] += (amt || 1);
+      else categoryMap['Diğer'] += (amt || 1);
+    });
+
+    const labels = Object.keys(categoryMap);
+    const dataValues = Object.values(categoryMap);
+
+    this.createOrUpdateChart('chart-category-donut', 'doughnut', {
+      labels: labels,
+      datasets: [{
+        data: dataValues,
+        backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#06b6d4'],
+        borderWidth: 2,
+        borderColor: 'var(--bg-card, #ffffff)'
+      }]
+    }, {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, weight: '600' }, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.label}: ${Number(ctx.raw || 0).toLocaleString('tr-TR')} ₺`
+          }
+        }
+      },
+      cutout: '65%'
+    });
+  },
+
   createOrUpdateChart(canvasId, type, data, options) {
     if (this.state.charts[canvasId]) {
       this.state.charts[canvasId].destroy();
