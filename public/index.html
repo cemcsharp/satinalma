@@ -264,8 +264,8 @@
       <!-- 1. DASHBOARD VIEW (ZENGİN & GÖRSEL SATINALMA YÖNETİM KOKPİTİ) -->
       <section id="view-dashboard" class="view-section">
         
-        <!-- SIRA 1: 6 BOYUTLU STRATEJİK FİNANS, TALEP, HIZ & GÜVENCE GÖSTERGESİ -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <!-- SIRA 1: 4 TEMEL STRATEJİK FİNANS, TALEP & HIZ GÖSTERGESİ -->
+        <div class="grid-4" style="margin-bottom: 1.5rem;">
           <!-- 1.1 Toplam Satınalma Hacmi -->
           <div class="glass-card kpi-card" style="border-left: 4px solid var(--accent-primary);">
             <div class="kpi-icon blue">💰</div>
@@ -306,26 +306,6 @@
               </div>
               <p>Ort. Temin Hızı (SLA)</p>
               <div class="kpi-sub" id="dash-macro-sla-sub">Talep -> Sipariş Süresi</div>
-            </div>
-          </div>
-
-          <!-- 1.5 Fatura & Ödeme Yükü -->
-          <div class="glass-card kpi-card" style="border-left: 4px solid #06b6d4; cursor: pointer;" onclick="App.switchView('invoices')" title="Faturaları Görüntüle">
-            <div class="kpi-icon blue">🧾</div>
-            <div class="kpi-data">
-              <h3 id="dash-macro-invoices" style="color: #0891b2;">0 ₺</h3>
-              <p>Ödenmemiş Faturalar</p>
-              <div class="kpi-sub" id="dash-macro-invoices-sub">0 Bekleyen Fatura</div>
-            </div>
-          </div>
-
-          <!-- 1.6 Kasadaki Teminat Güvencesi -->
-          <div class="glass-card kpi-card" style="border-left: 4px solid #eab308; cursor: pointer;" onclick="App.switchView('guarantees')" title="Teminat Mektuplarını Aç">
-            <div class="kpi-icon yellow">🛡️</div>
-            <div class="kpi-data">
-              <h3 id="dash-macro-guarantees" style="color: #d97706;">0 ₺</h3>
-              <p>Kasadaki Teminat</p>
-              <div class="kpi-sub" id="dash-macro-guarantees-sub">0 Aktif Sözleşme / Mektup</div>
             </div>
           </div>
         </div>
@@ -525,17 +505,14 @@
             </div>
           </div>
 
-          <!-- SAĞ: 📑 Sözleşmeler & Teminat Mektupları Özeti -->
+          <!-- SAĞ: 📑 Sözleşmeler & Durum Özeti -->
           <div class="dashboard-section-box" style="margin-bottom: 0;">
             <div class="dashboard-section-header">
               <div class="section-title-group">
-                <h3>📑 Sözleşme & Teminat Mektupları</h3>
-                <p>Kurumsal sözleşme süreleri, yaklaşan bitişler ve kasa teminatları</p>
+                <h3>📑 Sözleşme Yönetimi & Durum Özeti</h3>
+                <p>Aktif, süresi yaklaşan ve tamamlanmış kurumsal sözleşmeler</p>
               </div>
-              <div style="display: flex; gap: 0.35rem;">
-                <button class="btn-secondary" onclick="App.switchView('contracts')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Sözleşmeler &rarr;</button>
-                <button class="btn-secondary" onclick="App.switchView('guarantees')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Teminatlar &rarr;</button>
-              </div>
+              <button class="btn-secondary" onclick="App.switchView('contracts')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Sözleşmeler &rarr;</button>
             </div>
 
             <!-- Sözleşme Sayısal Sayaçları -->
@@ -550,24 +527,24 @@
                 <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #d97706;" id="dash-cont-stat-expiring">0</div>
                 <div style="font-size: 0.7rem; color: #d97706; font-weight: 600;">Yenileme</div>
               </div>
-              <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">🛡️ Kasa Teminatı</div>
-                <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #10b981;" id="dash-cont-stat-guarantee">0 Mektup</div>
-                <div style="font-size: 0.7rem; color: #10b981; font-weight: 600;" id="dash-cont-amt-guarantee">0 ₺</div>
+              <div style="background: rgba(100, 116, 139, 0.08); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">🔒 Kapanan Sözleşme</div>
+                <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: var(--text-muted);" id="dash-cont-stat-closed">0</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Kapatıldı</div>
               </div>
             </div>
 
-            <!-- Sözleşme & Teminat Mini Tablosu -->
+            <!-- Sözleşme Mini Tablosu -->
             <div class="dashboard-mini-table-wrapper">
               <table class="dashboard-mini-table" id="dash-table-expiring-contracts">
                 <thead>
                   <tr>
-                    <th>Sözleşme / Kod</th>
-                    <th>Konu</th>
-                    <th>Yüklenici</th>
-                    <th>Bitiş / Vade</th>
-                    <th style="text-align: right;">Teminat</th>
+                    <th>Sözleşme No</th>
+                    <th>Konu / Kapsam</th>
+                    <th>Yüklenici Firma</th>
+                    <th>Bitiş Tarihi</th>
                     <th style="text-align: right;">Sözleşme Bedeli</th>
+                    <th style="text-align: center;">Durum</th>
                   </tr>
                 </thead>
                 <tbody>

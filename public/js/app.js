@@ -2809,34 +2809,6 @@ async init() {
       }
     }
     if (elSlaSub) elSlaSub.innerText = `Talep -> Sipariş (${measuredTurnaroundCount} Ölçüm)`;
-
-    // 1.5 Fatura & Ödeme Yükü
-    let unpaidInvoicesVolume = 0;
-    let unpaidInvoicesCount = 0;
-    invoices.forEach(i => {
-      if (i.paymentStatus !== 'Ödendi') {
-        unpaidInvoicesVolume += (i.amount || 0);
-        unpaidInvoicesCount++;
-      }
-    });
-    const elInvoices = document.getElementById('dash-macro-invoices');
-    const elInvoicesSub = document.getElementById('dash-macro-invoices-sub');
-    if (elInvoices) elInvoices.innerText = this.formatMoney(unpaidInvoicesVolume, 'TRY', 0);
-    if (elInvoicesSub) elInvoicesSub.innerText = `${unpaidInvoicesCount} Bekleyen Fatura`;
-
-    // 1.6 Kasadaki Teminat Güvencesi
-    let activeGuaranteesVolume = 0;
-    let activeGuaranteesCount = 0;
-    guarantees.forEach(g => {
-      if (g.status === 'Aktif' || g.status === 'Vadesi Yaklaşan') {
-        activeGuaranteesVolume += (g.amount || 0);
-        activeGuaranteesCount++;
-      }
-    });
-    const elGuaranteesTotal = document.getElementById('dash-macro-guarantees');
-    const elGuaranteesSub = document.getElementById('dash-macro-guarantees-sub');
-    if (elGuaranteesTotal) elGuaranteesTotal.innerText = this.formatMoney(activeGuaranteesVolume, 'TRY', 0);
-    if (elGuaranteesSub) elGuaranteesSub.innerText = `${activeGuaranteesCount} Aktif Teminat Mektubu`;
   },
 
   renderDashboardRequestsSummary(requests) {
@@ -3127,22 +3099,24 @@ async init() {
     let vaultGuaranteesCount = 0, vaultGuaranteesAmount = 0;
 
     contracts.forEach(c => {
-      if (c.status === 'Aktif' || c.status === 'Süresiz') {
+      const isClosed = (c.status === 'Tamamlandı' || c.status === 'Pasif' || c.status === 'Feshedildi' || c.status === 'İptal');
+      if (isClosed) {
+        closedContractsCount++;
+      } else {
         activeContractsCount++;
         activeContractsAmount += (c.contractAmount || 0);
         if (c.endDate) {
           const dEnd = new Date(c.endDate);
           dEnd.setHours(0,0,0,0);
           const diff = Math.ceil((dEnd - today) / (1000 * 60 * 60 * 24));
-          if (diff > 0 && diff <= 30) expiring30ContractsCount++;
+          if (diff <= 0) {
+            closedContractsCount++;
+            activeContractsCount--;
+            activeContractsAmount -= (c.contractAmount || 0);
+          } else if (diff <= 30) {
+            expiring30ContractsCount++;
+          }
         }
-      }
-    });
-
-    guarantees.forEach(g => {
-      if (g.status === 'Aktif' || g.status === 'Vadesi Yaklaşan') {
-        vaultGuaranteesCount++;
-        vaultGuaranteesAmount += (g.amount || 0);
       }
     });
 
@@ -3150,34 +3124,46 @@ async init() {
     setVal('dash-cont-stat-active', `${activeContractsCount} Sözleşme`);
     setVal('dash-cont-amt-active', this.formatMoney(activeContractsAmount, 'TRY', 0));
     setVal('dash-cont-stat-expiring', `${expiring30ContractsCount} Sözleşme`);
-    setVal('dash-cont-stat-guarantee', `${vaultGuaranteesCount} Mektup`);
-    setVal('dash-cont-amt-guarantee', this.formatMoney(vaultGuaranteesAmount, 'TRY', 0));
+    setVal('dash-cont-stat-closed', `${closedContractsCount} Sözleşme`);
 
-    // Mini Table: Top 5 contracts / guarantees
-    const criticalContracts = [...contracts].filter(c => c.status === 'Aktif').slice(0, 5);
+    // Mini Table: Top 5 contracts
+    const displayContracts = [...contracts].sort((a, b) => {
+      if (a.status === 'Aktif' && b.status !== 'Aktif') return -1;
+      if (b.status === 'Aktif' && a.status !== 'Aktif') return 1;
+      return 0;
+    }).slice(0, 5);
+
     const tbody = document.querySelector('#dash-table-expiring-contracts tbody');
     if (tbody) {
-      if (criticalContracts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Aktif sözleşme kaydı bulunamadı.</td></tr>';
+      if (displayContracts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Sözleşme kaydı bulunamadı.</td></tr>';
       } else {
-        tbody.innerHTML = criticalContracts.map(c => {
+        tbody.innerHTML = displayContracts.map(c => {
           let dateBadge = c.endDate || 'Süresiz';
-          if (c.endDate) {
+          let statusBadge = `<span class="badge status-completed" style="font-size:0.68rem;">Aktif</span>`;
+          if (c.status === 'Tamamlandı' || c.status === 'Pasif' || c.status === 'Feshedildi') {
+            statusBadge = `<span class="badge" style="background:var(--bg-hover); color:var(--text-muted); font-size:0.68rem;">Kapandı</span>`;
+          } else if (c.endDate) {
             const dEnd = new Date(c.endDate);
             dEnd.setHours(0,0,0,0);
             const diff = Math.ceil((dEnd - today) / (1000 * 60 * 60 * 24));
-            if (diff <= 30 && diff > 0) dateBadge = `<span class="badge priority-orta" style="font-size:0.68rem;">🟠 ${diff} Gün</span>`;
-            else if (diff <= 0) dateBadge = `<span class="badge priority-kritik" style="font-size:0.68rem;">🔴 Süresi Doldu</span>`;
+            if (diff <= 0) {
+              dateBadge = `<span class="badge priority-kritik" style="font-size:0.68rem;">🔴 Süresi Doldu</span>`;
+              statusBadge = `<span class="badge priority-kritik" style="font-size:0.68rem;">Bitti</span>`;
+            } else if (diff <= 30) {
+              dateBadge = `<span class="badge priority-orta" style="font-size:0.68rem;">🟠 ${diff} Gün</span>`;
+              statusBadge = `<span class="badge priority-orta" style="font-size:0.68rem;">Yenileme</span>`;
+            }
           }
 
           return `
             <tr>
               <td><strong style="font-family:var(--font-mono); color:var(--accent-primary); font-size:0.8rem;">${c.contractNo || `#${c.id}`}</strong></td>
-              <td><div style="font-weight:600; max-width:130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.subject}">${c.subject}</div></td>
-              <td><div style="font-size:0.78rem; color:var(--text-muted); max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.supplier}">${c.supplier || '-'}</div></td>
+              <td><div style="font-weight:600; max-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.subject}">${c.subject}</div></td>
+              <td><div style="font-size:0.78rem; color:var(--text-muted); max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.supplier}">${c.supplier || '-'}</div></td>
               <td>${dateBadge}</td>
-              <td style="text-align:right; font-family:var(--font-mono); font-size:0.8rem; color:#d97706;">${c.guaranteeAmount > 0 ? this.formatMoney(c.guaranteeAmount, 'TRY', 0) : '-'}</td>
               <td style="text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--text-main);">${this.formatMoney(c.contractAmount || 0, c.currency || 'TRY', 0)}</td>
+              <td style="text-align:center;">${statusBadge}</td>
             </tr>
           `;
         }).join('');
