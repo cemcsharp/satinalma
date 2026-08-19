@@ -1074,6 +1074,21 @@ async init() {
     document.getElementById('form-user-manage')?.addEventListener('submit', (e) => this.handleSaveUser(e));
     document.getElementById('form-unit-edit')?.addEventListener('submit', (e) => this.handleSaveEditUnit(e));
     document.getElementById('form-contract-manage')?.addEventListener('submit', (e) => this.handleSaveContract(e));
+    
+    // Auto-update contract sequence year if user changes start date on a new contract
+    document.getElementById('cm-start-date')?.addEventListener('change', (e) => {
+      const cmId = document.getElementById('cm-id')?.value;
+      if (!cmId && e.target.value) {
+        const d = new Date(e.target.value);
+        if (!isNaN(d.getTime())) {
+          const yr = d.getFullYear();
+          const curNo = (document.getElementById('cm-no')?.value || '').trim();
+          if (!curNo || curNo.startsWith('PRU-SOZ-')) {
+            document.getElementById('cm-no').value = this.generateNextContractNo(yr);
+          }
+        }
+      }
+    });
     document.getElementById('form-guarantee-manage')?.addEventListener('submit', (e) => this.handleSaveGuarantee(e));
     document.getElementById('form-invoice-manage')?.addEventListener('submit', (e) => this.handleSaveInvoice(e));
     document.getElementById('form-tender-manage')?.addEventListener('submit', (e) => this.handleSaveTender(e));
@@ -3724,6 +3739,46 @@ async init() {
     }).join('');
   },
 
+  generateNextContractNo(targetYear = null) {
+    const yr = targetYear || new Date().getFullYear();
+    const contracts = this.state.contracts || [];
+    
+    // Find all contract numbers for this year and parse the highest sequence
+    let maxSeq = 0;
+    const regex = new RegExp(`(?:PRU-)?(?:SOZ-)?${yr}-(\\d+)`, 'i');
+    const regexSimple = new RegExp(`${yr}\\/(\\d+)`, 'i');
+
+    contracts.forEach(c => {
+      const cNo = (c.contractNo || '').trim();
+      let match = cNo.match(regex);
+      if (!match) match = cNo.match(regexSimple);
+      if (match && match[1]) {
+        const seq = parseInt(match[1], 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    });
+
+    const nextSeq = maxSeq + 1;
+    return `PRU-SOZ-${yr}-${String(nextSeq).padStart(3, '0')}`;
+  },
+
+  autoFillNextContractNo() {
+    const startDate = document.getElementById('cm-start-date')?.value;
+    let yr = null;
+    if (startDate) {
+      const d = new Date(startDate);
+      if (!isNaN(d.getTime())) yr = d.getFullYear();
+    }
+    const nextNo = this.generateNextContractNo(yr);
+    const noInput = document.getElementById('cm-no');
+    if (noInput) {
+      noInput.value = nextNo;
+      this.showToast(`Sıradaki otomatik sözleşme kodu atandı: ${nextNo}`, "info", "⚡");
+    }
+  },
+
   openContractModal(contractId = null) {
     if (contractId) {
       const c = this.state.contracts.find(item => String(item.id) === String(contractId));
@@ -3756,6 +3811,10 @@ async init() {
     } else {
       document.getElementById('cm-id').value = '';
       document.getElementById('form-contract-manage').reset();
+      
+      const autoNo = this.generateNextContractNo();
+      document.getElementById('cm-no').value = autoNo;
+
       this.onAmountInput(document.getElementById('cm-amount'), 'cm-currency', true);
       this.onAmountInput(document.getElementById('cm-guarantee-amount'), 'cm-currency');
       document.getElementById('contract-modal-title').innerText = '➕ Yeni Sözleşme Oluştur';
@@ -3766,7 +3825,18 @@ async init() {
   async handleSaveContract(e) {
     e.preventDefault();
     const id = document.getElementById('cm-id').value;
-    const contractNo = document.getElementById('cm-no').value.trim();
+    let contractNo = document.getElementById('cm-no').value.trim();
+    if (!contractNo) {
+      contractNo = this.generateNextContractNo();
+    }
+
+    // Duplicate Check: Check if another contract already has this contract number
+    const isDuplicate = (this.state.contracts || []).some(item => String(item.id) !== String(id) && (item.contractNo || '').toLowerCase().trim() === contractNo.toLowerCase());
+    if (isDuplicate) {
+      this.showToast(`⚠️ "${contractNo}" numaralı sözleşme zaten kayıtlı! Lütfen farklı bir numara belirleyin.`, "warning", "⚠️");
+      return;
+    }
+
     const supplier = document.getElementById('cm-supplier').value.trim();
     const title = document.getElementById('cm-title').value.trim();
     const unit = document.getElementById('cm-unit').value;
