@@ -527,10 +527,32 @@ async init() {
     if (!user) return;
 
     const isExec = user.role === 'EXECUTIVE';
+    const isAdmin = user.role === 'ADMIN';
+
     if (isExec) {
       document.body.classList.add('role-executive');
     } else {
       document.body.classList.remove('role-executive');
+    }
+
+    if (!isAdmin) {
+      document.body.classList.add('role-non-admin');
+    } else {
+      document.body.classList.remove('role-non-admin');
+    }
+
+    // Toggle Settings menu item visibility (ADMIN only)
+    const settingsNavItem = document.querySelector('li[data-view="settings"]');
+    if (settingsNavItem) {
+      settingsNavItem.style.display = isAdmin ? '' : 'none';
+    }
+
+    // Topbar live rates button (only opens settings if ADMIN)
+    const ratesPill = document.getElementById('topbar-rates-pill');
+    if (ratesPill) {
+      ratesPill.style.cursor = isAdmin ? 'pointer' : 'default';
+      ratesPill.title = isAdmin ? 'TCMB Canlı Döviz Kurları (Ayarları Açmak İçin Tıklayın)' : 'TCMB Canlı Döviz Kurları';
+      ratesPill.onclick = isAdmin ? () => this.switchView('settings') : null;
     }
 
     const execBadge = document.getElementById('badge-executive-banner');
@@ -1531,6 +1553,13 @@ async init() {
   },
 
   switchView(viewName) {
+    // Restrict Settings view to ADMIN only
+    if (viewName === 'settings' && this.state.currentUser?.role !== 'ADMIN') {
+      this.showToast('Ayarlar sayfasına erişim sadece Satınalma Yöneticisi (ADMIN) yetkisine açıktır.', 'warning', '🔒');
+      this.switchView('dashboard');
+      return;
+    }
+
     this.toggleMobileSidebar(true);
     this.state.currentView = viewName;
     localStorage.setItem('activeView', viewName);

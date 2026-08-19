@@ -3320,7 +3320,10 @@ body.role-executive #btn-save-rates,
 body.role-executive #btn-save-rates-custom,
 body.role-executive #btn-vp-rate-now,
 body.role-executive li[data-view="delegation"],
-body.role-executive li[data-view="settings"],
+body.role-non-admin li[data-view="settings"],
+body.role-executive li[data-view="settings"] {
+  display: none !important;
+}
 body.role-executive .btn-delete-action,
 body.role-executive .btn-edit-action,
 body.role-executive .chk-invoice-item,
