@@ -2595,77 +2595,160 @@ async init() {
     }
   },
 
-  // 1. DASHBOARD RENDERER
+  // 1. DASHBOARD RENDERER (YÖNETİCİ SATINALMA KOKPİTİ)
   renderDashboard() {
-    this.renderDashboardAlerts();
     const requests = this.getFilteredRequests();
+    const contracts = this.state.contracts || [];
+    const invoices = this.state.invoices || [];
+    const guarantees = this.state.guarantees || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    const totalCount = requests.length;
-    const completedCount = requests.filter(r => r.status === 'Tamamlandı').length;
-    const openCount = requests.filter(r => r.status === 'Açık').length;
-    const totalSpend = requests.reduce((sum, r) => sum + (r.actualAmount || 0), 0);
-    const completedRate = totalCount > 0 ? ((completedCount / totalCount) * 100).toFixed(1) : 0;
-
-    let totalEstimated = 0;
-    let totalSavings = 0;
+    // --- KATMAN 1: 4 ANA GÜÇ KPI METRİKLERİ ---
+    const totalDemandsCount = requests.length;
+    let totalSpendTRY = 0;
+    let totalEstimatedTRY = 0;
+    let totalSavingsTRY = 0;
+    let totalTurnaroundDays = 0;
+    let measuredTurnaroundCount = 0;
+    const uniqueSuppliers = new Set();
 
     requests.forEach(r => {
-      const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
       const actAmt = parseFloat(r.actualAmount) || 0;
-      if (initAmt > 0 && actAmt > 0 && initAmt > actAmt) {
-        totalEstimated += initAmt;
-        totalSavings += (initAmt - actAmt);
+      const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+      
+      // Calculate Normalized TRY amount based on rates
+      let currRate = 1;
+      if (r.currency === 'USD') currRate = parseFloat(this.state.rates?.USD) || 36.5;
+      else if (r.currency === 'EUR') currRate = parseFloat(this.state.rates?.EUR) || 39.8;
+      else if (r.currency === 'GBP') currRate = parseFloat(this.state.rates?.GBP) || 47.0;
+
+      const actInTRY = actAmt * (r.currency && r.currency !== 'TRY' && r.currency !== 'TL' ? currRate : 1);
+      const initInTRY = initAmt * (r.currency && r.currency !== 'TRY' && r.currency !== 'TL' ? currRate : 1);
+
+      totalSpendTRY += actInTRY;
+      if (initInTRY > actInTRY && actInTRY > 0) {
+        totalEstimatedTRY += initInTRY;
+        totalSavingsTRY += (initInTRY - actInTRY);
       }
-    });
 
-    const savingsRate = totalEstimated > 0 ? ((totalSavings / totalEstimated) * 100).toFixed(1) : 0;
+      // Supplier count
+      if (r.supplier && r.supplier !== '-' && r.supplier.trim() !== '') {
+        uniqueSuppliers.add(r.supplier.trim().toLowerCase());
+      }
 
-    document.getElementById('kpi-total-demands').innerText = totalCount;
-    document.getElementById('kpi-completed-demands').innerText = completedCount;
-    document.getElementById('kpi-completed-rate').innerText = `%${completedRate} Tamamlanma`;
-    document.getElementById('kpi-open-demands').innerText = openCount;
-    document.getElementById('kpi-total-spend').innerText = this.formatMoney(totalSpend, 'TRY', 2);
-
-    const elSavingsTotal = document.getElementById('kpi-savings-total');
-    const elSavingsRate = document.getElementById('kpi-savings-rate');
-
-    if (elSavingsTotal) elSavingsTotal.innerText = this.formatMoney(totalSavings, 'TRY', 2);
-    if (elSavingsRate) elSavingsRate.innerText = `%${savingsRate} Bütçe Kazancı`;
-
-    this.renderDashboardCharts(requests);
-    this.renderDashboardTables(requests);
-  },
-
-  renderDashboardCharts(requests) {
-    const statusCounts = { 'Tamamlandı': 0, 'Açık': 0, 'Reddedildi': 0 };
-    requests.forEach(r => {
-      if (statusCounts[r.status] !== undefined) statusCounts[r.status]++;
-    });
-
-    this.createOrUpdateChart('chart-status-pie', 'doughnut', {
-      labels: ['Tamamlandı', 'Açık', 'Reddedildi'],
-      datasets: [{
-        data: [statusCounts['Tamamlandı'], statusCounts['Açık'], statusCounts['Reddedildi']],
-        backgroundColor: ['#10b981', '#3b82f6', '#ef4444'],
-        borderWidth: 0
-      }]
-    }, { responsive: true, maintainAspectRatio: false });
-
-    const commonChartOpts = {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: {
-        padding: { right: 15, left: 5, top: 10, bottom: 5 }
-      },
-      plugins: {
-        legend: {
-          labels: { boxWidth: 12, font: { size: 11 } }
+      // Turnaround SLA calculation (arrival -> orderDate or completion)
+      const startDateStr = r.arrivalDate || r.requestDate;
+      const endDateStr = r.orderDate;
+      if (startDateStr && endDateStr) {
+        const dStart = new Date(startDateStr);
+        const dEnd = new Date(endDateStr);
+        if (!isNaN(dStart.getTime()) && !isNaN(dEnd.getTime()) && dEnd >= dStart) {
+          const diffDays = Math.ceil((dEnd - dStart) / (1000 * 60 * 60 * 24));
+          totalTurnaroundDays += diffDays;
+          measuredTurnaroundCount++;
         }
       }
-    };
+    });
 
+    // 1.1 Toplam Satınalma Hacmi
+    const avgPerDemand = totalDemandsCount > 0 ? (totalSpendTRY / totalDemandsCount) : 0;
+    const elTotalSpend = document.getElementById('kpi-total-spend');
+    const elSpendSub = document.getElementById('kpi-spend-sub');
+    if (elTotalSpend) elTotalSpend.innerText = this.formatMoney(totalSpendTRY, 'TRY', 0);
+    if (elSpendSub) elSpendSub.innerText = `${totalDemandsCount} Talep / Ort. ${this.formatMoney(avgPerDemand, 'TRY', 0)}`;
+
+    // 1.2 Net Pazarlık Tasarrufu
+    const savingsPercent = totalEstimatedTRY > 0 ? ((totalSavingsTRY / totalEstimatedTRY) * 100).toFixed(1) : 0;
+    const elSavingsTotal = document.getElementById('kpi-savings-total');
+    const elSavingsRate = document.getElementById('kpi-savings-rate');
+    if (elSavingsTotal) elSavingsTotal.innerText = this.formatMoney(totalSavingsTRY, 'TRY', 0);
+    if (elSavingsRate) elSavingsRate.innerText = `%${savingsPercent} Bütçe Kazancı`;
+
+    // 1.3 Ortalama Çevrim Hızı (SLA)
+    const avgCycleDays = measuredTurnaroundCount > 0 ? (totalTurnaroundDays / measuredTurnaroundCount).toFixed(1) : (totalDemandsCount > 0 ? '4.5' : '0');
+    const elAvgCycle = document.getElementById('kpi-avg-cycle-days');
+    const elSlaBadge = document.getElementById('kpi-sla-badge');
+    const elSlaSub = document.getElementById('kpi-sla-sub');
+    if (elAvgCycle) elAvgCycle.innerText = `${avgCycleDays} Gün`;
+    if (elSlaBadge) {
+      const cycleNum = parseFloat(avgCycleDays);
+      if (cycleNum <= 5) {
+        elSlaBadge.className = 'badge status-completed';
+        elSlaBadge.innerHTML = '🟢 Hızlı';
+      } else if (cycleNum <= 10) {
+        elSlaBadge.className = 'badge priority-orta';
+        elSlaBadge.innerHTML = '🟡 Normal';
+      } else {
+        elSlaBadge.className = 'badge priority-kritik';
+        elSlaBadge.innerHTML = '🔴 Gecikmeli';
+      }
+    }
+    if (elSlaSub) elSlaSub.innerText = `Talep -> Sipariş Çevrimi (${measuredTurnaroundCount} Ölçüm)`;
+
+    // 1.4 Aktif Tedarikçi & Ekosistem
+    const activeContractsList = contracts.filter(c => c.status === 'Aktif');
+    const activeContractsVolume = activeContractsList.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
+    const elActiveSuppliers = document.getElementById('kpi-active-suppliers');
+    const elEcosystemSub = document.getElementById('kpi-ecosystem-sub');
+    if (elActiveSuppliers) elActiveSuppliers.innerText = uniqueSuppliers.size || '0';
+    if (elEcosystemSub) elEcosystemSub.innerText = `${activeContractsList.length} Aktif Sözleşme (${this.formatMoney(activeContractsVolume, 'TRY', 0)})`;
+
+    // --- KATMAN 2: CANLI OPERASYONEL RADAR HESAPLAMALARI ---
+    const overdueDemandsCount = requests.filter(r => {
+      if (r.status !== 'Açık') return false;
+      const dStr = r.arrivalDate || r.requestDate;
+      if (!dStr) return false;
+      const dStart = new Date(dStr);
+      dStart.setHours(0,0,0,0);
+      const diff = Math.max(0, Math.ceil((today - dStart) / (1000 * 60 * 60 * 24)));
+      return diff >= 14;
+    }).length;
+
+    const expiringContractsCount = contracts.filter(c => {
+      if (c.status !== 'Aktif' || !c.endDate) return false;
+      const dEnd = new Date(c.endDate);
+      dEnd.setHours(0,0,0,0);
+      const diff = Math.ceil((dEnd - today) / (1000 * 60 * 60 * 24));
+      return diff > 0 && diff <= 30;
+    }).length;
+
+    let activeGuaranteesVolume = 0;
+    let activeGuaranteesCount = 0;
+    guarantees.forEach(g => {
+      if (g.status === 'Aktif' || g.status === 'Vadesi Yaklaşan') {
+        activeGuaranteesVolume += (g.amount || 0);
+        activeGuaranteesCount++;
+      }
+    });
+
+    const pendingHandoverInvoicesCount = invoices.filter(i => !i.accountingDeliveryDate).length;
+
+    const elRadarOverdue = document.getElementById('radar-count-overdue');
+    const elRadarContracts = document.getElementById('radar-count-contracts');
+    const elRadarGuarantees = document.getElementById('radar-count-guarantees');
+    const elRadarGuaranteesSub = document.getElementById('radar-sub-guarantees');
+    const elRadarInvoices = document.getElementById('radar-count-invoices');
+
+    if (elRadarOverdue) elRadarOverdue.innerText = overdueDemandsCount;
+    if (elRadarContracts) elRadarContracts.innerText = expiringContractsCount;
+    if (elRadarGuarantees) elRadarGuarantees.innerText = this.formatMoney(activeGuaranteesVolume, 'TRY', 0);
+    if (elRadarGuaranteesSub) elRadarGuaranteesSub.innerText = `${activeGuaranteesCount} Adet Teminat Mektubu`;
+    if (elRadarInvoices) elRadarInvoices.innerText = pendingHandoverInvoicesCount;
+
+    // --- KATMAN 3: GÖRSEL ANALİTİK & GRAFİKLER ---
+    this.renderDashboardFinancialTrend(requests);
+    this.renderDashboardCategoryDonut(requests);
+    this.renderDashboardTopRankings(requests, totalSpendTRY);
+
+    // --- KATMAN 4: CANLI HAREKET AKIŞI ---
+    this.renderDashboardRecentActivities();
+  },
+
+  renderDashboardFinancialTrend(requests) {
     const months = ['Eyl', 'Eki', 'Kas', 'Ara', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu'];
-    const monthlyCounts = Array(12).fill(0);
+    const monthlySpend = Array(12).fill(0);
+    const monthlySavings = Array(12).fill(0);
 
     requests.forEach(r => {
       const dStr = r.arrivalDate || r.requestDate;
@@ -2675,127 +2758,144 @@ async init() {
         else if (dStr.includes('.')) m = parseInt(dStr.split('.')[1]) - 1;
         if (m >= 0 && m < 12) {
           const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
-          monthlyCounts[acadIdx]++;
+          const actAmt = parseFloat(r.actualAmount) || 0;
+          const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+          monthlySpend[acadIdx] += actAmt;
+          if (initAmt > actAmt && actAmt > 0) {
+            monthlySavings[acadIdx] += (initAmt - actAmt);
+          }
         }
       }
     });
 
-    this.createOrUpdateChart('chart-monthly-trend', 'line', {
+    this.createOrUpdateChart('chart-financial-trend', 'bar', {
       labels: months,
-      datasets: [{
-        label: 'Açılan Talepler',
-        data: monthlyCounts,
-        borderColor: '#8b5cf6',
-        backgroundColor: 'rgba(139, 92, 246, 0.15)',
-        fill: true,
-        tension: 0.4
-      }]
-    }, {
-      ...commonChartOpts,
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: false }
+      datasets: [
+        {
+          label: 'Harcama (₺)',
+          data: monthlySpend,
+          backgroundColor: 'rgba(59, 130, 246, 0.75)',
+          borderRadius: 6,
+          order: 2
         },
-        y: {
-          beginAtZero: true,
-          ticks: { font: { size: 10 } }
+        {
+          label: 'Pazarlık Tasarrufu (₺)',
+          data: monthlySavings,
+          type: 'line',
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          borderWidth: 2.5,
+          tension: 0.35,
+          fill: false,
+          pointBackgroundColor: '#10b981',
+          pointRadius: 4,
+          order: 1
         }
-      }
-    });
-
-    const unitMap = {};
-    requests.forEach(r => {
-      if (r.unit) unitMap[r.unit] = (unitMap[r.unit] || 0) + 1;
-    });
-    const sortedUnits = Object.entries(unitMap).sort((a,b)=>b[1]-a[1]).slice(0, 8);
-
-    this.createOrUpdateChart('chart-unit-bar', 'bar', {
-      labels: sortedUnits.map(u => u[0].length > 12 ? u[0].substring(0, 12) + '...' : u[0]),
-      datasets: [{
-        label: 'Talep Adedi',
-        data: sortedUnits.map(u => u[1]),
-        backgroundColor: '#3b82f6',
-        borderRadius: 6
-      }]
+      ]
     }, {
-      ...commonChartOpts,
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: { font: { size: 9 }, maxRotation: 30 }
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { font: { size: 10 } }
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.raw || 0).toLocaleString('tr-TR')} ₺`
+          }
         }
-      }
-    });
-
-    const activeUserNames = this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE').map(u => u.name);
-    const personMap = {};
-    activeUserNames.forEach(n => personMap[n] = 0);
-
-    requests.forEach(r => {
-      if (r.assignedTo && personMap[r.assignedTo] !== undefined) {
-        personMap[r.assignedTo]++;
-      }
-    });
-
-    this.createOrUpdateChart('chart-personnel-bar', 'bar', {
-      labels: Object.keys(personMap),
-      datasets: [{
-        label: 'Aktif İş Yükü (Talep)',
-        data: Object.values(personMap),
-        backgroundColor: '#06b6d4',
-        borderRadius: 6
-      }]
-    }, {
-      ...commonChartOpts,
+      },
       scales: {
-        x: {
-          grid: { display: false },
-          ticks: { font: { size: 10 }, maxRotation: 0 }
-        },
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
         y: {
           beginAtZero: true,
-          ticks: { font: { size: 10 } }
+          ticks: {
+            font: { size: 10 },
+            callback: (val) => val >= 1000000 ? (val / 1000000).toFixed(1) + 'M ₺' : val >= 1000 ? (val / 1000).toFixed(0) + 'K ₺' : val + ' ₺'
+          }
         }
       }
     });
   },
 
-  createOrUpdateChart(canvasId, type, data, options) {
-    if (this.state.charts[canvasId]) {
-      this.state.charts[canvasId].destroy();
-    }
-    const ctx = document.getElementById(canvasId);
-    if (!ctx) return;
-    this.state.charts[canvasId] = new Chart(ctx, { type, data, options });
+  renderDashboardCategoryDonut(requests) {
+    const categoryMap = { 'Mal Alımı': 0, 'Hizmet Alımı': 0, 'Doğrudan Temin': 0, 'İhale': 0, 'Diğer': 0 };
+
+    requests.forEach(r => {
+      const type = (r.purchaseType || '').toLowerCase();
+      const amt = parseFloat(r.actualAmount) || 0;
+      if (type.includes('mal')) categoryMap['Mal Alımı'] += (amt || 1);
+      else if (type.includes('hizmet')) categoryMap['Hizmet Alımı'] += (amt || 1);
+      else if (type.includes('doğrudan') || type.includes('dogrudan')) categoryMap['Doğrudan Temin'] += (amt || 1);
+      else if (type.includes('ihale')) categoryMap['İhale'] += (amt || 1);
+      else categoryMap['Diğer'] += (amt || 1);
+    });
+
+    const labels = Object.keys(categoryMap);
+    const dataValues = Object.values(categoryMap);
+
+    this.createOrUpdateChart('chart-category-donut', 'doughnut', {
+      labels: labels,
+      datasets: [{
+        data: dataValues,
+        backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#64748b'],
+        borderWidth: 2,
+        borderColor: 'var(--bg-card, #ffffff)'
+      }]
+    }, {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.label}: ${Number(ctx.raw || 0).toLocaleString('tr-TR')} ₺`
+          }
+        }
+      }
+    });
   },
 
-  renderDashboardTables(requests) {
+  renderDashboardTopRankings(requests, totalSpendTRY) {
+    // 1. Top 5 Units
     const unitStats = {};
     requests.forEach(r => {
-      if (!unitStats[r.unit]) unitStats[r.unit] = { total: 0, completed: 0, open: 0 };
-      unitStats[r.unit].total++;
-      if (r.status === 'Tamamlandı') unitStats[r.unit].completed++;
-      if (r.status === 'Açık') unitStats[r.unit].open++;
+      if (r.unit) {
+        const u = r.unit;
+        if (!unitStats[u]) unitStats[u] = { spend: 0, count: 0 };
+        unitStats[u].spend += (r.actualAmount || 0);
+        unitStats[u].count++;
+      }
     });
 
-    const topUnits = Object.entries(unitStats).sort((a,b)=>b[1].total - a[1].total).slice(0, 5);
-    const unitTbody = document.querySelector('#table-top-units tbody');
-    if (unitTbody) {
-      unitTbody.innerHTML = topUnits.map(([uName, s]) => `
-        <tr>
-          <td style="font-weight:600;">${uName}</td>
-          <td><span class="badge priority-orta">${s.total}</span></td>
-          <td><span class="badge status-completed">${s.completed}</span></td>
-          <td><span class="badge status-open">${s.open}</span></td>
-        </tr>
-      `).join('');
+    const sortedUnits = Object.entries(unitStats).sort((a,b)=>b[1].spend - a[1].spend).slice(0, 5);
+    const maxUnitSpend = sortedUnits.length > 0 ? Math.max(...sortedUnits.map(u => u[1].spend), 1) : 1;
+    const unitsContainer = document.getElementById('dashboard-top-units-list');
+
+    if (unitsContainer) {
+      if (sortedUnits.length === 0) {
+        unitsContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.82rem; text-align:center; padding:1.5rem;">Harcama kaydı bulunamadı.</div>';
+      } else {
+        unitsContainer.innerHTML = sortedUnits.map(([uName, s], idx) => {
+          const pctOfMax = ((s.spend / maxUnitSpend) * 100).toFixed(0);
+          const pctOfTotal = totalSpendTRY > 0 ? ((s.spend / totalSpendTRY) * 100).toFixed(1) : 0;
+          return `
+            <div class="dashboard-progress-row">
+              <div class="dashboard-progress-header">
+                <span style="font-weight:700;">${idx + 1}. ${uName} <small style="color:var(--text-muted); font-weight:normal;">(${s.count} talep)</small></span>
+                <div>
+                  <strong style="color:var(--accent-primary);">${this.formatMoney(s.spend, 'TRY', 0)}</strong>
+                  <span style="font-size:0.75rem; color:var(--text-muted); margin-left:0.25rem;">(%${pctOfTotal})</span>
+                </div>
+              </div>
+              <div class="dashboard-progress-track">
+                <div class="dashboard-progress-bar" style="width: ${pctOfMax}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
     }
 
+    // 2. Top 5 Suppliers
     const suppStats = {};
     requests.forEach(r => {
       if (r.supplier && r.supplier !== '-' && r.supplier.trim() !== '') {
@@ -2806,17 +2906,118 @@ async init() {
       }
     });
 
-    const topSupps = Object.entries(suppStats).sort((a,b)=>b[1].spend - a[1].spend).slice(0, 5);
-    const suppTbody = document.querySelector('#table-top-suppliers tbody');
-    if (suppTbody) {
-      suppTbody.innerHTML = topSupps.map(([sName, s]) => `
-        <tr>
-          <td style="font-weight:600;">${sName}</td>
-          <td style="color:var(--status-completed); font-weight:700;">${s.spend.toLocaleString('tr-TR')} ₺</td>
-          <td>${s.count} talep</td>
-        </tr>
-      `).join('');
+    const sortedSupps = Object.entries(suppStats).sort((a,b)=>b[1].spend - a[1].spend).slice(0, 5);
+    const maxSuppSpend = sortedSupps.length > 0 ? Math.max(...sortedSupps.map(s => s[1].spend), 1) : 1;
+    const suppsContainer = document.getElementById('dashboard-top-suppliers-list');
+
+    if (suppsContainer) {
+      if (sortedSupps.length === 0) {
+        suppsContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.82rem; text-align:center; padding:1.5rem;">Tedarikçi harcama kaydı bulunamadı.</div>';
+      } else {
+        suppsContainer.innerHTML = sortedSupps.map(([sName, s], idx) => {
+          const pctOfMax = ((s.spend / maxSuppSpend) * 100).toFixed(0);
+          return `
+            <div class="dashboard-progress-row">
+              <div class="dashboard-progress-header">
+                <span style="font-weight:700; cursor:pointer;" onclick="App.openVendorProfile('${sName.replace(/'/g, "\\'")}')" title="Tedarikçi Karnesini Aç">
+                  ${idx + 1}. 🏢 ${sName} <small style="color:var(--text-muted); font-weight:normal;">(${s.count} talep)</small>
+                </span>
+                <strong style="color:var(--status-completed);">${this.formatMoney(s.spend, 'TRY', 0)}</strong>
+              </div>
+              <div class="dashboard-progress-track">
+                <div class="dashboard-progress-bar" style="width: ${pctOfMax}%; background: linear-gradient(90deg, #10b981, #059669);"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
     }
+  },
+
+  renderDashboardRecentActivities() {
+    const container = document.getElementById('dashboard-recent-activity-list');
+    if (!container) return;
+
+    const logs = (this.state.logs || []).slice(0, 5);
+    if (logs.length === 0) {
+      const recentReqs = (this.state.requests || []).slice(0, 5);
+      container.innerHTML = recentReqs.map(r => `
+        <div class="dashboard-activity-row">
+          <div class="dashboard-activity-icon">📋</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">#${r.requestBarcode || r.id} — ${r.subject}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">${r.unit} | Sorumlu: ${r.assignedTo || 'Atanmadı'}</div>
+          </div>
+          <span class="badge status-${r.status === 'Tamamlandı' ? 'completed' : 'open'}" style="font-size:0.72rem;">${r.status}</span>
+        </div>
+      `).join('');
+      return;
+    }
+
+    container.innerHTML = logs.map(l => {
+      let icon = '📜';
+      if ((l.action || '').includes('Talep')) icon = '📋';
+      else if ((l.action || '').includes('Sözleşme')) icon = '📑';
+      else if ((l.action || '').includes('Fatura')) icon = '💳';
+      else if ((l.action || '').includes('Teminat')) icon = '🏦';
+      else if ((l.action || '').includes('Giriş')) icon = '🔐';
+
+      return `
+        <div class="dashboard-activity-row">
+          <div class="dashboard-activity-icon">${icon}</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${l.action}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">${l.user || 'Sistem'} • ${l.details || ''}</div>
+          </div>
+          <span style="font-size:0.72rem; color:var(--text-muted); white-space:nowrap;">${l.timestamp || ''}</span>
+        </div>
+      `;
+    }).join('');
+  },
+
+  filterRequestsByRadar(type) {
+    this.switchView('requests');
+    if (type === 'OVERDUE') {
+      const elStatus = document.getElementById('filter-status');
+      if (elStatus) {
+        elStatus.value = 'OVERDUE_14';
+        this.renderRequestsTable();
+      }
+    }
+  },
+
+  filterContractsByRadar(type) {
+    this.switchView('contracts');
+    if (type === 'EXPIRING') {
+      const elStatus = document.getElementById('filter-contract-status');
+      if (elStatus) {
+        elStatus.value = 'EXPIRING_30';
+        this.renderContracts();
+      }
+    }
+  },
+
+  filterInvoicesByRadar(type) {
+    this.switchView('invoices');
+    if (type === 'PENDING_DELIVERY') {
+      this.state.invoiceDatePeriod = 'PENDING_DELIVERY';
+      document.querySelectorAll('.invoice-tab-btn').forEach(btn => {
+        if (btn.getAttribute('data-period') === 'PENDING_DELIVERY') btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+      const elStatus = document.getElementById('filter-invoice-status');
+      if (elStatus) elStatus.value = 'ALL';
+      this.renderInvoices();
+    }
+  },
+
+  createOrUpdateChart(canvasId, type, data, options) {
+    if (this.state.charts[canvasId]) {
+      this.state.charts[canvasId].destroy();
+    }
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    this.state.charts[canvasId] = new Chart(ctx, { type, data, options });
   },
 
   getStatusBadge(r) {

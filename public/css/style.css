@@ -3316,14 +3316,207 @@ body.role-executive #btn-open-bulk-modal,
 body.role-executive #btn-import-excel,
 body.role-executive #btn-backup-now,
 body.role-executive #btn-restore-backup,
+#sidebar-overlay.show {
+  display: block !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+@media (max-width: 992px) {
+  /* 1. Sidebar off-canvas drawer (Override collapsed state completely on mobile) */
+  aside.sidebar,
+  aside.sidebar.collapsed,
+  body.sidebar-collapsed aside.sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 280px !important;
+    max-width: 85vw !important;
+    z-index: 9999 !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.7) !important;
+    background-color: var(--bg-sidebar) !important;
+  }
+
+  aside.sidebar.mobile-open,
+  aside.sidebar.collapsed.mobile-open,
+  body.sidebar-collapsed aside.sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  #btn-sidebar-toggle {
+    display: none !important;
+  }
+
+  aside.sidebar.collapsed .brand-text,
+  aside.sidebar.collapsed .nav-section-title,
+  aside.sidebar.collapsed .nav-item button span:not(.nav-icon),
+  aside.sidebar.collapsed .user-details,
+  aside.sidebar.collapsed #btn-logout {
+    display: flex !important;
+  }
+
+  aside.sidebar.collapsed .brand {
+    justify-content: flex-start !important;
+  }
+
+  aside.sidebar.collapsed .nav-item button {
+    justify-content: flex-start !important;
+    padding: 0.65rem 0.8rem !important;
+  }
+
+  aside.sidebar.collapsed .nav-item .nav-icon {
+    margin-right: 0.75rem !important;
+  }
+
+  /* 2. Main Content Full Width */
+  main.main-content,
+  aside.sidebar.collapsed + main.main-content,
+  body.sidebar-collapsed main.main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1rem 0.85rem 5rem 0.85rem !important;
+    min-height: 100vh !important;
+  }
+
+  /* 3. Hamburger Button in Top Header */
+  .btn-mobile-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-size: 1.3rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--transition-fast);
+  }
+  .btn-mobile-toggle:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-primary);
+  }
+
+  /* 4. Top Header Flexibility */
+  header.top-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.85rem !important;
+    padding-bottom: 0.85rem !important;
+  }
+
+  .header-left-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+  }
+
+  .header-title h2 {
+    font-size: 1.25rem !important;
+  }
+  .header-title p {
+    font-size: 0.75rem !important;
+  }
+
+  .header-controls {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.6rem !important;
+    width: 100% !important;
+  }
+
+  .top-search-container {
+    width: 100% !important;
+    order: 1 !important;
+  }
+  .top-search-container .search-input-box {
+    width: 100% !important;
+  }
+
+  .topbar-rates-pill {
+    font-size: 0.76rem !important;
+    padding: 0.35rem 0.65rem !important;
+  }
+
+  #btn-open-new-request {
+    margin-left: auto !important;
+    padding: 0.5rem 0.85rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* 5. Filter Bars and Search */
+  .filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.65rem !important;
+  }
+  .filter-bar .search-input-box,
+  .filter-bar select,
+  .filter-bar .filter-group {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  /* 6. Grids and Cards */
+  .grid-4, .grid-3, .grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+  }
+
+  /* 7. Tables Overflow Scrolling */
+  .table-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: var(--radius-sm) !important;
+    margin: 0.5rem 0 !important;
+  }
+
+  table.custom-table {
+    min-width: 650px !important;
+  }
+
+  /* 8. Modals Mobile Fit */
+  .modal-overlay {
+    padding: 0.5rem !important;
+    align-items: flex-start !important;
+  }
+  .modal-content {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0.5rem 0 !important;
+    padding: 1.25rem 1rem !important;
+    border-radius: var(--radius-md) !important;
+  }
+  .modal-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 👑 Kurumsal Yönetici (EXECUTIVE - Read-Only) Role Rules */
+body.role-executive #btn-open-new-request,
+body.role-executive #btn-open-add-contract,
+body.role-executive #btn-open-add-guarantee,
+body.role-executive #btn-open-add-invoice,
+body.role-executive #btn-open-add-tender,
+body.role-executive #btn-open-bulk-modal,
+body.role-executive #btn-import-excel,
+body.role-executive #btn-backup-now,
+body.role-executive #btn-restore-backup,
 body.role-executive #btn-save-rates,
 body.role-executive #btn-save-rates-custom,
 body.role-executive #btn-vp-rate-now,
 body.role-executive li[data-view="delegation"],
 body.role-non-admin li[data-view="settings"],
-body.role-executive li[data-view="settings"] {
-  display: none !important;
-}
+body.role-executive li[data-view="settings"],
 body.role-executive .btn-delete-action,
 body.role-executive .btn-edit-action,
 body.role-executive .chk-invoice-item,
@@ -3334,4 +3527,73 @@ body.role-executive .btn-invoice-handover-action {
 
 body.role-executive .badge-executive-mode {
   display: inline-flex !important;
+}
+
+/* 🚀 Executive Purchasing Cockpit (Modern Dashboard) */
+.radar-pill {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.radar-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.12);
+  border-color: var(--accent-primary) !important;
+}
+
+.dashboard-progress-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dashboard-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.82rem;
+}
+
+.dashboard-progress-track {
+  height: 8px;
+  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.dashboard-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-hover));
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-activity-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  transition: background 0.2s ease;
+}
+
+.dashboard-activity-row:hover {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.dashboard-activity-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  background: rgba(59, 130, 246, 0.12);
+  flex-shrink: 0;
 }

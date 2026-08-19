@@ -255,138 +255,215 @@
 
       <!-- View Containers -->
 
-      <!-- 1. DASHBOARD VIEW -->
+      <!-- 1. DASHBOARD VIEW (YÖNETİCİ SATINALMA KOKPİTİ) -->
       <section id="view-dashboard" class="view-section">
-        <!-- Smart Proactive Alerts Banner (Yaklaşan Vadeler & Alarmlar) -->
-        <div id="dashboard-alerts-container" style="display: none; margin-bottom: 1.25rem;"></div>
-
-        <div class="grid-4" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));">
+        
+        <!-- KATMAN 1: 4 ANA GÜÇ KPI KARTI -->
+        <div class="grid-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom: 1.25rem;">
+          <!-- KPI 1: Toplam Satınalma Hacmi -->
           <div class="glass-card kpi-card">
-            <div class="kpi-icon blue">📋</div>
-            <div class="kpi-data">
-              <h3 id="kpi-total-demands">0</h3>
-              <p>Toplam Talep</p>
-              <div class="kpi-sub" id="kpi-total-sub">Seçili Akademik Yıl</div>
-            </div>
-          </div>
-
-          <div class="glass-card kpi-card">
-            <div class="kpi-icon green">✅</div>
-            <div class="kpi-data">
-              <h3 id="kpi-completed-demands">0</h3>
-              <p>Tamamlanan Talep</p>
-              <div class="kpi-sub" id="kpi-completed-rate">%0 Tamamlanma</div>
-            </div>
-          </div>
-
-          <div class="glass-card kpi-card">
-            <div class="kpi-icon yellow">⏳</div>
-            <div class="kpi-data">
-              <h3 id="kpi-open-demands">0</h3>
-              <p>Açık / Devam Eden</p>
-              <div class="kpi-sub" id="kpi-open-sub">Bekleyen İşler</div>
-            </div>
-          </div>
-
-          <div class="glass-card kpi-card">
-            <div class="kpi-icon purple">💰</div>
+            <div class="kpi-icon blue">💰</div>
             <div class="kpi-data">
               <h3 id="kpi-total-spend">0 ₺</h3>
-              <p>Gerçekleşen Harcama</p>
-              <div class="kpi-sub" id="kpi-spend-sub">Bütçeden İtfa Edilen</div>
+              <p>Toplam Satınalma Hacmi</p>
+              <div class="kpi-sub" id="kpi-spend-sub">0 Talep / Ort. 0 ₺</div>
             </div>
           </div>
 
-          <div class="glass-card kpi-card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.06);">
+          <!-- KPI 2: Net Pazarlık Tasarrufu -->
+          <div class="glass-card kpi-card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);">
             <div class="kpi-icon green">🎯</div>
             <div class="kpi-data">
               <h3 id="kpi-savings-total" style="color: var(--status-completed);">0 ₺</h3>
-              <p style="color: var(--status-completed); font-weight:700;">Pazarlık Tasarrufu (Saving)</p>
+              <p style="color: var(--status-completed); font-weight:700;">Net Pazarlık Tasarrufu</p>
               <div class="kpi-sub" id="kpi-savings-rate" style="color: var(--status-completed); font-weight:600;">%0 Bütçe Kazancı</div>
             </div>
           </div>
-        </div>
 
-        <!-- Charts Grid -->
-        <div class="grid-2">
-          <div class="glass-card">
-            <div class="card-header">
-              <h3>📊 Talep Durum Dağılımı</h3>
-            </div>
-            <div style="height: 205px; position: relative; width: 100%; min-width: 0; overflow: hidden;">
-              <canvas id="chart-status-pie"></canvas>
+          <!-- KPI 3: Ortalama Çevrim Hızı (SLA) -->
+          <div class="glass-card kpi-card" style="border: 1px solid rgba(99, 102, 241, 0.35); background: rgba(99, 102, 241, 0.04);">
+            <div class="kpi-icon purple">⚡</div>
+            <div class="kpi-data">
+              <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                <h3 id="kpi-avg-cycle-days">0 Gün</h3>
+                <span id="kpi-sla-badge" class="badge status-completed" style="font-size:0.72rem; padding:0.15rem 0.45rem;">🟢 Hızlı</span>
+              </div>
+              <p>Ort. Çevrim Hızı (SLA)</p>
+              <div class="kpi-sub" id="kpi-sla-sub">Talep -> Sipariş Süresi</div>
             </div>
           </div>
 
-          <div class="glass-card">
-            <div class="card-header">
-              <h3>📈 Aylık Talep Trendi</h3>
-            </div>
-            <div style="height: 205px; position: relative; width: 100%; min-width: 0; overflow: hidden;">
-              <canvas id="chart-monthly-trend"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid-2">
-          <div class="glass-card">
-            <div class="card-header">
-              <h3>🏢 Birim Bazlı Talep Yoğunluğu (Top 8)</h3>
-            </div>
-            <div style="height: 205px; position: relative; width: 100%; min-width: 0; overflow: hidden;">
-              <canvas id="chart-unit-bar"></canvas>
-            </div>
-          </div>
-
-          <div class="glass-card">
-            <div class="card-header">
-              <h3>⚖️ Aktif Personel İş Yükü Dağılımı</h3>
-            </div>
-            <div style="height: 205px; position: relative; width: 100%; min-width: 0; overflow: hidden;">
-              <canvas id="chart-personnel-bar"></canvas>
+          <!-- KPI 4: Aktif Ekosistem & Güvence -->
+          <div class="glass-card kpi-card">
+            <div class="kpi-icon yellow">🏢</div>
+            <div class="kpi-data">
+              <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                <h3 id="kpi-active-suppliers">0</h3>
+                <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;">Tedarikçi</span>
+              </div>
+              <p>Aktif Tedarikçi & Ekosistem</p>
+              <div class="kpi-sub" id="kpi-ecosystem-sub">0 Aktif Sözleşme</div>
             </div>
           </div>
         </div>
 
-        <!-- Quick Summary Tables -->
-        <div class="grid-2">
-          <div class="glass-card">
-            <div class="card-header">
-              <h3>🏢 En Çok Talep Gönderen Birimler</h3>
+        <!-- KATMAN 2: CANLI OPERASYONEL RADAR (TIKLANABİLİR EYLEM HAPLARI) -->
+        <div class="dashboard-radar-banner" style="margin-bottom: 1.25rem;">
+          <div class="radar-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.1rem;">🚨</span>
+              <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Bugün Dikkat Gerektirenler (Canlı Operasyon Radarı)</h4>
             </div>
-            <div class="table-container">
-              <table class="custom-table" id="table-top-units">
-                <thead>
-                  <tr>
-                    <th>Birim Adı</th>
-                    <th>Talep</th>
-                    <th>Tamamlanan</th>
-                    <th>Açık</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">İlgili modüle gitmek için tıklayınız</span>
           </div>
 
-          <div class="glass-card">
-            <div class="card-header">
-              <h3>🏭 En Yüksek Harcamalı Tedarikçiler</h3>
+          <div class="grid-4" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
+            <div class="glass-card radar-pill" onclick="App.filterRequestsByRadar('OVERDUE')" style="cursor: pointer; padding: 0.75rem 1rem; border-left: 4px solid #ef4444;" title="14 günden uzun süredir açık bekleyen talepler">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: #ef4444;">🔴 Geciken Talepler (14+ Gün)</span>
+                <strong id="radar-count-overdue" style="font-size: 1.1rem; color: #ef4444;">0</strong>
+              </div>
+              <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 0.2rem;" id="radar-sub-overdue">Müdahale bekleyen açık işler</div>
             </div>
-            <div class="table-container">
-              <table class="custom-table" id="table-top-suppliers">
-                <thead>
-                  <tr>
-                    <th>Tedarikçi Adı</th>
-                    <th>Harcama (TRY)</th>
-                    <th>Talep Sayısı</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
+
+            <div class="glass-card radar-pill" onclick="App.filterContractsByRadar('EXPIRING')" style="cursor: pointer; padding: 0.75rem 1rem; border-left: 4px solid #f97316;" title="30 gün içinde vadesi dolacak sözleşmeler">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: #ea580c;">🟠 Vadesi Yaklaşan Sözleşme</span>
+                <strong id="radar-count-contracts" style="font-size: 1.1rem; color: #ea580c;">0</strong>
+              </div>
+              <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 0.2rem;" id="radar-sub-contracts">30 gün içinde yenileme/bitiş</div>
+            </div>
+
+            <div class="glass-card radar-pill" onclick="App.switchView('guarantees')" style="cursor: pointer; padding: 0.75rem 1rem; border-left: 4px solid #3b82f6;" title="Kasada tutulan aktif teminat mektupları">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: #2563eb;">🏦 Kasadaki Teminat Güvencesi</span>
+                <strong id="radar-count-guarantees" style="font-size: 1.05rem; color: #2563eb;">0 ₺</strong>
+              </div>
+              <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 0.2rem;" id="radar-sub-guarantees">0 Adet Teminat Mektubu</div>
+            </div>
+
+            <div class="glass-card radar-pill" onclick="App.filterInvoicesByRadar('PENDING_DELIVERY')" style="cursor: pointer; padding: 0.75rem 1rem; border-left: 4px solid #8b5cf6;" title="Muhasebeye teslim bekleyen faturalar">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: #7c3aed;">📤 Teslim Bekleyen Faturalar</span>
+                <strong id="radar-count-invoices" style="font-size: 1.1rem; color: #7c3aed;">0</strong>
+              </div>
+              <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 0.2rem;" id="radar-sub-invoices">Satınalmada bekleyen tutanaklar</div>
             </div>
           </div>
         </div>
+
+        <!-- KATMAN 3: GÖRSEL ANALİTİK MASASI (GRAFİKLER & LİDERLİK SIRALAMALARI) -->
+        <div class="grid-2" style="margin-bottom: 1.25rem;">
+          <!-- 3.1 Finansal Harcama & Tasarruf Trendi (Çift Eksenli) -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div>
+                <h3>📈 Aylık Harcama ve Tasarruf Trendi</h3>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">Aylık gerçekleşen harcama (₺) ve sağlanan pazarlık kazancı</p>
+              </div>
+            </div>
+            <div style="height: 220px; position: relative; width: 100%; min-width: 0; overflow: hidden;">
+              <canvas id="chart-financial-trend"></canvas>
+            </div>
+          </div>
+
+          <!-- 3.2 Satınalma Türü & Sözleşme Dağılımı -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div>
+                <h3>🍩 Satınalma Türü & Harcama Kırılımı</h3>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">Mal Alımı, Hizmet Alımı, Doğrudan Temin ve İhale oranları</p>
+              </div>
+            </div>
+            <div style="height: 220px; position: relative; width: 100%; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+              <canvas id="chart-category-donut"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.3 Top 5 Birim & Top 5 Tedarikçi Progress Bar Tablosu -->
+        <div class="grid-2" style="margin-bottom: 1.25rem;">
+          <!-- Top 5 Birim -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div>
+                  <h3>🏢 En Çok Harcama Yapan İlk 5 Birim</h3>
+                  <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">Üniversite bütçesini en yoğun kullanan akademik/idari birimler</p>
+                </div>
+                <button class="btn-secondary" onclick="App.switchView('unit-analysis')" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Tümü 🔗</button>
+              </div>
+            </div>
+            <div id="dashboard-top-units-list" style="display: flex; flex-direction: column; gap: 0.85rem; padding-top: 0.4rem;">
+              <!-- Dynamic items with progress bars -->
+            </div>
+          </div>
+
+          <!-- Top 5 Tedarikçi -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div>
+                  <h3>🏭 En Yüksek İş Hacmine Sahip İlk 5 Tedarikçi</h3>
+                  <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">En çok ödeme yapılan ana yüklenici ve tedarikçi firmalar</p>
+                </div>
+                <button class="btn-secondary" onclick="App.switchView('supplier-analysis')" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Tümü 🔗</button>
+              </div>
+            </div>
+            <div id="dashboard-top-suppliers-list" style="display: flex; flex-direction: column; gap: 0.85rem; padding-top: 0.4rem;">
+              <!-- Dynamic items with progress bars -->
+            </div>
+          </div>
+        </div>
+
+        <!-- KATMAN 4: CANLI HAREKET AKIŞI & YÖNETİCİ HIZLI İŞLEM MASASI -->
+        <div class="grid-2" style="grid-template-columns: 2fr 1fr; gap: 1rem;">
+          <!-- 4.1 Son Sistem Hareketleri -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div>
+                  <h3>📜 Canlı Sistem Hareketleri & Son İşlemler</h3>
+                  <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">Son işlenen talepler, siparişler ve fatura kayıtları</p>
+                </div>
+                <button class="btn-secondary" onclick="App.switchView('activity-logs')" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">Tüm Loglar 🔗</button>
+              </div>
+            </div>
+            <div id="dashboard-recent-activity-list" style="display: flex; flex-direction: column; gap: 0.6rem;">
+              <!-- Dynamic recent activity stream -->
+            </div>
+          </div>
+
+          <!-- 4.2 Yönetici Hızlı Kısayol Masası -->
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div class="card-header" style="margin-bottom: 0.75rem;">
+                <h3>⚡ Yönetici Hızlı Masası</h3>
+              </div>
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Sık kullanılan operasyonel ve analitik modüllere tek tıkla doğrudan erişin.
+              </p>
+              <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                <button class="btn-secondary" onclick="App.switchView('invoices')" style="justify-content: flex-start; padding: 0.6rem 0.85rem; font-size: 0.82rem;">
+                  <span>💳</span> <strong>Haftalık Ödeme Listesi</strong>
+                </button>
+                <button class="btn-secondary" onclick="App.filterRequestsByRadar('OVERDUE')" style="justify-content: flex-start; padding: 0.6rem 0.85rem; font-size: 0.82rem; color: #ef4444;">
+                  <span>🚨</span> <strong>Geciken Talepleri İncele</strong>
+                </button>
+                <button class="btn-secondary" onclick="App.switchView('yearly-report')" style="justify-content: flex-start; padding: 0.6rem 0.85rem; font-size: 0.82rem;">
+                  <span>📅</span> <strong>Yıllık Faaliyet & SLA Raporu</strong>
+                </button>
+                <button class="btn-primary" id="btn-dashboard-quick-new-req" onclick="App.openNewRequestModal()" style="justify-content: center; padding: 0.6rem 0.85rem; font-size: 0.82rem; margin-top: 0.4rem;">
+                  <span>➕</span> <strong>Yeni Talep Oluştur</strong>
+                </button>
+              </div>
+            </div>
+            <div style="background: rgba(30, 58, 138, 0.05); border: 1px dashed rgba(59, 130, 246, 0.3); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted); text-align: center;">
+              💡 <strong>İpucu:</strong> Tüm modüllerde hızlı arama yapmak için <kbd style="background: var(--bg-card); padding: 0.1rem 0.35rem; border-radius: 4px; border: 1px solid var(--border-color); font-family: var(--font-mono);">Ctrl + K</kbd> tuşlarını kullanabilirsiniz.
+            </div>
+          </div>
+        </div>
+
       </section>
 
       <!-- 🔔 NOTIFICATIONS & ALARM CENTER VIEW -->
