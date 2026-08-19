@@ -176,17 +176,34 @@ async function importExcel() {
         title = 'Satınalma Şube Müdürü';
       }
 
+      const existingUser = await client.query('SELECT id FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1', [usr]);
+      if (existingUser.rowCount === 0) {
+        await client.query(
+          'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
+          [usr, title, role, true, '123456']
+        );
+      } else {
+        await client.query(
+          'UPDATE users SET title = $1, role = $2, "isActive" = true WHERE id = $3',
+          [title, role, existingUser.rows[0].id]
+        );
+      }
+    }
+
+    // Üst Yönetim (Executive) kullanıcısını kontrol et ve ekle
+    const execCheck = await client.query("SELECT id FROM users WHERE role = 'EXECUTIVE' OR LOWER(TRIM(name)) = LOWER(TRIM('Rektörlük / Üst Yönetim')) LIMIT 1");
+    if (execCheck.rowCount === 0) {
       await client.query(
-        'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
-        [usr, title, role, true, '123456']
+        'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
+        ['Rektörlük / Üst Yönetim', 'Rektörlük & Genel Sekreterlik', 'EXECUTIVE', true, '123456']
       );
     }
 
-    // Üst Yönetim (Executive) kullanıcısını otomatik ekle
-    await client.query(
-      'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
-      ['Rektörlük / Üst Yönetim', 'Rektörlük & Genel Sekreterlik', 'EXECUTIVE', true, '123456']
-    );
+    // Çiftleyen kullanıcıları otomatik temizle (Tekil bırak)
+    await client.query(`
+      DELETE FROM users a USING users b
+      WHERE a.id > b.id AND LOWER(TRIM(a.name)) = LOWER(TRIM(b.name))
+    `);
 
     for (const reg of regulationsSet) {
       await client.query('INSERT INTO regulations (name) VALUES ($1) ON CONFLICT DO NOTHING', [reg]);

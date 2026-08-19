@@ -2623,6 +2623,12 @@ async function initDatabaseSchema() {
       }
     }
 
+    // 🛡️ ÇİFTLEYEN KULLANICI KAYITLARINI TEMİZLE (Tekil Bırak)
+    await pool.query(`
+      DELETE FROM users a USING users b
+      WHERE a.id > b.id AND LOWER(TRIM(a.name)) = LOWER(TRIM(b.name))
+    `).catch(() => {});
+
     // 🛡️ YÖNETİCİ VE ÜST YÖNETİM ROLLERİNİ GARANTİ ALTINA AL
     await pool.query(`
       UPDATE users 
