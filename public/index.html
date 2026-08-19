@@ -1066,7 +1066,7 @@
         </div>
       </section>
 
-      <!-- 6. INVOICES & WEEKLY PAYMENT SCHEDULE VIEW (YENİ) -->
+      <!-- 6. INVOICES & WEEKLY PAYMENT SCHEDULE VIEW -->
       <section id="view-invoices" class="view-section" style="display: none;">
         <div class="card-header" style="margin-bottom: 1.5rem;">
           <div>
@@ -1080,14 +1080,17 @@
             <button class="btn-primary" id="btn-invoice-handover" style="background: #4f46e5; border-color: #4338ca;">
               <span>📄</span> Muhasebeye Teslim Et & Tutanak Yazdır
             </button>
-            <button class="btn-secondary" id="btn-export-weekly-payments">
-              <span>📥</span> Haftalık Liste (Excel)
+            <button class="btn-secondary" id="btn-export-invoices-excel">
+              <span>📥</span> Excel İndir
+            </button>
+            <button class="btn-export-pdf" id="btn-export-invoices-pdf">
+              <span>🖨️</span> PDF / Yazdır
             </button>
           </div>
         </div>
 
         <!-- Invoice KPI Cards -->
-        <div class="grid-4">
+        <div class="grid-4" style="margin-bottom: 1.5rem;">
           <div class="glass-card kpi-card" id="card-inv-kpi-total" style="cursor: pointer;">
             <div class="kpi-icon blue">🧾</div>
             <div class="kpi-data">
@@ -1101,8 +1104,8 @@
             <div class="kpi-icon yellow">📥</div>
             <div class="kpi-data">
               <h3 id="invoice-kpi-pending">0 ₺</h3>
-              <p>Teslim Bekleyenler</p>
-              <div class="kpi-sub" style="color:#d97706;">Satınalmada (Teslim Edilmedi)</div>
+              <p>Satınalmada (Bekliyor)</p>
+              <div class="kpi-sub" style="color:#d97706;">⚡ Muhasebeye Teslim Edilecekler</div>
             </div>
           </div>
 
@@ -1125,68 +1128,60 @@
           </div>
         </div>
 
-        <!-- Smart Date Filter Toolbar for Weekly Payment Schedule & Handover -->
-        <div class="filter-bar">
+        <!-- Clean, Structured Filter Bar -->
+        <div class="filter-bar" style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between;">
+          <!-- 3 Main Delivery Focus Tabs -->
           <div style="display:flex; gap:0.4rem; flex-wrap:wrap;" id="invoice-date-tabs">
-            <button class="btn-secondary active-date-tab" data-period="ALL" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
-              Tüm Faturalar
+            <button class="btn-secondary active-date-tab" data-period="PENDING_DELIVERY" style="padding:0.45rem 0.9rem; font-size:0.82rem; font-weight:700; border-color:#f59e0b; color:#d97706;">
+              📥 Satınalmada (Teslim Bekleyenler)
             </button>
-            <button class="btn-secondary" data-period="PENDING_DELIVERY" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:#f59e0b; color:#d97706; font-weight:700;">
-              📥 Teslim Bekleyenler (Satınalmada)
-            </button>
-            <button class="btn-secondary" data-period="DELIVERED" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:#6366f1; color:#4f46e5; font-weight:700;">
+            <button class="btn-secondary" data-period="DELIVERED" style="padding:0.45rem 0.9rem; font-size:0.82rem; font-weight:700;">
               📤 Muhasebeye Teslim Edilenler
             </button>
-            <button class="btn-secondary" data-period="THIS_WEEK" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:var(--status-open);">
-              ⚡ Bu Hafta Vadesi Gelenler
-            </button>
-            <button class="btn-secondary" data-period="NEXT_WEEK" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
-              🔜 Gelecek Hafta Vadesi Gelenler
-            </button>
-            <button class="btn-secondary" data-period="OVERDUE" style="padding:0.45rem 0.8rem; font-size:0.8rem; border-color:var(--status-rejected);">
-              ⚠️ Gecikmiş Ödemeler
-            </button>
-            <button class="btn-secondary" data-period="THIS_MONTH" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
-              📅 Bu Ay Vadesi Gelenler
+            <button class="btn-secondary" data-period="ALL" style="padding:0.45rem 0.9rem; font-size:0.82rem;">
+              📋 Tüm Faturalar
             </button>
           </div>
 
-          <div class="search-input-box" style="min-width:200px;">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="filter-invoice-search" placeholder="Fatura no, tedarikçi, talep no ile ara...">
+          <!-- Due Filter, Status & Search -->
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <div class="search-input-box" style="min-width: 220px;">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="filter-invoice-search" placeholder="Fatura no, firma, açıklama, barkod...">
+            </div>
+
+            <select class="filter-select" id="filter-invoice-due-period" title="Ödeme Vadesi Filtresi" style="border-color: var(--accent-primary); font-weight: 600;">
+              <option value="ALL">🗓️ Tüm Ödeme Vadeleri</option>
+              <option value="THIS_WEEK">⚡ Bu Hafta Vadesi Gelenler</option>
+              <option value="NEXT_WEEK">🔜 Gelecek Hafta Vadesi Gelenler</option>
+              <option value="OVERDUE">⚠️ Vadesi Geçmiş / Gecikenler</option>
+              <option value="THIS_MONTH">📅 Bu Ay Vadesi Gelenler</option>
+            </select>
+
+            <select class="filter-select" id="filter-invoice-status" title="Ödeme Durumu">
+              <option value="ALL">Tüm Ödeme Durumları</option>
+              <option value="Ödeme Bekliyor">⏳ Ödeme Bekliyor</option>
+              <option value="Ödendi">🟢 Ödendi</option>
+              <option value="Gecikmede">🔴 Gecikmede</option>
+            </select>
           </div>
-
-          <select class="filter-select" id="filter-invoice-status">
-            <option value="ALL">Tüm Ödeme Durumları</option>
-            <option value="Ödeme Bekliyor">⏳ Ödeme Bekliyor</option>
-            <option value="Gecikmede">🔴 Gecikmede</option>
-            <option value="Ödendi">🟢 Ödendi</option>
-          </select>
-
-          <button class="btn-export-excel" id="btn-export-invoices-excel">
-            <span>📥</span> Excel İndir
-          </button>
-          <button class="btn-export-pdf" id="btn-export-invoices-pdf">
-            <span>🖨️</span> PDF / Yazdır
-          </button>
         </div>
 
-        <!-- Invoices Table -->
+        <!-- Invoices Table with Description Column -->
         <div class="table-container">
           <table class="custom-table" id="table-invoices">
             <thead>
               <tr>
                 <th style="width: 36px; text-align: center;"><input type="checkbox" id="chk-select-all-invoices" title="Tümünü Seç / Kaldır"></th>
-                <th>Fatura No</th>
+                <th>Fatura No & Barkod</th>
                 <th>Tedarikçi Firma</th>
-                <th>Fatura Tarihi</th>
-                <th>Vade Tarihi</th>
-                <th>Kalan Gün / Vade</th>
                 <th>Fatura Tutarı</th>
-                <th>Muhasebe Teslimi</th>
-                <th>Ödeme Durumu</th>
-                <th>İlişkili Talep/Sipariş</th>
-                <th>İşlemler</th>
+                <th>Fatura Tarihi</th>
+                <th>Vade & Kalan Süre</th>
+                <th>Teslimat Durumu</th>
+                <th>Ödeme</th>
+                <th style="min-width: 200px;">📝 Açıklama / Notlar</th>
+                <th style="text-align: center; width: 140px;">İşlemler</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -3947,6 +3942,7 @@
                   <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center;">Fatura Tarihi</th>
                   <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center;">Vade Tarihi</th>
                   <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: left;">İlişkili Talep/Sipariş</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: left;">Açıklama / Not</th>
                   <th style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: right; width: 130px;">Tutar</th>
                 </tr>
               </thead>
@@ -3955,7 +3951,7 @@
               </tbody>
               <tfoot>
                 <tr style="background: #f8fafc; font-weight: 800;">
-                  <td colspan="6" style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: right;" id="ih-total-count-label">Toplam: 0 Adet Fatura</td>
+                  <td colspan="7" style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: right;" id="ih-total-count-label">Toplam: 0 Adet Fatura</td>
                   <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: right; color: #166534; font-size: 0.95rem; font-family: monospace;" id="ih-total-amount">0,00 ₺</td>
                 </tr>
               </tfoot>

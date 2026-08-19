@@ -930,7 +930,7 @@ async init() {
     });
 
     // Filters for Invoices & Date Period Tabs
-    ['filter-invoice-search', 'filter-invoice-status'].forEach(id => {
+    ['filter-invoice-search', 'filter-invoice-status', 'filter-invoice-due-period'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener('input', () => this.renderInvoices());
@@ -945,6 +945,10 @@ async init() {
         this.state.invoiceDatePeriod = btn.getAttribute('data-period');
         this.renderInvoices();
       });
+    });
+
+    document.getElementById('btn-export-invoices-excel')?.addEventListener('click', () => {
+      this.exportTableToExcel('table-invoices', 'Resmi_Faturalar_ve_Muhasebe_Takip_Cetveli.xls');
     });
 
     // Invoice Handover Protocol Button
@@ -5139,7 +5143,8 @@ async init() {
 
     const searchText = document.getElementById('filter-invoice-search')?.value.toLowerCase().trim() || '';
     const statusVal = document.getElementById('filter-invoice-status')?.value || 'ALL';
-    const periodVal = this.state.invoiceDatePeriod || 'ALL';
+    const duePeriodVal = document.getElementById('filter-invoice-due-period')?.value || 'ALL';
+    const periodVal = this.state.invoiceDatePeriod || 'PENDING_DELIVERY';
 
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -5173,27 +5178,26 @@ async init() {
     const elDelivered = document.getElementById('invoice-kpi-delivered');
     const elPaid = document.getElementById('invoice-kpi-paid');
 
-    if (elTotal) elTotal.innerText = this.formatMoney(totalAmountAll, 'TRY', 2);
+    if (elTotal) elTotal.innerText = `${this.formatMoney(totalAmountAll, 'TRY', 2)} (${invoices.length} Fatura)`;
     if (elPending) elPending.innerText = `${this.formatMoney(pendingDeliveryTotal, 'TRY', 2)} (${pendingDeliveryInvoices.length} Adet)`;
     if (elDelivered) elDelivered.innerText = `${this.formatMoney(deliveredTotal, 'TRY', 2)} (${deliveredInvoices.length} Adet)`;
     if (elPaid) elPaid.innerText = this.formatMoney(paidAmount, 'TRY', 2);
 
-    // Apply Smart Date & Delivery Period Filters
+    // Apply Delivery Tab Filters
     invoices = invoices.filter(inv => {
-      // Delivery & Status Tab Filters
       if (periodVal === 'PENDING_DELIVERY' && (inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
       if (periodVal === 'DELIVERED' && (!inv.accountingDeliveryDate || inv.paymentStatus === 'Ödendi')) return false;
 
-      if (inv.dueDate) {
+      // Due Period Filter
+      if (duePeriodVal !== 'ALL') {
+        if (!inv.dueDate) return false;
         const due = new Date(inv.dueDate);
         due.setHours(0,0,0,0);
 
-        if (periodVal === 'THIS_WEEK' && (due < mondayThisWeek || due > sundayThisWeek)) return false;
-        if (periodVal === 'NEXT_WEEK' && (due < mondayNextWeek || due > sundayNextWeek)) return false;
-        if (periodVal === 'OVERDUE' && (due >= today || inv.paymentStatus === 'Ödendi')) return false;
-        if (periodVal === 'THIS_MONTH' && (due.getMonth() !== today.getMonth() || due.getFullYear() !== today.getFullYear())) return false;
-      } else if (['THIS_WEEK', 'NEXT_WEEK', 'OVERDUE', 'THIS_MONTH'].includes(periodVal)) {
-        return false;
+        if (duePeriodVal === 'THIS_WEEK' && (due < mondayThisWeek || due > sundayThisWeek)) return false;
+        if (duePeriodVal === 'NEXT_WEEK' && (due < mondayNextWeek || due > sundayNextWeek)) return false;
+        if (duePeriodVal === 'OVERDUE' && (due >= today || inv.paymentStatus === 'Ödendi')) return false;
+        if (duePeriodVal === 'THIS_MONTH' && (due.getMonth() !== today.getMonth() || due.getFullYear() !== today.getFullYear())) return false;
       }
 
       // Dropdown Status Filter
@@ -5206,7 +5210,7 @@ async init() {
         const mNo = inv.invoiceNo?.toLowerCase().includes(searchText);
         const mSupp = inv.supplier?.toLowerCase().includes(searchText);
         const mRel = inv.relatedBarcode?.toLowerCase().includes(searchText);
-        const mNotes = inv.notes?.toLowerCase().includes(searchText);
+        const mNotes = (inv.notes || inv.description || '')?.toLowerCase().includes(searchText);
         if (!mNo && !mSupp && !mRel && !mNotes) return false;
       }
       return true;
@@ -5216,7 +5220,7 @@ async init() {
     if (!tbody) return;
 
     if (invoices.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun fatura bulunamadı.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:2rem;">Filtreleme kriterlerine uygun fatura bulunamadı.</td></tr>`;
       this._onInvoiceCheckboxChange();
       return;
     }
@@ -5228,14 +5232,14 @@ async init() {
 
       let dueBadge = '';
       if (inv.paymentStatus === 'Ödendi') {
-        dueBadge = `<span class="badge status-completed">🟢 Tamamlandı</span>`;
+        dueBadge = `<span class="badge status-completed" style="font-size:0.72rem;">🟢 Ödendi</span>`;
       } else if (diffDays !== null) {
-        if (diffDays < 0) dueBadge = `<span class="badge priority-kritik">🔴 ${Math.abs(diffDays)} Gün Gecikti</span>`;
-        else if (diffDays === 0) dueBadge = `<span class="badge priority-yüksek">⚡ Bugün Vade!</span>`;
-        else if (diffDays <= 7) dueBadge = `<span class="badge priority-yüksek">🟠 ${diffDays} Gün Kaldı</span>`;
-        else dueBadge = `<span class="badge status-open">🟢 ${diffDays} Gün</span>`;
+        if (diffDays < 0) dueBadge = `<span class="badge priority-kritik" style="font-size:0.72rem;">🔴 ${Math.abs(diffDays)} Gün Gecikti</span>`;
+        else if (diffDays === 0) dueBadge = `<span class="badge priority-yuksek" style="font-size:0.72rem;">⚡ Bugün Vade!</span>`;
+        else if (diffDays <= 7) dueBadge = `<span class="badge priority-yuksek" style="font-size:0.72rem;">🟠 ${diffDays} Gün Kaldı</span>`;
+        else dueBadge = `<span class="badge status-open" style="font-size:0.72rem;">🟢 ${diffDays} Gün</span>`;
       } else {
-        dueBadge = `<span style="color:var(--text-muted); font-size:0.8rem;">-</span>`;
+        dueBadge = `<span style="color:var(--text-muted); font-size:0.75rem;">-</span>`;
       }
 
       let deliveryBadge = '';
@@ -5255,17 +5259,26 @@ async init() {
           <td style="text-align: center;">
             <input type="checkbox" class="chk-select-invoice" data-id="${inv.id}" onchange="App._onInvoiceCheckboxChange()">
           </td>
-          <td><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${inv.invoiceNo}</span></td>
-          <td style="font-weight:600; min-width: 160px;">${inv.supplier}</td>
-          <td style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">${inv.invoiceDate || '-'}</td>
-          <td style="font-weight:700; font-size:0.85rem; white-space:nowrap;">${inv.dueDate || '-'}</td>
-          <td style="white-space:nowrap;">${dueBadge}</td>
-          <td style="font-weight:700; font-family:var(--font-mono); color:var(--status-completed); white-space:nowrap;">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</td>
+          <td>
+            <span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${inv.invoiceNo}</span>
+            ${inv.relatedBarcode ? `<br><small style="font-size:0.75rem; color:var(--accent-purple); font-family:var(--font-mono);">#${inv.relatedBarcode}</small>` : ''}
+          </td>
+          <td style="font-weight:600; min-width: 150px;">${inv.supplier}</td>
+          <td style="font-weight:800; font-family:var(--font-mono); color:var(--status-completed); font-size:0.92rem; white-space:nowrap;">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</td>
+          <td style="font-size:0.82rem; color:var(--text-muted); white-space:nowrap;">${inv.invoiceDate || '-'}</td>
+          <td style="white-space:nowrap;">
+            <div style="font-weight:700; font-size:0.84rem;">${inv.dueDate || '-'}</div>
+            <div style="margin-top:2px;">${dueBadge}</div>
+          </td>
           <td style="white-space:nowrap;">${deliveryBadge}</td>
           <td style="white-space:nowrap;">${statusBadge}</td>
-          <td><span style="font-family:var(--font-mono); font-size:0.8rem; color:var(--accent-purple);">${inv.relatedBarcode || '-'}</span></td>
           <td>
-            <div class="action-btns">
+            <div style="font-size:0.82rem; color:var(--text-main); max-width:260px; line-height:1.35; white-space:normal; word-break:break-word;">
+              ${inv.notes || inv.description || '<span style="color:var(--text-muted); font-size:0.75rem;">-</span>'}
+            </div>
+          </td>
+          <td style="text-align: center;">
+            <div class="action-btns" style="justify-content:center;">
               <a href="#invoice/${inv.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'invoice', ${inv.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('invoice', '${inv.id}', 'Fatura #${inv.invoiceNo} — ${inv.supplier?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
               ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>` : ''}
@@ -5364,7 +5377,8 @@ async init() {
           <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-weight: 600;">${inv.supplier}</td>
           <td style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center; font-size: 0.8rem;">${inv.invoiceDate || '-'}</td>
           <td style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: center; font-weight: 600; font-size: 0.8rem;">${inv.dueDate || '-'}</td>
-          <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-family: monospace; font-size: 0.8rem;">${inv.relatedBarcode || '-'}</td>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-family: monospace; font-size: 0.8rem;">${inv.relatedBarcode ? '#' + inv.relatedBarcode : '-'}</td>
+          <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-size: 0.8rem; color: #334155; line-height: 1.3;">${inv.notes || inv.description || '-'}</td>
           <td style="border: 1px solid #94a3b8; padding: 6px 8px; text-align: right; font-weight: 700; font-family: monospace; color: #166534;">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</td>
         </tr>
       `).join('');
