@@ -10339,7 +10339,12 @@ const App = {
     const targetStatus = (isOrderProcess && status === 'Açık') ? 'Sipariş Verildi' : status;
 
     if (multiSuppliers.length > 1) {
+      const totalMultiAmount = multiSuppliers.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+
       // 1. Update primary row for item 0
+      const ratio0 = totalMultiAmount > 0 ? ((parseFloat(multiSuppliers[0].amount) || 0) / totalMultiAmount) : (1 / multiSuppliers.length);
+      const estAmt0 = Math.round(estAmt * ratio0);
+
       req.requestBarcode = `${baseBc}-1`;
       req.arrivalDate = arrDate;
       req.requestDate = arrDate;
@@ -10349,8 +10354,8 @@ const App = {
       req.purchaseType = purchaseType;
       req.priority = priority;
       req.assignedTo = assignedTo;
-      req.estimatedAmount = estAmt;
-      req.budgetAmount = estAmt;
+      req.estimatedAmount = estAmt0;
+      req.budgetAmount = estAmt0;
       req.currency = currency;
       req.orderBarcode = baseOrdBc ? `${baseOrdBc}-1` : '';
       req.orderDate = orderDate || '';
@@ -10369,6 +10374,9 @@ const App = {
         const subOrd = baseOrdBc ? `${baseOrdBc}-${idx + 1}` : '';
         const subItem = multiSuppliers[idx];
 
+        const ratio = totalMultiAmount > 0 ? ((parseFloat(subItem.amount) || 0) / totalMultiAmount) : (1 / multiSuppliers.length);
+        const subEstAmt = Math.round(estAmt * ratio);
+
         const subReq = {
           sequenceNo: req.sequenceNo,
           requestBarcode: subBc,
@@ -10379,8 +10387,8 @@ const App = {
           assignedTo: assignedTo,
           priority: priority,
           status: targetStatus,
-          estimatedAmount: estAmt,
-          budgetAmount: estAmt,
+          estimatedAmount: subEstAmt,
+          budgetAmount: subEstAmt,
           actualAmount: subItem.amount || 0,
           currency: currency,
           supplier: subItem.supplier,
