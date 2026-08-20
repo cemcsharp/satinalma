@@ -8923,77 +8923,16 @@ const App = {
         }
       });
     });
-
-    const tbodyUnits = document.querySelector('#table-vp-units tbody');
-    if (tbodyUnits) {
-      const unitEntries = Object.entries(unitMap);
-      if (unitEntries.length === 0) {
-        tbodyUnits.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">Bu firma için henüz birim işlem kaydı bulunmuyor.</td></tr>`;
-      } else {
-        tbodyUnits.innerHTML = unitEntries.map(([uName, uData]) => {
-          const avgUnitScore = uData.ratings.length > 0
-            ? (uData.ratings.reduce((a, b) => a + b, 0) / uData.ratings.length).toFixed(1) + ' ⭐'
-            : '<span style="color:var(--text-muted); font-size:0.75rem;">Değerlendirme yok</span>';
-
-          return `
-            <tr>
-              <td style="font-weight:700; color:var(--text-main);">🏛️ ${uName}</td>
-              <td style="font-weight:600;">${uData.count}</td>
-              <td style="font-weight:700; color:var(--status-completed); font-family:var(--font-mono);">${uData.spend.toLocaleString('tr-TR')} ₺</td>
-              <td style="text-align:right; font-weight:700; color:#f59e0b;">${avgUnitScore}</td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
-
-    // Render Contracts & Guarantees List
-    const contractsListEl = document.getElementById('vp-contracts-guarantees-list');
-    if (contractsListEl) {
-      let itemsHtml = '';
-      if (vendorContracts.length > 0) {
-        itemsHtml += vendorContracts.map(c => `
-          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-card); border:1px solid var(--border-color); padding:0.5rem 0.75rem; border-radius:var(--radius-sm);">
-            <div>
-              <strong>📑 Sözleşme: ${c.title || c.contractNo || 'Sözleşme'}</strong>
-              <div style="font-size:0.72rem; color:var(--text-muted);">Vade: ${c.startDate || '-'} ➔ ${c.endDate || '-'}</div>
-            </div>
-            <span class="badge status-completed">${Number(c.totalAmount || 0).toLocaleString('tr-TR')} ${c.currency || 'TRY'}</span>
-          </div>
-        `).join('');
-      }
-      if (vendorGuarantees.length > 0) {
-        itemsHtml += vendorGuarantees.map(g => `
-          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-card); border:1px solid var(--border-color); padding:0.5rem 0.75rem; border-radius:var(--radius-sm);">
-            <div>
-              <strong>🛡️ Teminat Mektubu: ${g.bank || 'Banka'} (#${g.letterNo || '-'})</strong>
-              <div style="font-size:0.72rem; color:var(--text-muted);">Geçerlilik: ${g.expiryDate || '-'} (${g.status || 'Aktif'})</div>
-            </div>
-            <span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:700;">${Number(g.guaranteeAmount || 0).toLocaleString('tr-TR')} ${g.currency || 'TRY'}</span>
-          </div>
-        `).join('');
-      }
-
-      if (!itemsHtml) {
-        itemsHtml = `<div style="color:var(--text-muted); font-size:0.8rem; padding:0.5rem 0;">Bu firma adına kayıtlı aktif sözleşme veya teminat mektubu bulunmuyor.</div>`;
-      }
-      contractsListEl.innerHTML = itemsHtml;
-    }
-
-    // Render Past History Table
-    const tbodyHistory = document.querySelector('#table-vp-history tbody');
-    const historyCountEl = document.getElementById('vp-history-count-text');
-    if (tbodyHistory) {
+    // Render History Tables
+    const tbodyReqs = document.querySelector('#table-vp-requests tbody');
+    if (tbodyReqs) {
       if (vendorRequests.length === 0) {
-        tbodyHistory.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:2rem;">Bu firmaya ait kayıtlı sipariş veya talep bulunamadı.</td></tr>`;
-        if (historyCountEl) historyCountEl.innerText = '0 kayıt';
+        tbodyReqs.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Bu tedarikçiye ait talep kaydı bulunamadı.</td></tr>`;
       } else {
-        if (historyCountEl) historyCountEl.innerText = `${vendorRequests.length} adet işlem kaydı`;
-        tbodyHistory.innerHTML = vendorRequests.map(r => {
-          // Find if there is a rating for this specific request
-          const matchingRating = (scoreData?.reviews || []).find(rv => 
-            rv.requestId && (String(rv.requestId) === String(r.id) || (r.requestBarcode && String(rv.requestId) === String(r.requestBarcode)))
-          );
+        tbodyReqs.innerHTML = vendorRequests.map(r => {
+          const matchingRating = (this.state.vendorRatings || [])
+            .map(vr => this.normalizeRating(vr))
+            .find(vr => vr && String(vr.requestId) === String(r.id) && vr.supplierName.toLowerCase() === safeCleanStd);
 
           const isHizmet = (r.purchaseType || 'MAL') === 'HIZMET';
           const typeBadge = isHizmet
