@@ -10074,10 +10074,11 @@ const App = {
       return;
     }
 
-    document.getElementById('er-id').value = req.id;
-    if (document.getElementById('er-request-barcode')) {
-      document.getElementById('er-request-barcode').value = req.requestBarcode || '';
-    }
+    const elId = document.getElementById('er-id');
+    if (elId) elId.value = req.id;
+
+    const elBc = document.getElementById('er-request-barcode');
+    if (elBc) elBc.value = req.requestBarcode || '';
 
     // Tarih formatını (DD.MM.YYYY veya YYYY-MM-DD) date input formatına (YYYY-MM-DD) uyarla
     let arrDateVal = req.arrivalDate || req.requestDate || '';
@@ -10101,27 +10102,29 @@ const App = {
         }
       }
     }
-    if (document.getElementById('er-arrival-date')) {
-      document.getElementById('er-arrival-date').value = arrDateVal;
-    }
+    const elArrDate = document.getElementById('er-arrival-date');
+    if (elArrDate) elArrDate.value = arrDateVal;
 
-    if (document.getElementById('er-subject')) {
-      document.getElementById('er-subject').value = req.subject || '';
-    }
+    const elSubj = document.getElementById('er-subject');
+    if (elSubj) elSubj.value = req.subject || '';
 
-    if (document.getElementById('er-purchase-type')) {
-      document.getElementById('er-purchase-type').value = req.purchaseType || 'MAL';
-    }
+    const elPType = document.getElementById('er-purchase-type');
+    if (elPType) elPType.value = req.purchaseType || 'MAL';
 
-    document.getElementById('er-status').value = req.status || 'Açık';
+    const elStatus = document.getElementById('er-status');
+    if (elStatus) elStatus.value = req.status || 'Açık';
 
-    if (document.getElementById('er-priority')) {
-      document.getElementById('er-priority').value = req.priority || 'Orta';
-    }
+    const elPriority = document.getElementById('er-priority');
+    if (elPriority) elPriority.value = req.priority || 'Orta';
 
-    if (document.getElementById('er-unit')) document.getElementById('er-unit').value = req.unit || '';
-    if (document.getElementById('er-assigned-to')) document.getElementById('er-assigned-to').value = req.assignedTo || '';
-    document.getElementById('er-order-barcode').value = req.orderBarcode || '';
+    const elUnit = document.getElementById('er-unit');
+    if (elUnit) elUnit.value = req.unit || '';
+
+    const elAssigned = document.getElementById('er-assigned-to');
+    if (elAssigned) elAssigned.value = req.assignedTo || '';
+
+    const elOrderBc = document.getElementById('er-order-barcode');
+    if (elOrderBc) elOrderBc.value = req.orderBarcode || '';
     
     let orderDateVal = req.orderDate || '';
     if (orderDateVal) {
@@ -10142,8 +10145,11 @@ const App = {
         }
       }
     }
-    document.getElementById('er-order-date').value = orderDateVal;
-    document.getElementById('er-currency').value = req.currency || 'TRY';
+    const elOrderDate = document.getElementById('er-order-date');
+    if (elOrderDate) elOrderDate.value = orderDateVal;
+
+    const elCurr = document.getElementById('er-currency');
+    if (elCurr) elCurr.value = req.currency || 'TRY';
 
     // Populate Multi-Supplier Container
     const container = document.getElementById('er-suppliers-container');
@@ -10193,7 +10199,8 @@ const App = {
       regSelect.value = regVal;
     }
 
-    document.getElementById('er-description').value = req.description || '';
+    const elDesc = document.getElementById('er-description');
+    if (elDesc) elDesc.value = req.description || '';
 
     const titleEl = document.getElementById('edit-modal-title');
     if (titleEl) titleEl.innerText = `✏️ Talep #${req.requestBarcode || req.id} Düzenle`;
