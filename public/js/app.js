@@ -3975,7 +3975,7 @@ const App = {
         <td style="white-space:nowrap;">${this.getStatusBadge(r)}</td>
         <td style="font-family:var(--font-mono); white-space:nowrap;">${r.orderBarcode || '-'}</td>
         <td style="font-size:0.82rem; white-space:nowrap;">${r.orderDate || '-'}</td>
-        <td style="font-size:0.82rem; min-width: 120px;">${r.supplier || '-'}</td>
+        <td style="font-size:0.82rem; min-width: 120px;">${this.formatSupplierCell(r)}</td>
         <td style="font-weight:700; font-family:var(--font-mono); white-space:nowrap; text-align:right;">${r.actualAmount > 0 ? this.formatMoney(r.actualAmount, r.currency || 'TRY', 2) : '-'}</td>
         <td style="white-space:nowrap;">
           <div class="action-btns">
@@ -4358,55 +4358,35 @@ const App = {
     }, '🗑️');
   },
 
-  async deleteInvoice(invoiceId) {
-    const inv = this.state.invoices.find(item => String(item.id) === String(invoiceId));
-    if (!inv) {
-      this.showToast(`Silinecek fatura kaydı (#${invoiceId}) bulunamadı.`, "error");
-      return;
+  formatSupplierCell(r) {
+    if (!r) return '-';
+    let items = [];
+    if (r.multiSuppliers) {
+      try {
+        const parsed = typeof r.multiSuppliers === 'string' ? JSON.parse(r.multiSuppliers) : r.multiSuppliers;
+        if (Array.isArray(parsed) && parsed.length > 0) items = parsed;
+      } catch (e) {}
+    }
+    if (items.length === 0 && r.supplier && r.supplier.includes(',')) {
+      items = r.supplier.split(',').map(s => ({ supplier: s.trim(), amount: 0 })).filter(it => it.supplier);
     }
 
-    this.showConfirm("Faturayı Sil", `Fatura #${inv.invoiceNo} (${inv.supplier}) silinecek. Emin misiniz?`, async () => {
-      await this.apiSync('invoices', 'DELETE', inv.id);
-      this.state.invoices = this.state.invoices.filter(item => String(item.id) !== String(invoiceId));
-      this.logAction('Fatura Silindi', `No: ${inv.invoiceNo}, Tedarikçi: ${inv.supplier}`);
-      this.showToast("Fatura başarıyla silindi!", "warning");
-      this.renderInvoices();
-    }, '🗑️');
+    if (items.length > 1) {
+      const tooltip = items.map(it => `${it.supplier}${it.amount ? ': ' + parseFloat(it.amount).toLocaleString('tr-TR') + ' ₺' : ''}`).join('\n');
+      const first = items[0].supplier;
+      const shortFirst = first.length > 16 ? first.substring(0, 16) + '...' : first;
+      return `
+        <div style="display:inline-flex; align-items:center; gap:0.35rem;" title="${tooltip.replace(/"/g, '&quot;')}">
+          <span class="badge" style="background:rgba(139,92,246,0.12); color:#8b5cf6; border:1px solid rgba(139,92,246,0.3); font-size:0.7rem; font-weight:700; padding:0.1rem 0.35rem;">🏢 ${items.length} Firma</span>
+          <span style="font-size:0.8rem; font-weight:600;">${shortFirst}</span>
+        </div>
+      `;
+    }
+
+    return r.supplier || '-';
   },
 
-  // 11. ACTIVITY LOGS RENDERER
-  renderActivityLogs() {
-    let logs = this.state.logs || [];
-    const searchText = document.getElementById('filter-log-search')?.value.toLowerCase().trim() || '';
-
-    if (searchText) {
-      logs = logs.filter(l => 
-        l.user?.toLowerCase().includes(searchText) ||
-        l.action?.toLowerCase().includes(searchText) ||
-        l.details?.toLowerCase().includes(searchText)
-      );
-    }
-
-    const tbody = document.querySelector('#table-activity-logs tbody');
-    if (!tbody) return;
-
-    if (logs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:2rem;">Kayıtlı aktivite logu bulunamadı.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = logs.map(l => `
-      <tr>
-        <td style="font-size:0.8rem; color:var(--text-muted); font-family:var(--font-mono); white-space:nowrap;">${l.timestamp}</td>
-        <td style="font-weight:600;">${l.user}</td>
-        <td><span class="badge status-completed">${l.action}</span></td>
-        <td style="font-size:0.88rem; max-width:450px;">${l.details}</td>
-      </tr>
-    `).join('');
-  },
-
-  // VIEW DETAILS MODAL HANDLERS
-  viewRequestDetails(requestId) {
+  openViewDetailsModal(requestId) {
     const req = this.state.requests.find(r => String(r.id) === String(requestId));
     if (!req) {
       this.showToast(`Talep (#${requestId}) bilgileri bulunamadı.`, "error");
@@ -4415,6 +4395,44 @@ const App = {
 
     this.state.currentActiveDetail = { type: 'request', data: req };
     document.getElementById('view-details-title').innerText = `📋 Talep Detayı #${req.requestBarcode || req.id}`;
+
+    let multiItems = [];
+    if (req.multiSuppliers) {
+      try {
+        const parsed = typeof req.multiSuppliers === 'string' ? JSON.parse(req.multiSuppliers) : req.multiSuppliers;
+        if (Array.isArray(parsed) && parsed.length > 0) multiItems = parsed;
+      } catch (e) {}
+    }
+    if (multiItems.length === 0 && req.supplier && req.supplier.includes(',')) {
+      multiItems = req.supplier.split(',').map(s => ({ supplier: s.trim(), amount: 0 })).filter(it => it.supplier);
+    }
+
+    let supplierBlockHtml = '';
+    if (multiItems.length > 1) {
+      supplierBlockHtml = `
+        <div style="grid-column: span 2; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-md); padding: 0.85rem;">
+          <div style="font-size: 0.75rem; color: var(--accent-purple); font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🏢 TEDARİKÇİ FİRMALAR & PARÇALI TUTARLARI</span>
+            <span class="badge" style="background: var(--accent-purple); color: white; font-size: 0.68rem; font-weight:700;">${multiItems.length} Firma Kısmi Sipariş</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+            ${multiItems.map((it, idx) => `
+              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 0.45rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <span style="font-weight: 700; color: var(--text-main); font-size: 0.88rem;">🏢 ${idx + 1}. ${it.supplier}</span>
+                <span style="font-weight: 800; font-family: var(--font-mono); color: var(--status-completed); font-size: 0.9rem;">${it.amount > 0 ? parseFloat(it.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + (req.currency || 'TRY') : '-'}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    } else {
+      supplierBlockHtml = `
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">TEDARİKÇİ FİRMA</div>
+          <div style="font-weight: 600; color: var(--text-main);">${req.supplier || '-'}</div>
+        </div>
+      `;
+    }
 
     const body = document.getElementById('view-details-body');
     if (body) {
@@ -4456,10 +4474,7 @@ const App = {
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">SİPARİŞ BARKODU</div>
             <div style="font-family: var(--font-mono); font-weight: 600; color: var(--text-main);">${req.orderBarcode || '-'}</div>
           </div>
-          <div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">TEDARİKÇİ FİRMA</div>
-            <div style="font-weight: 600; color: var(--text-main);">${req.supplier || '-'}</div>
-          </div>
+          ${supplierBlockHtml}
           <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">YÖNETMELİK MADDESİ</div>
             <div style="font-weight: 600; color: var(--text-main);">${req.regulation ? 'Madde ' + req.regulation : '-'}</div>

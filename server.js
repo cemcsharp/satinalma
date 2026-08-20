@@ -2836,6 +2836,21 @@ async function initDatabaseSchema() {
       `).catch(e => console.error('Supplier auto-seeding warning:', e.message));
       console.log('✅ Mevcut tedarikçiler veritabanından başarıyla aktarıldı!');
     }
+
+    // 🛡️ ÇOKLU TEDARİKCİ BİRLEŞİK İSİMLERİNİ TEMİZLE (Parçala ve Tekilleştir)
+    try {
+      const combinedSupps = await pool.query("SELECT id, name FROM suppliers WHERE name LIKE '%,%'");
+      for (const row of combinedSupps.rows) {
+        const names = row.name.split(',').map(n => n.trim()).filter(Boolean);
+        for (const name of names) {
+          await pool.query(
+            "INSERT INTO suppliers (name, category, status) VALUES ($1, 'Genel', 'Aktif') ON CONFLICT (name) DO NOTHING",
+            [name]
+          );
+        }
+        await pool.query("DELETE FROM suppliers WHERE id = $1", [row.id]);
+      }
+    } catch (e) {}
   } catch (err) {
     console.error('Veritabanı ilklendirme hatası:', err.message);
   }
