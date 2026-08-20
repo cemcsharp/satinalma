@@ -4387,8 +4387,12 @@ const App = {
     return r.supplier || '-';
   },
 
+  viewRequestDetails(requestId) {
+    this.openViewDetailsModal(requestId);
+  },
+
   openViewDetailsModal(requestId) {
-    const req = this.state.requests.find(r => String(r.id) === String(requestId));
+    const req = this.state.requests.find(r => String(r.id) === String(requestId) || (r.requestBarcode && String(r.requestBarcode) === String(requestId)));
     if (!req) {
       this.showToast(`Talep (#${requestId}) bilgileri bulunamadı.`, "error");
       return;
