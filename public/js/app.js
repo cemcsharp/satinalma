@@ -6653,6 +6653,9 @@ const App = {
                   <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--accent-primary); color:var(--accent-primary); font-weight:700;" onclick="App.openVendorProfile('${safeName}')" title="360° Firma Profili & Radar Karnesi">
                     <span>🔍</span> Profil
                   </button>
+                  <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--status-completed); color:var(--status-completed); font-weight:700;" onclick="App.openEditSupplierByName('${safeName}')" title="Cari Kartı Düzenle / Tanımla">
+                    <span>✏️</span> Düzenle
+                  </button>
                   <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:#f59e0b; color:#d97706; font-weight:700;" onclick="App.openVendorRateModal('${safeName}')" title="Puan Ver">
                     <span>⭐</span> Puanla
                   </button>
@@ -6691,7 +6694,7 @@ const App = {
   },
 
   switchSupplierSubtab(subtabName) {
-    const subtabs = ['analytics', 'directory', 'merge'];
+    const subtabs = ['analytics', 'directory'];
     subtabs.forEach(t => {
       const elTab = document.getElementById(`subtab-supplier-${t}`);
       const elBtn = document.getElementById(`btn-subtab-supplier-${t}`);
@@ -6707,10 +6710,19 @@ const App = {
 
     if (subtabName === 'directory') {
       this.renderSupplierDirectory();
-    } else if (subtabName === 'merge') {
-      this.renderSupplierMergeTool();
     } else if (subtabName === 'analytics') {
       this.renderSupplierAnalysis();
+    }
+  },
+
+  openEditSupplierByName(supplierName) {
+    if (!supplierName) return;
+    const cleanName = supplierName.trim();
+    const supp = (this.state.suppliers || []).find(s => (s.name || '').trim().toLowerCase() === cleanName.toLowerCase());
+    if (supp) {
+      this.openEditSupplierModal(supp.id);
+    } else {
+      this.openNewSupplierModal(cleanName);
     }
   },
 

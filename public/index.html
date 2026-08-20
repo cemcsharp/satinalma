@@ -1679,9 +1679,6 @@
           <button class="btn-secondary" id="btn-subtab-supplier-directory" onclick="App.switchSupplierSubtab('directory')" style="padding: 0.6rem 1.25rem; font-weight: 700; font-size: 0.88rem; border-color: var(--accent-primary); display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;">
             🏢 Sekme 2: Tedarikçi Kütüğü (Cari Listesi)
           </button>
-          <button class="btn-secondary" id="btn-subtab-supplier-merge" onclick="App.switchSupplierSubtab('merge')" style="padding: 0.6rem 1.25rem; font-weight: 700; font-size: 0.88rem; border-color: #f59e0b; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;">
-            🧹 Sekme 3: Yazım Birleştirme & Temizleme
-          </button>
         </div>
 
         <!-- SUBTAB 1: PERFORMANCE ANALYTICS & SCORECARDS -->
@@ -1738,13 +1735,16 @@
           </div>
 
           <div class="glass-card">
-            <div class="card-header">
+            <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
               <div>
                 <h3>🏭 Tedarikçi Bazlı Harcama, İş Hacmi ve Segmentasyon</h3>
                 <p style="font-size:0.8rem; color:var(--text-muted); margin:0.2rem 0 0 0;">
                   Tedarikçi firmaların performans puanları, seviye rozetleri (Tier) ve kurumsal işlem hacimleri.
                 </p>
               </div>
+              <button class="btn-primary" onclick="App.openNewSupplierModal()" style="font-weight: 700; padding: 0.55rem 1.1rem;">
+                <span>➕</span> Yeni Tedarikçi Tanımla
+              </button>
             </div>
 
             <!-- Filters Toolbar for Supplier Analysis -->
@@ -1862,47 +1862,6 @@
                   <tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">⏳ Tedarikçi kütüğü yükleniyor...</td></tr>
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- SUBTAB 3: YAZIM BİRLEŞTİRME & TEMİZLEME ARACI -->
-        <div id="subtab-supplier-merge" style="display: none;">
-          <div class="glass-card">
-            <div class="card-header">
-              <div>
-                <h3>🧹 Tedarikçi İsimleri Birleştirme & Düzeltme Motoru</h3>
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
-                  Geçmişte farklı yazılmış mükerrer firma isimlerini seçerek tek bir resmi cari adı altında birleştirin. Tüm geçmiş talepler, sözleşmeler, faturalar ve teminatlar otomatik güncellenir.
-                </p>
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
-              <!-- Left: Target Official Supplier Selection -->
-              <div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
-                <h4 style="margin-top: 0; color: var(--status-completed); font-size: 0.95rem;">🎯 1. Adım: Hedef Resmi Unvanı Seçin veya Girin</h4>
-                <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.85rem;">Tüm verilerin aktarılacağı resmi ve doğru tedarikçi adı.</p>
-                <div class="form-group">
-                  <label style="font-size: 0.8rem; font-weight: 700;">Resmi Hedef Tedarikçi Adı</label>
-                  <input type="text" id="merge-target-supplier" list="supplier-datalist" placeholder="ör: Kocabaş Bilgisayar Sistemleri A.Ş." style="font-weight: 700;">
-                </div>
-              </div>
-
-              <!-- Right: Source Duplicate Names List -->
-              <div style="background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
-                <h4 style="margin-top: 0; color: #d97706; font-size: 0.95rem;">⚠️ 2. Adım: Hedefle Birleştirilecek Hatalı Yazımları Seçin</h4>
-                <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.85rem;">Seçilen bu yazımlar silinerek hedef unvana dönüştürülecektir.</p>
-                <div id="merge-sources-checkbox-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; background: var(--bg-card);">
-                  <div style="color: var(--text-muted); font-size: 0.8rem; padding: 0.5rem; text-align: center;">Yükleniyor...</div>
-                </div>
-              </div>
-            </div>
-
-            <div style="margin-top: 1.25rem; text-align: right;">
-              <button class="btn-primary" onclick="App.handleMergeSuppliers()" style="padding: 0.7rem 1.5rem; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669);">
-                🧹 Seçili Yazımları Hedef Unvana Birleştir ve Tüm Verileri Güncelle
-              </button>
             </div>
           </div>
         </div>
@@ -4380,7 +4339,7 @@
   </div>
 
   <!-- Modal 11: Tedarikçi Cari Kartı Ekle / Düzenle -->
-  <div id="modal-supplier" class="modal-overlay" style="display: none;">
+  <div id="modal-supplier" class="modal-overlay">
     <div class="modal-content" style="max-width: 620px;">
       <div class="modal-header">
         <h3 id="modal-supplier-title">🏢 Yeni Tedarikçi Cari Kartı Tanımla</h3>
