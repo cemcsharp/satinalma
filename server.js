@@ -171,7 +171,7 @@ function verifyPassword(password, storedHash) {
 
 function generateToken(user) {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const exp = Date.now() + (24 * 60 * 60 * 1000); // 24 saat geçerli
+  const exp = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 gün geçerli
   const payload = Buffer.from(JSON.stringify({
     id: user.id,
     name: user.name,

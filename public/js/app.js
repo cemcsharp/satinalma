@@ -74,36 +74,65 @@ const App = {
     }
   },
 
-async init() {
+  async init() {
     console.log("Initializing Satınalma Takip App (Güvenli Mod)...");
     this.initTheme();
     this.bindEvents();
-    await this.fetchUsersList();
 
     const savedToken = localStorage.getItem('authToken');
+    const savedUserRaw = localStorage.getItem('currentUser');
+    
     if (savedToken) {
+      if (savedUserRaw) {
+        try {
+          this.state.currentUser = JSON.parse(savedUserRaw);
+          this.state.isLoggedIn = true;
+          document.documentElement.classList.add('has-auth-token');
+          const loginEl = document.getElementById('login-screen');
+          if (loginEl) loginEl.style.display = 'none';
+          const appEl = document.getElementById('app');
+          if (appEl) appEl.style.display = 'flex';
+          this.updateUserProfileCard();
+        } catch (e) {}
+      }
+
       try {
         const meRes = await this.authFetch('/api/auth/me');
-        if (meRes.ok) {
+        if (meRes && meRes.ok) {
           const meData = await meRes.json();
           this.state.currentUser = meData.user;
           this.state.isLoggedIn = true;
-          document.getElementById('login-screen').style.display = 'none';
-          document.getElementById('app').style.display = 'flex';
+          localStorage.setItem('currentUser', JSON.stringify(meData.user));
+          document.documentElement.classList.add('has-auth-token');
+          const loginEl = document.getElementById('login-screen');
+          if (loginEl) loginEl.style.display = 'none';
+          const appEl = document.getElementById('app');
+          if (appEl) appEl.style.display = 'flex';
           this.updateUserProfileCard();
           await this.fetchInitialData();
+          await this.fetchUsersList();
           const hashView = window.location.hash.replace(/^#\/?/, '').split('/')[0];
           const validViews = ['dashboard', 'requests', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
           const savedView = (hashView && validViews.includes(hashView)) ? hashView : (localStorage.getItem('activeView') || 'dashboard');
           this.switchView(savedView, true);
           this.handleHashRoute();
           return;
+        } else if (meRes && meRes.status === 401) {
+          this.handleLogout();
+          return;
         }
       } catch (e) {
-        console.error('Session validation failed:', e);
+        console.error('Session validation network error:', e);
+        if (this.state.currentUser) {
+          await this.fetchInitialData().catch(() => {});
+          const savedView = localStorage.getItem('activeView') || 'dashboard';
+          this.switchView(savedView, true);
+          return;
+        }
       }
     }
 
+    await this.fetchUsersList();
     this.handleLogout();
   },
 
@@ -479,7 +508,9 @@ async init() {
 
       // Başarılı Giriş
       localStorage.setItem('authToken', data.token);
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
       localStorage.setItem('loggedInUserId', data.user.id);
+      document.documentElement.classList.add('has-auth-token');
       this.state.currentUser = data.user;
       this.state.isLoggedIn = true;
 
@@ -514,7 +545,9 @@ async init() {
     this.state.isLoggedIn = false;
     this.state.currentUser = null;
     localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
     localStorage.removeItem('loggedInUserId');
+    document.documentElement.classList.remove('has-auth-token');
     document.getElementById('app').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
     const passField = document.getElementById('login-screen-password');

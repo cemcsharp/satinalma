@@ -16,6 +16,11 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- SheetJS for Excel file import & parsing -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    if (localStorage.getItem('authToken') && localStorage.getItem('currentUser')) {
+      document.documentElement.classList.add('has-auth-token');
+    }
+  </script>
 </head>
 <body>
   <!-- Toast Notification Area -->

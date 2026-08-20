@@ -3818,3 +3818,11 @@ body.role-executive .badge-executive-mode {
   text-overflow: ellipsis;
 }
 
+/* 🔐 Sesssion Persistence Helpers */
+html.has-auth-token #login-screen {
+  display: none !important;
+}
+html.has-auth-token #app {
+  display: flex !important;
+}
+
