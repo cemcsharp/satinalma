@@ -209,6 +209,7 @@ const App = {
         this.populateSupplierDatalists();
         this.populateYearSelect();
         this.syncRatesInputUI();
+        this.renderWorkloadSettingsUI();
       }
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -8214,6 +8215,7 @@ const App = {
       }).join('');
     }
     this.syncRatesInputUI();
+    this.renderWorkloadSettingsUI();
     this.renderUnitsSettings();
     this.renderRegulationsSettings();
     this.renderBackupsTableSettings();
@@ -8365,17 +8367,22 @@ const App = {
     const quotaInput = document.getElementById('setting-max-open-requests');
     const enforceChk = document.getElementById('setting-enforce-quota');
     if (quotaInput) {
-      quotaInput.value = this.state.settings?.maxOpenRequestsPerUser || 15;
+      const qVal = parseInt(this.state.settings?.maxOpenRequestsPerUser, 10);
+      quotaInput.value = !isNaN(qVal) && qVal > 0 ? qVal : 15;
     }
     if (enforceChk) {
-      enforceChk.checked = this.state.settings?.enforceQuota !== false;
+      const enfVal = this.state.settings?.enforceQuota;
+      enforceChk.checked = enfVal !== false && enfVal !== 'false';
     }
   },
 
   async saveWorkloadSettings(e) {
     if (e) e.preventDefault();
-    const maxQuota = parseInt(document.getElementById('setting-max-open-requests')?.value, 10) || 15;
-    const enforceQuota = document.getElementById('setting-enforce-quota')?.checked !== false;
+    const quotaInput = document.getElementById('setting-max-open-requests');
+    const enforceChk = document.getElementById('setting-enforce-quota');
+
+    const maxQuota = parseInt(quotaInput?.value, 10) || 15;
+    const enforceQuota = Boolean(enforceChk?.checked);
 
     if (!this.state.settings) this.state.settings = {};
     this.state.settings.maxOpenRequestsPerUser = maxQuota;
@@ -8385,12 +8392,12 @@ const App = {
       await this.authFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'maxOpenRequestsPerUser', value: maxQuota })
+        body: JSON.stringify({ key: 'maxOpenRequestsPerUser', value: String(maxQuota) })
       });
       await this.authFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'enforceQuota', value: enforceQuota })
+        body: JSON.stringify({ key: 'enforceQuota', value: String(enforceQuota) })
       });
 
       this.logAction('Kapasite Ayarları Güncellendi', `Kişi Başı Maksimum Kota: ${maxQuota}, Blokaj: ${enforceQuota ? 'Aktif' : 'Pasif'}`);
