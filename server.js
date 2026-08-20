@@ -110,6 +110,7 @@ const TABLE_COLUMNS = {
     'complianceScore', 'communicationScore', 'overallScore', 'reviewNotes',
     'ratedBy', 'ratedAt'
   ],
+  suppliers: ['name', 'taxNumber', 'taxOffice', 'category', 'contactPerson', 'email', 'phone', 'address', 'status', 'notes'],
   settings: ['key', 'value'],
   rates: ['currency', 'rate', 'lastUpdated']
 };
@@ -291,7 +292,7 @@ function sanitizeVal(val, k) {
 // 🗄️ DATABASE BACKUP ENGINE HELPERS
 // ----------------------------------------------------
 async function exportAllDatabaseData() {
-  const tables = ['users', 'units', 'regulations', 'rates', 'requests', 'contracts', 'invoices', 'guarantees', 'tenders', 'documents', 'logs', 'vendor_ratings', 'settings'];
+  const tables = ['users', 'units', 'regulations', 'rates', 'requests', 'contracts', 'invoices', 'guarantees', 'tenders', 'documents', 'logs', 'vendor_ratings', 'settings', 'suppliers'];
   const snapshot = { exportedAt: new Date().toISOString(), version: '2.1.0' };
   for (const t of tables) {
     try {
@@ -1335,6 +1336,149 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ----------------------------------------------------
+    // 🏢 SUPPLIERS (TEDARİKCİ KÜTÜĞÜ) ENDPOINTS
+    // ----------------------------------------------------
+    if (urlPath === '/api/suppliers' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      const result = await pool.query('SELECT * FROM suppliers ORDER BY name ASC');
+      res.writeHead(200);
+      res.end(JSON.stringify(result.rows));
+      return;
+    }
+
+    if (urlPath === '/api/suppliers' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      if (!currentUser) { sendUnauthorized(); return; }
+      const body = await readBody(req);
+      const data = JSON.parse(body || '{}');
+      if (!data.name || !data.name.trim()) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Tedarikçi resmi unvanı boş olamaz.' }));
+        return;
+      }
+      const sName = data.name.trim();
+      try {
+        const insertRes = await pool.query(`
+          INSERT INTO suppliers (name, "taxNumber", "taxOffice", category, "contactPerson", email, phone, address, status, notes)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *
+        `, [
+          sName,
+          data.taxNumber || null,
+          data.taxOffice || null,
+          data.category || 'Genel',
+          data.contactPerson || null,
+          data.email || null,
+          data.phone || null,
+          data.address || null,
+          data.status || 'Aktif',
+          data.notes || null
+        ]);
+        res.writeHead(201);
+        res.end(JSON.stringify(insertRes.rows[0]));
+      } catch (err) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: err.message.includes('unique') ? 'Bu unvanda bir tedarikçi zaten kayıtlı.' : err.message }));
+      }
+      return;
+    }
+
+    if (urlPath.startsWith('/api/suppliers/') && method === 'PUT') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      if (!currentUser) { sendUnauthorized(); return; }
+      const suppId = parseInt(urlPath.split('/')[3], 10);
+      const body = await readBody(req);
+      const data = JSON.parse(body || '{}');
+      const sName = (data.name || '').trim();
+      if (!suppId || !sName) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Geçersiz tedarikçi ID veya unvan.' }));
+        return;
+      }
+
+      try {
+        const updateRes = await pool.query(`
+          UPDATE suppliers
+          SET name = $1, "taxNumber" = $2, "taxOffice" = $3, category = $4, "contactPerson" = $5, email = $6, phone = $7, address = $8, status = $9, notes = $10
+          WHERE id = $11
+          RETURNING *
+        `, [
+          sName,
+          data.taxNumber || null,
+          data.taxOffice || null,
+          data.category || 'Genel',
+          data.contactPerson || null,
+          data.email || null,
+          data.phone || null,
+          data.address || null,
+          data.status || 'Aktif',
+          data.notes || null,
+          suppId
+        ]);
+
+        res.writeHead(200);
+        res.end(JSON.stringify(updateRes.rows[0]));
+      } catch (err) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+
+    if (urlPath.startsWith('/api/suppliers/') && method === 'DELETE') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      if (!currentUser) { sendUnauthorized(); return; }
+      const suppId = parseInt(urlPath.split('/')[3], 10);
+      await pool.query('DELETE FROM suppliers WHERE id = $1', [suppId]);
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+
+    if (urlPath === '/api/suppliers/merge' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      if (!currentUser) { sendUnauthorized(); return; }
+      const body = await readBody(req);
+      const { targetName, sourceNames } = JSON.parse(body || '{}');
+
+      if (!targetName || !Array.isArray(sourceNames) || sourceNames.length === 0) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Hedef firma ismi ve birleştirilecek kaynak isimler eksik.' }));
+        return;
+      }
+
+      const cleanTarget = targetName.trim();
+      const cleanSources = sourceNames.map(s => String(s).trim()).filter(Boolean);
+
+      // Ensure target exists in suppliers table
+      await pool.query(`
+        INSERT INTO suppliers (name, category, status) VALUES ($1, 'Genel', 'Aktif')
+        ON CONFLICT (name) DO NOTHING
+      `, [cleanTarget]);
+
+      for (const src of cleanSources) {
+        if (src.toLowerCase() === cleanTarget.toLowerCase()) continue;
+        await pool.query('UPDATE requests SET supplier = $1 WHERE LOWER(TRIM(supplier)) = LOWER(TRIM($2))', [cleanTarget, src]);
+        await pool.query('UPDATE contracts SET supplier = $1 WHERE LOWER(TRIM(supplier)) = LOWER(TRIM($2))', [cleanTarget, src]);
+        await pool.query('UPDATE invoices SET supplier = $1 WHERE LOWER(TRIM(supplier)) = LOWER(TRIM($2))', [cleanTarget, src]);
+        await pool.query('UPDATE guarantees SET supplier = $1 WHERE LOWER(TRIM(supplier)) = LOWER(TRIM($2))', [cleanTarget, src]);
+        await pool.query('UPDATE tenders SET "winnerSupplier" = $1 WHERE LOWER(TRIM("winnerSupplier")) = LOWER(TRIM($2))', [cleanTarget, src]);
+        await pool.query('UPDATE vendor_ratings SET "supplierName" = $1 WHERE LOWER(TRIM("supplierName")) = LOWER(TRIM($2))', [cleanTarget, src]);
+        await pool.query('DELETE FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND LOWER(TRIM(name)) != LOWER(TRIM($2))', [src, cleanTarget]);
+      }
+
+      const dateStr = new Date().toLocaleString('tr-TR');
+      await pool.query(
+        'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+        [dateStr, currentUser.name, 'Tedarikçi Birleştirme', `Tedarikçi yazımları "${cleanSources.join(', ')}" -> "${cleanTarget}" olarak birleştirildi.`]
+      ).catch(() => {});
+
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, targetName: cleanTarget, mergedCount: cleanSources.length }));
+      return;
+    }
+
+    // ----------------------------------------------------
     // ⭐ TEDARİKÇİ PUANLAMA (E-POSTA LİNKİNDEN GELEN PUBLIC İŞLEMLER)
     // ----------------------------------------------------
     if (urlPath === '/api/vendor_ratings/check' && method === 'GET') {
@@ -1366,7 +1510,7 @@ const server = http.createServer(async (req, res) => {
       }
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       
-      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders, documents, vendorRatings, settings] = await Promise.all([
+      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders, documents, vendorRatings, settings, suppliers] = await Promise.all([
         getTableData('users'), // Şifresiz döner
         getTableData('requests'),
         getTableData('contracts'),
@@ -1379,7 +1523,8 @@ const server = http.createServer(async (req, res) => {
         getTableData('tenders').catch(() => []),
         getTableData('documents').catch(() => []),
         getTableData('vendor_ratings').catch(() => []),
-        getTableData('settings').catch(() => [])
+        getTableData('settings').catch(() => []),
+        getTableData('suppliers').catch(() => [])
       ]);
 
       const ratesObj = {};
@@ -1403,7 +1548,8 @@ const server = http.createServer(async (req, res) => {
         tenders: tenders || [],
         documents: documents || [],
         vendorRatings: vendorRatings || [],
-        settings: settingsMap
+        settings: settingsMap,
+        suppliers: suppliers || []
       };
 
       res.writeHead(200);
@@ -2452,6 +2598,21 @@ async function initDatabaseSchema() {
         value TEXT
       );
 
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        "taxNumber" VARCHAR(50),
+        "taxOffice" VARCHAR(100),
+        category VARCHAR(100) DEFAULT 'Genel',
+        "contactPerson" VARCHAR(150),
+        email VARCHAR(150),
+        phone VARCHAR(50),
+        address TEXT,
+        status VARCHAR(20) DEFAULT 'Aktif',
+        notes TEXT,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100);
@@ -2648,6 +2809,29 @@ async function initDatabaseSchema() {
         'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
         ['Rektörlük / Üst Yönetim', 'Rektörlük & Genel Sekreterlik', 'EXECUTIVE', true, hashPassword('123456')]
       ).catch(() => {});
+    }
+
+    // 🏢 TEDARİKCİ KÜTÜĞÜ OTOMATİK DOLDURMA (Auto-Seeding)
+    const suppCheck = await pool.query('SELECT COUNT(*) FROM suppliers').catch(() => ({ rows: [{ count: '0' }] }));
+    if (parseInt(suppCheck.rows[0]?.count || 0, 10) === 0) {
+      console.log('ℹ️ Tedarikçi kütüğü boş, mevcut kayıtlardan tedarikçiler aktarılıyor...');
+      await pool.query(`
+        INSERT INTO suppliers (name, category, status)
+        SELECT DISTINCT TRIM(supplier_name), 'Genel', 'Aktif'
+        FROM (
+          SELECT supplier AS supplier_name FROM requests WHERE supplier IS NOT NULL AND TRIM(supplier) != ''
+          UNION
+          SELECT supplier AS supplier_name FROM contracts WHERE supplier IS NOT NULL AND TRIM(supplier) != ''
+          UNION
+          SELECT supplier AS supplier_name FROM invoices WHERE supplier IS NOT NULL AND TRIM(supplier) != ''
+          UNION
+          SELECT supplier AS supplier_name FROM guarantees WHERE supplier IS NOT NULL AND TRIM(supplier) != ''
+          UNION
+          SELECT "winnerSupplier" AS supplier_name FROM tenders WHERE "winnerSupplier" IS NOT NULL AND TRIM("winnerSupplier") != ''
+        ) AS existing_suppliers
+        ON CONFLICT (name) DO NOTHING;
+      `).catch(e => console.error('Supplier auto-seeding warning:', e.message));
+      console.log('✅ Mevcut tedarikçiler veritabanından başarıyla aktarıldı!');
     }
   } catch (err) {
     console.error('Veritabanı ilklendirme hatası:', err.message);

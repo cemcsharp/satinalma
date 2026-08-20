@@ -32,6 +32,7 @@ const App = {
     expandedMatrixGroups: new Set(),
     expandedMatrixSubGroups: new Set(),
     vendorRatings: [],
+    suppliers: [],
     smtpConfig: null,
     parsedExcelData: [],
     charts: {}
@@ -198,12 +199,14 @@ const App = {
         this.state.logs = data.logs || [];
         this.state.documents = data.documents || [];
         this.state.vendorRatings = (data.vendorRatings || []).map(r => this.normalizeRating(r)).filter(Boolean);
+        this.state.suppliers = data.suppliers || [];
         this.state.settings = data.settings || {};
         if (data.rates) this.state.rates = data.rates;
         this.state.dismissedNotifs = JSON.parse(localStorage.getItem('dismissedNotifs') || '[]');
 
         this.populateLoginDropdown();
         this.populateDropdowns();
+        this.populateSupplierDatalists();
         this.populateYearSelect();
         this.syncRatesInputUI();
       }
@@ -6659,6 +6662,280 @@ const App = {
           `;
         }).join('');
       }
+    }
+  },
+
+  populateSupplierDatalists() {
+    const datalist = document.getElementById('supplier-datalist');
+    if (!datalist) return;
+
+    const supplierNames = new Set();
+    (this.state.suppliers || []).forEach(s => {
+      if (s.name && s.name.trim()) supplierNames.add(s.name.trim());
+    });
+    (this.state.requests || []).forEach(r => {
+      if (r.supplier && r.supplier.trim()) supplierNames.add(r.supplier.trim());
+    });
+    (this.state.contracts || []).forEach(c => {
+      if (c.supplier && c.supplier.trim()) supplierNames.add(c.supplier.trim());
+    });
+    (this.state.invoices || []).forEach(i => {
+      if (i.supplier && i.supplier.trim()) supplierNames.add(i.supplier.trim());
+    });
+    (this.state.guarantees || []).forEach(g => {
+      if (g.supplier && g.supplier.trim()) supplierNames.add(g.supplier.trim());
+    });
+
+    const sortedNames = Array.from(supplierNames).sort((a, b) => a.localeCompare(b, 'tr'));
+    datalist.innerHTML = sortedNames.map(name => `<option value="${name.replace(/"/g, '&quot;')}"></option>`).join('');
+  },
+
+  switchSupplierSubtab(subtabName) {
+    const subtabs = ['analytics', 'directory', 'merge'];
+    subtabs.forEach(t => {
+      const elTab = document.getElementById(`subtab-supplier-${t}`);
+      const elBtn = document.getElementById(`btn-subtab-supplier-${t}`);
+      if (elTab) elTab.style.display = (t === subtabName) ? 'block' : 'none';
+      if (elBtn) {
+        if (t === subtabName) {
+          elBtn.className = 'btn-primary';
+        } else {
+          elBtn.className = 'btn-secondary';
+        }
+      }
+    });
+
+    if (subtabName === 'directory') {
+      this.renderSupplierDirectory();
+    } else if (subtabName === 'merge') {
+      this.renderSupplierMergeTool();
+    } else if (subtabName === 'analytics') {
+      this.renderSupplierAnalysis();
+    }
+  },
+
+  renderSupplierDirectory() {
+    const searchVal = (document.getElementById('filter-directory-search')?.value || '').toLowerCase().trim();
+    const catVal = document.getElementById('filter-directory-category')?.value || 'ALL';
+    const statusVal = document.getElementById('filter-directory-status')?.value || 'ALL';
+
+    const suppliers = this.state.suppliers || [];
+    const filtered = suppliers.filter(s => {
+      if (searchVal) {
+        const text = `${s.name || ''} ${s.taxNumber || ''} ${s.contactPerson || ''} ${s.email || ''}`.toLowerCase();
+        if (!text.includes(searchVal)) return false;
+      }
+      if (catVal !== 'ALL' && s.category !== catVal) return false;
+      if (statusVal !== 'ALL' && s.status !== statusVal) return false;
+      return true;
+    });
+
+    const tbody = document.querySelector('#table-supplier-directory tbody');
+    if (!tbody) return;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Aramanıza uygun kayıtlı tedarikçi bulunamadı.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map((s, idx) => {
+      let statusBadge = `<span class="badge status-completed" style="font-size:0.72rem;">🟢 Aktif</span>`;
+      if (s.status === 'Onaylı') statusBadge = `<span class="badge priority-orta" style="font-size:0.72rem;">🌟 Onaylı</span>`;
+      else if (s.status === 'Pasif') statusBadge = `<span class="badge" style="background:var(--bg-hover); color:var(--text-muted); font-size:0.72rem;">⚪ Pasif</span>`;
+
+      return `
+        <tr>
+          <td style="font-weight:700; color:var(--text-muted); font-size:0.75rem;">${idx + 1}</td>
+          <td><strong style="color:var(--text-main); font-size:0.85rem;">${s.name}</strong></td>
+          <td><div style="font-size:0.78rem; font-family:var(--font-mono); color:var(--text-muted);">${s.taxNumber || '-'} ${s.taxOffice ? `(${s.taxOffice})` : ''}</div></td>
+          <td><span class="badge" style="background:var(--bg-hover); color:var(--accent-primary); font-size:0.72rem;">${s.category || 'Genel'}</span></td>
+          <td><div style="font-size:0.8rem; font-weight:600; color:var(--text-main);">${s.contactPerson || '-'}</div></td>
+          <td><div style="font-size:0.76rem; color:var(--text-muted);">${s.email || '-'}<br>${s.phone || ''}</div></td>
+          <td style="text-align:center;">${statusBadge}</td>
+          <td style="text-align:center;">
+            <div style="display:flex; gap:0.25rem; justify-content:center;">
+              <button class="btn-icon" onclick="App.openEditSupplierModal(${s.id})" title="Düzenle" style="font-size:0.8rem;">✏️</button>
+              <button class="btn-icon" onclick="App.deleteSupplier(${s.id})" title="Sil" style="font-size:0.8rem; color:#ef4444;">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  openNewSupplierModal(prefillName = '') {
+    const form = document.getElementById('form-supplier');
+    if (form) form.reset();
+    document.getElementById('supp-id').value = '';
+    document.getElementById('supp-name').value = prefillName;
+    document.getElementById('modal-supplier-title').innerText = '🏢 Yeni Tedarikçi Cari Kartı Tanımla';
+    this.openModal('modal-supplier');
+  },
+
+  openEditSupplierModal(id) {
+    const supp = (this.state.suppliers || []).find(s => String(s.id) === String(id));
+    if (!supp) return;
+
+    document.getElementById('supp-id').value = supp.id;
+    document.getElementById('supp-name').value = supp.name || '';
+    document.getElementById('supp-tax-number').value = supp.taxNumber || '';
+    document.getElementById('supp-tax-office').value = supp.taxOffice || '';
+    document.getElementById('supp-category').value = supp.category || 'Genel';
+    document.getElementById('supp-status').value = supp.status || 'Aktif';
+    document.getElementById('supp-contact-person').value = supp.contactPerson || '';
+    document.getElementById('supp-email').value = supp.email || '';
+    document.getElementById('supp-phone').value = supp.phone || '';
+    document.getElementById('supp-address').value = supp.address || '';
+    document.getElementById('supp-notes').value = supp.notes || '';
+
+    document.getElementById('modal-supplier-title').innerText = `🏢 Tedarikçi Düzenle: ${supp.name}`;
+    this.openModal('modal-supplier');
+  },
+
+  async saveSupplier(e) {
+    if (e) e.preventDefault();
+    const id = document.getElementById('supp-id').value;
+    const name = document.getElementById('supp-name').value.trim();
+    if (!name) {
+      this.showToast('Lütfen resmi firma unvanını giriniz.', 'warning');
+      return;
+    }
+
+    const payload = {
+      name,
+      taxNumber: document.getElementById('supp-tax-number').value.trim(),
+      taxOffice: document.getElementById('supp-tax-office').value.trim(),
+      category: document.getElementById('supp-category').value,
+      status: document.getElementById('supp-status').value,
+      contactPerson: document.getElementById('supp-contact-person').value.trim(),
+      email: document.getElementById('supp-email').value.trim(),
+      phone: document.getElementById('supp-phone').value.trim(),
+      address: document.getElementById('supp-address').value.trim(),
+      notes: document.getElementById('supp-notes').value.trim()
+    };
+
+    try {
+      let res;
+      if (id) {
+        res = await this.authFetch(`/api/suppliers/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await this.authFetch('/api/suppliers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (res.ok) {
+        const saved = await res.json();
+        if (id) {
+          const idx = (this.state.suppliers || []).findIndex(s => String(s.id) === String(id));
+          if (idx !== -1) this.state.suppliers[idx] = saved;
+        } else {
+          this.state.suppliers.push(saved);
+        }
+
+        this.closeModal('modal-supplier');
+        this.populateSupplierDatalists();
+        this.showToast(`Tedarikçi cari kartı kaydedildi: ${saved.name}`, 'success', '🏢');
+        this.renderSupplierDirectory();
+      } else {
+        const err = await res.json();
+        this.showToast(err.error || 'Tedarikçi kaydedilemedi.', 'danger');
+      }
+    } catch (err) {
+      console.error('saveSupplier error:', err);
+      this.showToast('Sunucu hatası oluştu.', 'danger');
+    }
+  },
+
+  async deleteSupplier(id) {
+    const supp = (this.state.suppliers || []).find(s => String(s.id) === String(id));
+    if (!supp) return;
+    if (!confirm(`"${supp.name}" tedarikçi kaydını cari kütükten silmek istediğinize emin misiniz?`)) return;
+
+    try {
+      const res = await this.authFetch(`/api/suppliers/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.state.suppliers = (this.state.suppliers || []).filter(s => String(s.id) !== String(id));
+        this.populateSupplierDatalists();
+        this.showToast('Tedarikçi kaydı silindi.', 'info');
+        this.renderSupplierDirectory();
+      }
+    } catch (err) {
+      console.error('deleteSupplier error:', err);
+    }
+  },
+
+  renderSupplierMergeTool() {
+    const supplierNames = new Set();
+    (this.state.suppliers || []).forEach(s => { if (s.name && s.name.trim()) supplierNames.add(s.name.trim()); });
+    (this.state.requests || []).forEach(r => { if (r.supplier && r.supplier.trim()) supplierNames.add(r.supplier.trim()); });
+    (this.state.contracts || []).forEach(c => { if (c.supplier && c.supplier.trim()) supplierNames.add(c.supplier.trim()); });
+    (this.state.invoices || []).forEach(i => { if (i.supplier && i.supplier.trim()) supplierNames.add(i.supplier.trim()); });
+    (this.state.guarantees || []).forEach(g => { if (g.supplier && g.supplier.trim()) supplierNames.add(g.supplier.trim()); });
+
+    const sortedList = Array.from(supplierNames).sort((a, b) => a.localeCompare(b, 'tr'));
+
+    const listContainer = document.getElementById('merge-sources-checkbox-list');
+    if (!listContainer) return;
+
+    if (sortedList.length === 0) {
+      listContainer.innerHTML = '<div style="color:var(--text-muted); padding:0.5rem; text-align:center;">Kayıtlı firma bulunamadı.</div>';
+      return;
+    }
+
+    listContainer.innerHTML = sortedList.map((name, idx) => `
+      <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer; padding:0.25rem 0.4rem; border-radius:4px; transition:background 0.15s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+        <input type="checkbox" class="merge-source-chk" value="${name.replace(/"/g, '&quot;')}" style="accent-color:#d97706;">
+        <span style="font-weight:600; color:var(--text-main);">${name}</span>
+      </label>
+    `).join('');
+  },
+
+  async handleMergeSuppliers() {
+    const targetInput = document.getElementById('merge-target-supplier');
+    const targetName = (targetInput?.value || '').trim();
+    if (!targetName) {
+      this.showToast('Lütfen hedef resmi tedarikçi unvanını giriniz veya seçiniz.', 'warning');
+      return;
+    }
+
+    const checkedNodes = document.querySelectorAll('.merge-source-chk:checked');
+    const sourceNames = Array.from(checkedNodes).map(chk => chk.value).filter(name => name.toLowerCase() !== targetName.toLowerCase());
+
+    if (sourceNames.length === 0) {
+      this.showToast('Lütfen hedef unvanla birleştirilecek en az 1 hatalı yazım seçiniz.', 'warning');
+      return;
+    }
+
+    if (!confirm(`Seçilen ${sourceNames.length} adet farklı firma yazımı ("${sourceNames.join('", "')}") resmi "${targetName}" unvanı altında birleştirilecektir. Devam etmek istiyor musunuz?`)) {
+      return;
+    }
+
+    try {
+      const res = await this.authFetch('/api/suppliers/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetName, sourceNames })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        this.showToast(`Tedarikçi yazımları başarıyla "${data.targetName}" unvanı altında birleştirildi!`, 'success', '🧹');
+        await this.fetchInitialData();
+        this.renderSupplierMergeTool();
+      } else {
+        const err = await res.json();
+        this.showToast(err.error || 'Birleştirme işlemi başarısız.', 'danger');
+      }
+    } catch (err) {
+      console.error('handleMergeSuppliers error:', err);
+      this.showToast('Sunucu hatası oluştu.', 'danger');
     }
   },
 

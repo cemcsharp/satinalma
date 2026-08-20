@@ -1670,118 +1670,240 @@
 
       <!-- 8. SUPPLIER ANALYSIS VIEW -->
       <section id="view-supplier-analysis" class="view-section" style="display: none;">
-        <!-- Supplier Risk & Performance Alerts Container -->
-        <div id="supplier-risk-alerts-container" style="margin-bottom: 1.25rem;"></div>
+        
+        <!-- SUB-NAVIGATION TABS FOR SUPPLIER HUB -->
+        <div class="yearly-report-tabs" style="margin-bottom: 1.25rem;">
+          <button class="btn-primary" id="btn-subtab-supplier-analytics" onclick="App.switchSupplierSubtab('analytics')" style="padding: 0.55rem 1.15rem; font-weight: 700; font-size: 0.88rem;">
+            📊 Sekme 1: Performans Analizi & Karneler
+          </button>
+          <button class="btn-secondary" id="btn-subtab-supplier-directory" onclick="App.switchSupplierSubtab('directory')" style="padding: 0.55rem 1.15rem; font-weight: 700; font-size: 0.88rem; border-color: var(--accent-primary);">
+            🏢 Sekme 2: Tedarikçi Kütüğü (Cari Listesi)
+          </button>
+          <button class="btn-secondary" id="btn-subtab-supplier-merge" onclick="App.switchSupplierSubtab('merge')" style="padding: 0.55rem 1.15rem; font-weight: 700; font-size: 0.88rem; border-color: #f59e0b;">
+            🧹 Sekme 3: Yazım Birleştirme & Temizleme
+          </button>
+        </div>
 
-        <!-- 🏭 Executive Supplier Analysis KPI Cards -->
-        <div class="grid-4" style="margin-bottom: 1.25rem;">
-          <div class="glass-card kpi-card" id="card-supp-kpi-total" style="cursor: pointer;" title="Tüm tedarikçileri listele">
-            <div class="kpi-icon blue">🏢</div>
-            <div class="kpi-data">
-              <h3 id="supp-kpi-total">0 Firma</h3>
-              <p>Aktif Tedarikçi</p>
-              <div class="kpi-sub" id="supp-kpi-total-spend">Toplam: 0,00 ₺</div>
+        <!-- SUBTAB 1: PERFORMANCE ANALYTICS & SCORECARDS -->
+        <div id="subtab-supplier-analytics">
+          <!-- Supplier Risk & Performance Alerts Container -->
+          <div id="supplier-risk-alerts-container" style="margin-bottom: 1.25rem;"></div>
+
+          <!-- 🏭 Executive Supplier Analysis KPI Cards -->
+          <div class="grid-4" style="margin-bottom: 1.25rem;">
+            <div class="glass-card kpi-card" id="card-supp-kpi-total" style="cursor: pointer;" title="Tüm tedarikçileri listele">
+              <div class="kpi-icon blue">🏢</div>
+              <div class="kpi-data">
+                <h3 id="supp-kpi-total">0 Firma</h3>
+                <p>Aktif Tedarikçi</p>
+                <div class="kpi-sub" id="supp-kpi-total-spend">Toplam: 0,00 ₺</div>
+              </div>
+            </div>
+
+            <div class="glass-card kpi-card" id="card-supp-kpi-gold" style="cursor: pointer;" title="Sadece Gold Tier stratejik tedarikçileri filtrele">
+              <div class="kpi-icon green">🌟</div>
+              <div class="kpi-data">
+                <h3 id="supp-kpi-gold" style="color: #10b981;">0 Firma</h3>
+                <p style="color: #10b981; font-weight: 700;">Stratejik / Gold Tier</p>
+                <div class="kpi-sub" id="supp-kpi-gold-sub">4.5+ Üstün Memnuniyet</div>
+              </div>
+            </div>
+
+            <div class="glass-card kpi-card" id="card-supp-kpi-avg">
+              <div class="kpi-icon yellow">⭐</div>
+              <div class="kpi-data">
+                <h3 id="supp-kpi-avg-score" style="color: #f59e0b;">0.0 / 5.0</h3>
+                <p>Ortalama Karne Puanı</p>
+                <div class="kpi-sub" id="supp-kpi-avg-sub">Kurumsal Değerlendirme</div>
+              </div>
+            </div>
+
+            <div class="glass-card kpi-card" id="card-supp-kpi-risk" style="cursor: pointer;" title="Riskli ve gözetim altındaki tedarikçileri filtrele">
+              <div class="kpi-icon red">⚠️</div>
+              <div class="kpi-data">
+                <h3 id="supp-kpi-risk" style="color: var(--status-rejected);">0 Firma</h3>
+                <p style="color: var(--status-rejected); font-weight: 700;">Riskli / Gözetim</p>
+                <div class="kpi-sub" id="supp-kpi-risk-sub">Düşük Puan / Alarm</div>
+              </div>
             </div>
           </div>
 
-          <div class="glass-card kpi-card" id="card-supp-kpi-gold" style="cursor: pointer;" title="Sadece Gold Tier stratejik tedarikçileri filtrele">
-            <div class="kpi-icon green">🌟</div>
-            <div class="kpi-data">
-              <h3 id="supp-kpi-gold" style="color: #10b981;">0 Firma</h3>
-              <p style="color: #10b981; font-weight: 700;">Stratejik / Gold Tier</p>
-              <div class="kpi-sub" id="supp-kpi-gold-sub">4.5+ Üstün Memnuniyet</div>
+          <!-- Pareto 80/20 & Dependency Insights Banner -->
+          <div id="supp-pareto-banner" style="background: rgba(30, 58, 138, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); padding: 0.75rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--text-main); flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span style="font-size: 1.2rem;">💡</span>
+              <span id="supp-pareto-text">Tedarikçi bağımlılık ve harcama konsantrasyonu hesaplanıyor...</span>
             </div>
+            <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: var(--accent-primary); font-weight: 700; font-size: 0.75rem;">Pareto 80/20 Analizi</span>
           </div>
 
-          <div class="glass-card kpi-card" id="card-supp-kpi-avg">
-            <div class="kpi-icon yellow">⭐</div>
-            <div class="kpi-data">
-              <h3 id="supp-kpi-avg-score" style="color: #f59e0b;">0.0 / 5.0</h3>
-              <p>Ortalama Karne Puanı</p>
-              <div class="kpi-sub" id="supp-kpi-avg-sub">Kurumsal Değerlendirme</div>
+          <div class="glass-card">
+            <div class="card-header">
+              <div>
+                <h3>🏭 Tedarikçi Bazlı Harcama, İş Hacmi ve Segmentasyon</h3>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin:0.2rem 0 0 0;">
+                  Tedarikçi firmaların performans puanları, seviye rozetleri (Tier) ve kurumsal işlem hacimleri.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div class="glass-card kpi-card" id="card-supp-kpi-risk" style="cursor: pointer;" title="Riskli ve gözetim altındaki tedarikçileri filtrele">
-            <div class="kpi-icon red">⚠️</div>
-            <div class="kpi-data">
-              <h3 id="supp-kpi-risk" style="color: var(--status-rejected);">0 Firma</h3>
-              <p style="color: var(--status-rejected); font-weight: 700;">Riskli / Gözetim</p>
-              <div class="kpi-sub" id="supp-kpi-risk-sub">Düşük Puan / Alarm</div>
+            <!-- Filters Toolbar for Supplier Analysis -->
+            <div class="filter-bar">
+              <div class="search-input-box" style="min-width: 240px;">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="filter-supplier-search" placeholder="Tedarikçi adı ile ara...">
+              </div>
+
+              <select class="filter-select" id="filter-supplier-unit">
+                <option value="ALL">Tüm Birimler</option>
+              </select>
+
+              <select class="filter-select" id="filter-supplier-tier">
+                <option value="ALL">🌟 Tüm Seviyeler (Tier)</option>
+                <option value="GOLD">🌟 Stratejik / Gold Tier (4.5+)</option>
+                <option value="SILVER">🥈 Standart / Silver Tier (3.5 - 4.4)</option>
+                <option value="RISK">⚠️ Gözetim / Riskli (2.5 - 3.4)</option>
+                <option value="BLACKLIST">🚫 Kara Liste (<2.5)</option>
+              </select>
+
+              <select class="filter-select" id="filter-supplier-sort">
+                <option value="SPEND_DESC">💰 En Yüksek Harcama (TRY)</option>
+                <option value="COUNT_DESC">📊 En Çok İş Hacmi (Talep Adedi)</option>
+                <option value="SCORE_DESC">⭐ En Yüksek Karne Puanı</option>
+                <option value="NAME_ASC">🔤 Firma Adı (A-Z)</option>
+              </select>
+
+              <button class="btn-secondary" id="btn-export-supplier-excel">
+                <span>📥</span> Excel İndir
+              </button>
+              <button class="btn-export-pdf" id="btn-export-supplier-pdf">
+                <span>🖨️</span> PDF / Yazdır
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table" id="table-supplier-detailed">
+                <thead>
+                  <tr>
+                    <th>Sıra</th>
+                    <th>Tedarikçi Adı</th>
+                    <th>🥇 Seviye / Segment</th>
+                    <th>⭐ Performans Karnesi</th>
+                    <th>Talep Adedi</th>
+                    <th>Toplam Harcama (TRY)</th>
+                    <th>Tamamlanan</th>
+                    <th>Bütçe Payı %</th>
+                    <th style="text-align: center;">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <!-- Pareto 80/20 & Dependency Insights Banner -->
-        <div id="supp-pareto-banner" style="background: rgba(30, 58, 138, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); padding: 0.75rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--text-main); flex-wrap: wrap; gap: 0.5rem;">
-          <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <span style="font-size: 1.2rem;">💡</span>
-            <span id="supp-pareto-text">Tedarikçi bağımlılık ve harcama konsantrasyonu hesaplanıyor...</span>
+        <!-- SUBTAB 2: TEDARİKCİ KÜTÜĞÜ (CARİ LİSTESİ) -->
+        <div id="subtab-supplier-directory" style="display: none;">
+          <div class="glass-card">
+            <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+              <div>
+                <h3>🏢 Kurumsal Tedarikçi Kütüğü & Cari Kartlar</h3>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
+                  Üniversite sistemine kayıtlı tüm resmi tedarikçi cari kartları ve iletişim bilgileri
+                </p>
+              </div>
+              <button class="btn-primary" onclick="App.openNewSupplierModal()" style="font-weight: 700; padding: 0.55rem 1.1rem;">
+                <span>➕</span> Yeni Tedarikçi Tanımla
+              </button>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="filter-bar">
+              <div class="search-input-box" style="min-width: 240px;">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="filter-directory-search" placeholder="Firma unvanı, VKN veya yetkili ara..." oninput="App.renderSupplierDirectory()">
+              </div>
+
+              <select class="filter-select" id="filter-directory-category" onchange="App.renderSupplierDirectory()">
+                <option value="ALL">Tüm Sektörler / Kategoriler</option>
+                <option value="Bilişim">Bilişim & Donanım</option>
+                <option value="İnşaat">İnşaat & Yapı Malzemeleri</option>
+                <option value="Temizlik">Temizlik & Hijyen</option>
+                <option value="Gıda">Gıda & Yemek</option>
+                <option value="Kırtasiye">Kırtasiye & Ofis</option>
+                <option value="Medikal">Medikal & Sağlık</option>
+                <option value="Danışmanlık">Danışmanlık & Hizmet</option>
+                <option value="Diğer">Diğer</option>
+              </select>
+
+              <select class="filter-select" id="filter-directory-status" onchange="App.renderSupplierDirectory()">
+                <option value="ALL">Tüm Durumlar</option>
+                <option value="Aktif">🟢 Aktif</option>
+                <option value="Onaylı">🌟 Onaylı Tedarikçi</option>
+                <option value="Pasif">⚪ Pasif</option>
+              </select>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table" id="table-supplier-directory">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>Resmi Unvan</th>
+                    <th>Vergi No / Daire</th>
+                    <th>Sektör / Kategori</th>
+                    <th>Yetkili Personel</th>
+                    <th>E-Posta / Telefon</th>
+                    <th style="text-align: center;">Durum</th>
+                    <th style="text-align: center; width: 110px;">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">⏳ Tedarikçi kütüğü yükleniyor...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-          <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: var(--accent-primary); font-weight: 700; font-size: 0.75rem;">Pareto 80/20 Analizi</span>
         </div>
 
-        <div class="glass-card">
-          <div class="card-header">
-            <div>
-              <h3>🏭 Tedarikçi Bazlı Harcama, İş Hacmi ve Segmentasyon</h3>
-              <p style="font-size:0.8rem; color:var(--text-muted); margin:0.2rem 0 0 0;">
-                Tedarikçi firmaların performans puanları, seviye rozetleri (Tier) ve kurumsal işlem hacimleri.
-              </p>
-            </div>
-          </div>
-
-          <!-- Filters Toolbar for Supplier Analysis -->
-          <div class="filter-bar">
-            <div class="search-input-box" style="min-width: 240px;">
-              <span class="search-icon">🔍</span>
-              <input type="text" id="filter-supplier-search" placeholder="Tedarikçi adı ile ara...">
+        <!-- SUBTAB 3: YAZIM BİRLEŞTİRME & TEMİZLEME ARACI -->
+        <div id="subtab-supplier-merge" style="display: none;">
+          <div class="glass-card">
+            <div class="card-header">
+              <div>
+                <h3>🧹 Tedarikçi İsimleri Birleştirme & Düzeltme Motoru</h3>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
+                  Geçmişte farklı yazılmış mükerrer firma isimlerini seçerek tek bir resmi cari adı altında birleştirin. Tüm geçmiş talepler, sözleşmeler, faturalar ve teminatlar otomatik güncellenir.
+                </p>
+              </div>
             </div>
 
-            <select class="filter-select" id="filter-supplier-unit">
-              <option value="ALL">Tüm Birimler</option>
-            </select>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+              <!-- Left: Target Official Supplier Selection -->
+              <div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
+                <h4 style="margin-top: 0; color: var(--status-completed); font-size: 0.95rem;">🎯 1. Adım: Hedef Resmi Unvanı Seçin veya Girin</h4>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.85rem;">Tüm verilerin aktarılacağı resmi ve doğru tedarikçi adı.</p>
+                <div class="form-group">
+                  <label style="font-size: 0.8rem; font-weight: 700;">Resmi Hedef Tedarikçi Adı</label>
+                  <input type="text" id="merge-target-supplier" list="supplier-datalist" placeholder="ör: Kocabaş Bilgisayar Sistemleri A.Ş." style="font-weight: 700;">
+                </div>
+              </div>
 
-            <select class="filter-select" id="filter-supplier-tier">
-              <option value="ALL">🌟 Tüm Seviyeler (Tier)</option>
-              <option value="GOLD">🌟 Stratejik / Gold Tier (4.5+)</option>
-              <option value="SILVER">🥈 Standart / Silver Tier (3.5 - 4.4)</option>
-              <option value="RISK">⚠️ Gözetim / Riskli (2.5 - 3.4)</option>
-              <option value="BLACKLIST">🚫 Kara Liste (<2.5)</option>
-            </select>
+              <!-- Right: Source Duplicate Names List -->
+              <div style="background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
+                <h4 style="margin-top: 0; color: #d97706; font-size: 0.95rem;">⚠️ 2. Adım: Hedefle Birleştirilecek Hatalı Yazımları Seçin</h4>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.85rem;">Seçilen bu yazımlar silinerek hedef unvana dönüştürülecektir.</p>
+                <div id="merge-sources-checkbox-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; background: var(--bg-card);">
+                  <div style="color: var(--text-muted); font-size: 0.8rem; padding: 0.5rem; text-align: center;">Yükleniyor...</div>
+                </div>
+              </div>
+            </div>
 
-            <select class="filter-select" id="filter-supplier-sort">
-              <option value="SPEND_DESC">💰 En Yüksek Harcama (TRY)</option>
-              <option value="COUNT_DESC">📊 En Çok İş Hacmi (Talep Adedi)</option>
-              <option value="SCORE_DESC">⭐ En Yüksek Karne Puanı</option>
-              <option value="NAME_ASC">🔤 Firma Adı (A-Z)</option>
-            </select>
-
-            <button class="btn-secondary" id="btn-export-supplier-excel">
-              <span>📥</span> Excel İndir
-            </button>
-            <button class="btn-export-pdf" id="btn-export-supplier-pdf">
-              <span>🖨️</span> PDF / Yazdır
-            </button>
-          </div>
-
-          <div class="table-container">
-            <table class="custom-table" id="table-supplier-detailed">
-              <thead>
-                <tr>
-                  <th>Sıra</th>
-                  <th>Tedarikçi Adı</th>
-                  <th>🥇 Seviye / Segment</th>
-                  <th>⭐ Performans Karnesi</th>
-                  <th>Talep Adedi</th>
-                  <th>Toplam Harcama (TRY)</th>
-                  <th>Tamamlanan</th>
-                  <th>Bütçe Payı %</th>
-                  <th style="text-align: center;">İşlem</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+            <div style="margin-top: 1.25rem; text-align: right;">
+              <button class="btn-primary" onclick="App.handleMergeSuppliers()" style="padding: 0.7rem 1.5rem; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669);">
+                🧹 Seçili Yazımları Hedef Unvana Birleştir ve Tüm Verileri Güncelle
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -3148,7 +3270,7 @@
 
           <div class="form-group">
             <label>Tedarikçi Adı (Firma) <span class="required" style="color:#ef4444;">*</span></label>
-            <input type="text" id="er-supplier" placeholder="ör: ABC Bilişim Teknolojileri Ltd.">
+            <input type="text" id="er-supplier" list="supplier-datalist" placeholder="ör: ABC Bilişim Teknolojileri Ltd.">
           </div>
 
           <div class="form-group">
@@ -3203,7 +3325,7 @@
 
           <div class="form-group">
             <label>Tedarikçi / Yüklenici <span class="required">*</span></label>
-            <input type="text" id="cm-supplier" required placeholder="ör: Pronet Güvenlik A.Ş.">
+            <input type="text" id="cm-supplier" list="supplier-datalist" required placeholder="ör: Pronet Güvenlik A.Ş.">
           </div>
 
           <div class="form-group full-width">
@@ -3299,7 +3421,7 @@
 
           <div class="form-group">
             <label>Tedarikçi Firma <span class="required">*</span></label>
-            <input type="text" id="im-supplier" required placeholder="ör: Kılıç Kırtasiye Ltd.">
+            <input type="text" id="im-supplier" list="supplier-datalist" required placeholder="ör: Kılıç Kırtasiye Ltd.">
           </div>
 
           <div class="form-group">
@@ -4256,6 +4378,82 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal 11: Tedarikçi Cari Kartı Ekle / Düzenle -->
+  <div id="modal-supplier" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 id="modal-supplier-title">🏢 Yeni Tedarikçi Cari Kartı Tanımla</h3>
+        <button class="btn-close-modal" onclick="App.closeModal('modal-supplier')">&times;</button>
+      </div>
+      <form id="form-supplier" onsubmit="App.saveSupplier(event)">
+        <input type="hidden" id="supp-id">
+        <div class="form-grid-2">
+          <div class="form-group" style="grid-column: span 2;">
+            <label style="font-weight:700;">Resmi Firma Unvanı <span style="color:red;">*</span></label>
+            <input type="text" id="supp-name" placeholder="ör: Kocabaş Bilgisayar Sistemleri San. ve Tic. A.Ş." required style="font-weight:700;">
+          </div>
+          <div class="form-group">
+            <label style="font-weight:700;">Vergi Numarası (VKN / TCKN)</label>
+            <input type="text" id="supp-tax-number" placeholder="ör: 5740123987">
+          </div>
+          <div class="form-group">
+            <label style="font-weight:700;">Vergi Dairesi</label>
+            <input type="text" id="supp-tax-office" placeholder="ör: Kadıköy V.D.">
+          </div>
+          <div class="form-group">
+            <label style="font-weight:700;">Sektör / Kategori</label>
+            <select id="supp-category">
+              <option value="Genel">Genel</option>
+              <option value="Bilişim">Bilişim & Donanım</option>
+              <option value="İnşaat">İnşaat & Yapı Malzemeleri</option>
+              <option value="Temizlik">Temizlik & Hijyen</option>
+              <option value="Gıda">Gıda & Yemek</option>
+              <option value="Kırtasiye">Kırtasiye & Ofis</option>
+              <option value="Medikal">Medikal & Sağlık</option>
+              <option value="Danışmanlık">Danışmanlık & Hizmet</option>
+              <option value="Diğer">Diğer</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="font-weight:700;">Durum</label>
+            <select id="supp-status">
+              <option value="Aktif">🟢 Aktif</option>
+              <option value="Onaylı">🌟 Onaylı Tedarikçi</option>
+              <option value="Pasif">⚪ Pasif</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="font-weight:700;">Yetkili Kişi</label>
+            <input type="text" id="supp-contact-person" placeholder="ör: Ahmet Yılmaz">
+          </div>
+          <div class="form-group">
+            <label style="font-weight:700;">E-Posta Adresi</label>
+            <input type="email" id="supp-email" placeholder="ör: info@firma.com">
+          </div>
+          <div class="form-group">
+            <label style="font-weight:700;">Telefon</label>
+            <input type="text" id="supp-phone" placeholder="ör: 0216 123 45 67">
+          </div>
+          <div class="form-group" style="grid-column: span 2;">
+            <label style="font-weight:700;">Adres</label>
+            <input type="text" id="supp-address" placeholder="Firma açık adresi...">
+          </div>
+          <div class="form-group" style="grid-column: span 2;">
+            <label style="font-weight:700;">Notlar / Açıklama</label>
+            <textarea id="supp-notes" rows="2" placeholder="Tedarikçi hakkında özel notlar..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+          <button type="button" class="btn-secondary" onclick="App.closeModal('modal-supplier')">İptal</button>
+          <button type="submit" class="btn-primary">💾 Cari Kartı Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Global Autocomplete Datalist for Suppliers across Forms -->
+  <datalist id="supplier-datalist"></datalist>
 
   <script src="/js/app.js?v=3.1"></script>
 </body>
