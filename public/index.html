@@ -3227,15 +3227,29 @@
             <input type="date" id="er-order-date">
           </div>
 
-          <div class="form-group">
-            <label>Tedarikçi Adı (Firma) <span class="required" style="color:#ef4444;">*</span></label>
-            <input type="text" id="er-supplier" list="supplier-datalist" placeholder="ör: ABC Bilişim Teknolojileri Ltd.">
-          </div>
+          <!-- Multi-Supplier Procurement Section -->
+          <div class="form-group full-width" style="background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-md); padding: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+              <label style="font-weight: 700; color: var(--accent-purple); font-size: 0.85rem; margin: 0;">
+                🏢 Tedarikçi / Tedarikçiler & Alım Tutarları
+              </label>
+              <button type="button" class="btn-secondary" onclick="App.addSupplierRowToEditModal()" style="padding: 0.35rem 0.75rem; font-size: 0.76rem; border-color: var(--accent-purple); color: var(--accent-purple); font-weight: 700;">
+                ➕ Başka Tedarikçi Ekle
+              </button>
+            </div>
+            
+            <div id="er-suppliers-container" style="display: flex; flex-direction: column; gap: 0.6rem;">
+              <!-- Dynamic supplier rows -->
+            </div>
 
-          <div class="form-group">
-            <label>Gerçekleşen Tutar <span class="required" style="color:#ef4444;">*</span></label>
-            <input type="text" inputmode="decimal" id="er-actual-amount" placeholder="0,00" oninput="App.onAmountInput(this, 'er-currency', true)">
-            <div id="er-actual-amount-preview" class="amount-live-preview is-actual"></div>
+            <!-- Total Actual Amount Summary -->
+            <div style="margin-top: 0.75rem; border-top: 1px dashed rgba(139, 92, 246, 0.3); padding-top: 0.6rem; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">💰 Gerçekleşen Toplam Harcama:</span>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="text" inputmode="decimal" id="er-actual-amount" placeholder="0,00" readonly style="font-weight: 800; font-family: var(--font-mono); color: var(--status-completed); background: var(--bg-hover); text-align: right; width: 160px;">
+                <div id="er-actual-amount-preview" class="amount-live-preview is-actual"></div>
+              </div>
+            </div>
           </div>
 
           <div class="form-group full-width">

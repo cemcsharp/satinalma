@@ -76,7 +76,7 @@ const TABLE_COLUMNS = {
     'sequenceNo', 'requestBarcode', 'subject', 'unit', 'arrivalDate', 'requestDate',
     'assignedTo', 'priority', 'status', 'estimatedAmount', 'budgetAmount', 'actualAmount',
     'currency', 'supplier', 'orderBarcode', 'orderDate', 'regulation', 'description',
-    'purchaseType', 'academicYear'
+    'purchaseType', 'academicYear', 'multiSuppliers'
   ],
   contracts: [
     'contractNo', 'title', 'supplier', 'unit', 'assignedTo', 'startDate', 'endDate',
@@ -2783,6 +2783,9 @@ async function initDatabaseSchema() {
         );
       }
     }
+
+    // 🛡️ ÇOKLU TEDARİKCİ SÜTÜN MİGRASYONU
+    await pool.query('ALTER TABLE requests ADD COLUMN IF NOT EXISTS "multiSuppliers" TEXT;').catch(() => {});
 
     // 🛡️ ÇİFTLEYEN KULLANICI KAYITLARINI TEMİZLE (Tekil Bırak)
     await pool.query(`

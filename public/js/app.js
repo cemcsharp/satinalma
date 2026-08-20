@@ -6461,19 +6461,41 @@ const App = {
     let totalSpendAll = 0;
 
     requests.forEach(r => {
-      const sName = (r.supplier || '').trim();
-      if (!sName) return;
-
-      if (unitVal !== 'ALL' && r.unit !== unitVal) return;
-
-      if (!suppMap[sName]) {
-        suppMap[sName] = { total: 0, completed: 0, spend: 0 };
+      let items = [];
+      if (r.multiSuppliers) {
+        try {
+          const parsed = typeof r.multiSuppliers === 'string' ? JSON.parse(r.multiSuppliers) : r.multiSuppliers;
+          if (Array.isArray(parsed) && parsed.length > 0) items = parsed;
+        } catch (e) {}
       }
-      suppMap[sName].total++;
-      if (r.status === 'Tamamlandı') suppMap[sName].completed++;
-      const spend = parseFloat(r.actualAmount) || 0;
-      suppMap[sName].spend += spend;
-      totalSpendAll += spend;
+
+      if (items.length > 0) {
+        items.forEach(item => {
+          const sName = (item.supplier || '').trim();
+          if (!sName) return;
+          if (unitVal !== 'ALL' && r.unit !== unitVal) return;
+          if (!suppMap[sName]) {
+            suppMap[sName] = { total: 0, completed: 0, spend: 0 };
+          }
+          suppMap[sName].total++;
+          if (r.status === 'Tamamlandı') suppMap[sName].completed++;
+          const spend = parseFloat(item.amount) || 0;
+          suppMap[sName].spend += spend;
+          totalSpendAll += spend;
+        });
+      } else {
+        const sName = (r.supplier || '').trim();
+        if (!sName) return;
+        if (unitVal !== 'ALL' && r.unit !== unitVal) return;
+        if (!suppMap[sName]) {
+          suppMap[sName] = { total: 0, completed: 0, spend: 0 };
+        }
+        suppMap[sName].total++;
+        if (r.status === 'Tamamlandı') suppMap[sName].completed++;
+        const spend = parseFloat(r.actualAmount) || 0;
+        suppMap[sName].spend += spend;
+        totalSpendAll += spend;
+      }
     });
 
     const allSuppliersList = Object.keys(suppMap);
@@ -10121,88 +10143,35 @@ const App = {
       }
     }
     document.getElementById('er-order-date').value = orderDateVal;
-    document.getElementById('er-supplier').value = req.supplier || '';
     document.getElementById('er-currency').value = req.currency || 'TRY';
 
-    const estInput = document.getElementById('er-estimated-amount');
-    if (estInput) {
-      const val = req.estimatedAmount || req.budgetAmount;
-      estInput.value = val ? val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-      this.onAmountInput(estInput, 'er-currency');
-    }
-
-    const actInput = document.getElementById('er-actual-amount');
-    if (actInput) {
-      actInput.value = req.actualAmount ? req.actualAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-      this.onAmountInput(actInput, 'er-currency', true);
-    }
-    
-    const regSelect = document.getElementById('er-regulation');
-    if (regSelect) {
-      let regVal = req.regulation || '';
-      if (regVal.startsWith('Madde ')) regVal = regVal.replace('Madde ', '');
-      regSelect.value = regVal;
-    }
-
-    document.getElementById('er-description').value = req.description || '';
-
-    const titleEl = document.getElementById('edit-modal-title');
-    if (titleEl) titleEl.innerText = `✏️ Talep #${req.requestBarcode || req.id} Düzenle`;
-
-    this.openModal('modal-edit-request');
-  },
-
-  async handleEditRequest(e) {
-    e.preventDefault();
-    const id = parseInt(document.getElementById('er-id').value);
-    const req = this.state.requests.find(r => r.id === id);
-    if (!req) return;
-
-    if (document.getElementById('er-request-barcode')) {
-      req.requestBarcode = document.getElementById('er-request-barcode').value.trim();
-    }
-    if (document.getElementById('er-arrival-date')) {
-      const arrDate = document.getElementById('er-arrival-date').value;
-      req.arrivalDate = arrDate;
-      req.requestDate = arrDate;
-      req.academicYear = this.getAcademicYear(arrDate);
-    }
-    if (document.getElementById('er-subject')) {
-      req.subject = document.getElementById('er-subject').value.trim();
-    }
-    if (document.getElementById('er-purchase-type')) {
-      req.purchaseType = document.getElementById('er-purchase-type').value || 'MAL';
-    }
-    if (document.getElementById('er-priority')) {
-      req.priority = document.getElementById('er-priority').value;
-    }
-
-    if (document.getElementById('er-unit')) document.getElementById('er-unit').value = req.unit || '';
-    if (document.getElementById('er-assigned-to')) document.getElementById('er-assigned-to').value = req.assignedTo || '';
-    document.getElementById('er-order-barcode').value = req.orderBarcode || '';
-    
-    let orderDateVal = req.orderDate || '';
-    if (orderDateVal) {
-      const dParts = String(orderDateVal).trim().split(/[./-]/);
-      if (dParts.length === 3) {
-        if (dParts[0].length <= 2 && dParts[2].length >= 4) {
-          const day = dParts[0].padStart(2, '0');
-          const month = dParts[1].padStart(2, '0');
-          let year = dParts[2].trim();
-          if (year.length > 4) year = year.slice(0, 4);
-          orderDateVal = `${year}-${month}-${day}`;
-        } else if (dParts[0].length >= 4) {
-          let year = dParts[0].trim();
-          if (year.length > 4) year = year.slice(0, 4);
-          const month = dParts[1].padStart(2, '0');
-          const day = dParts[2].padStart(2, '0');
-          orderDateVal = `${year}-${month}-${day}`;
-        }
+    // Populate Multi-Supplier Container
+    const container = document.getElementById('er-suppliers-container');
+    if (container) {
+      container.innerHTML = '';
+      let items = [];
+      if (req.multiSuppliers) {
+        try {
+          const parsed = typeof req.multiSuppliers === 'string' ? JSON.parse(req.multiSuppliers) : req.multiSuppliers;
+          if (Array.isArray(parsed) && parsed.length > 0) items = parsed;
+        } catch (e) {}
+      }
+      if (items.length > 0) {
+        items.forEach(it => {
+          const sAmtStr = (it.amount !== null && it.amount !== undefined && !isNaN(it.amount)) 
+            ? parseFloat(it.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
+            : '';
+          this.addSupplierRowToEditModal(it.supplier || '', sAmtStr);
+        });
+      } else if (req.supplier && req.supplier.trim()) {
+        const sAmtStr = req.actualAmount 
+          ? parseFloat(req.actualAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
+          : '';
+        this.addSupplierRowToEditModal(req.supplier, sAmtStr);
+      } else {
+        this.addSupplierRowToEditModal();
       }
     }
-    document.getElementById('er-order-date').value = orderDateVal;
-    document.getElementById('er-supplier').value = req.supplier || '';
-    document.getElementById('er-currency').value = req.currency || 'TRY';
 
     const estInput = document.getElementById('er-estimated-amount');
     if (estInput) {
@@ -10249,11 +10218,32 @@ const App = {
     const assignedTo = document.getElementById('er-assigned-to')?.value || 'Henüz Atanmadı';
     const currency = document.getElementById('er-currency')?.value || 'TRY';
 
-    // Sipariş alanları
+    // Sipariş ve Çoklu Tedarikçi alanları
     const orderBarcode = document.getElementById('er-order-barcode')?.value.trim();
     const orderDate = document.getElementById('er-order-date')?.value.trim();
-    const supplier = document.getElementById('er-supplier')?.value.trim();
-    const actualAmt = this.parseMoney(document.getElementById('er-actual-amount')?.value);
+    
+    const supplierRows = document.querySelectorAll('.er-supplier-row');
+    const multiSuppliers = [];
+    supplierRows.forEach(row => {
+      const sName = row.querySelector('.er-supplier-name')?.value.trim();
+      const sAmt = this.parseMoney(row.querySelector('.er-supplier-amount')?.value);
+      if (sName) {
+        multiSuppliers.push({ supplier: sName, amount: sAmt || 0 });
+      }
+    });
+
+    let supplier = '';
+    let actualAmt = 0;
+    if (multiSuppliers.length === 1) {
+      supplier = multiSuppliers[0].supplier;
+      actualAmt = multiSuppliers[0].amount || 0;
+    } else if (multiSuppliers.length > 1) {
+      supplier = multiSuppliers.map(s => s.supplier).join(', ');
+      actualAmt = multiSuppliers.reduce((acc, s) => acc + (s.amount || 0), 0);
+    } else {
+      actualAmt = this.parseMoney(document.getElementById('er-actual-amount')?.value);
+    }
+
     const regulation = document.getElementById('er-regulation')?.value.trim();
     const desc = document.getElementById('er-description')?.value.trim();
 
@@ -10302,7 +10292,6 @@ const App = {
     }
 
     // 2. Siparişe Dönüştürme ve Sipariş Bilgileri Zorunluluk Kontrolleri
-    // Eğer durum 'Sipariş Verildi' veya 'Tamamlandı' yapılmışsa ya da sipariş alanlarından herhangi biri doldurulmuşsa:
     const isOrderProcess = (status === 'Sipariş Verildi' || status === 'Tamamlandı') || 
                            Boolean(orderBarcode || orderDate || supplier || (actualAmt && actualAmt > 0));
 
