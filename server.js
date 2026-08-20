@@ -276,6 +276,10 @@ async function getTableData(tableName) {
       ratedAt: r.ratedAt || r.ratedat || ''
     }));
   }
+  if (tableName === 'settings') {
+    const res = await pool.query('SELECT * FROM settings');
+    return res.rows;
+  }
   const res = await pool.query(`SELECT * FROM ${tableName} ORDER BY id ASC`);
   return res.rows;
 }
