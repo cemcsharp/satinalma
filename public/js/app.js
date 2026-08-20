@@ -10323,36 +10323,96 @@ const App = {
       }
     }
 
-    req.requestBarcode = barcode;
-    req.arrivalDate = arrDate;
-    req.requestDate = arrDate;
-    req.academicYear = this.getAcademicYear(arrDate);
-    req.subject = subject;
-    req.unit = unit;
-    req.purchaseType = purchaseType;
-    req.priority = priority;
-    req.assignedTo = assignedTo;
-    req.estimatedAmount = estAmt;
-    req.budgetAmount = estAmt;
-    req.currency = currency;
-    req.orderBarcode = orderBarcode || '';
-    req.orderDate = orderDate || '';
-    req.supplier = supplier || '';
-    req.actualAmount = actualAmt || 0;
-    req.regulation = regulation || '';
-    req.description = desc || '';
+    const baseBc = String(barcode).replace(/-[0-9]+$/, '');
+    const baseOrdBc = String(orderBarcode || '').replace(/-[0-9]+$/, '');
+    const targetStatus = (isOrderProcess && status === 'Açık') ? 'Sipariş Verildi' : status;
 
-    // Eğer tüm sipariş bilgileri eksiksiz girilmişse ve durum hala 'Açık' ise, otomatik 'Sipariş Verildi' yap
-    if (isOrderProcess && status === 'Açık') {
-      req.status = 'Sipariş Verildi';
+    if (multiSuppliers.length > 1) {
+      // 1. Update primary row for item 0
+      req.requestBarcode = `${baseBc}-1`;
+      req.arrivalDate = arrDate;
+      req.requestDate = arrDate;
+      req.academicYear = this.getAcademicYear(arrDate);
+      req.subject = subject;
+      req.unit = unit;
+      req.purchaseType = purchaseType;
+      req.priority = priority;
+      req.assignedTo = assignedTo;
+      req.estimatedAmount = estAmt;
+      req.budgetAmount = estAmt;
+      req.currency = currency;
+      req.orderBarcode = baseOrdBc ? `${baseOrdBc}-1` : '';
+      req.orderDate = orderDate || '';
+      req.supplier = multiSuppliers[0].supplier;
+      req.actualAmount = multiSuppliers[0].amount || 0;
+      req.multiSuppliers = null;
+      req.regulation = regulation || '';
+      req.description = desc || '';
+      req.status = targetStatus;
+
+      await this.apiSync('requests', 'PUT', req);
+
+      // 2. Create distinct sub-request rows for item 1, 2, etc.
+      for (let idx = 1; idx < multiSuppliers.length; idx++) {
+        const subBc = `${baseBc}-${idx + 1}`;
+        const subOrd = baseOrdBc ? `${baseOrdBc}-${idx + 1}` : '';
+        const subItem = multiSuppliers[idx];
+
+        const subReq = {
+          sequenceNo: req.sequenceNo,
+          requestBarcode: subBc,
+          subject: subject,
+          unit: unit,
+          arrivalDate: arrDate,
+          requestDate: arrDate,
+          assignedTo: assignedTo,
+          priority: priority,
+          status: targetStatus,
+          estimatedAmount: estAmt,
+          budgetAmount: estAmt,
+          actualAmount: subItem.amount || 0,
+          currency: currency,
+          supplier: subItem.supplier,
+          orderBarcode: subOrd,
+          orderDate: orderDate || '',
+          regulation: regulation || '',
+          description: desc || '',
+          purchaseType: purchaseType,
+          academicYear: this.getAcademicYear(arrDate)
+        };
+        await this.apiSync('requests', 'POST', subReq);
+      }
+
+      this.showToast(`🎉 Talebiniz ${multiSuppliers.length} adet bağımsız sipariş satırı (${baseBc}-1, ${baseBc}-2) olarak kaydedildi!`, "success", "✅");
     } else {
-      req.status = status;
+      req.requestBarcode = barcode;
+      req.arrivalDate = arrDate;
+      req.requestDate = arrDate;
+      req.academicYear = this.getAcademicYear(arrDate);
+      req.subject = subject;
+      req.unit = unit;
+      req.purchaseType = purchaseType;
+      req.priority = priority;
+      req.assignedTo = assignedTo;
+      req.estimatedAmount = estAmt;
+      req.budgetAmount = estAmt;
+      req.currency = currency;
+      req.orderBarcode = orderBarcode || '';
+      req.orderDate = orderDate || '';
+      req.supplier = multiSuppliers[0]?.supplier || supplier || '';
+      req.actualAmount = multiSuppliers[0]?.amount || actualAmt || 0;
+      req.multiSuppliers = null;
+      req.regulation = regulation || '';
+      req.description = desc || '';
+      req.status = targetStatus;
+
+      await this.apiSync('requests', 'PUT', req);
+      this.showToast("Talep ve sipariş bilgileri başarıyla güncellendi!", "success");
     }
 
-    await this.apiSync('requests', 'PUT', req);
-
-    this.showToast("Talep ve sipariş bilgileri başarıyla güncellendi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+    await this.fetchInitialData();
+    this.populateSupplierDatalists();
     this.populateYearSelect();
     this.render();
   },

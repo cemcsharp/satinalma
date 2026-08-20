@@ -2851,6 +2851,62 @@ async function initDatabaseSchema() {
         await pool.query("DELETE FROM suppliers WHERE id = $1", [row.id]);
       }
     } catch (e) {}
+
+    // 🛡️ ÇOKLU TEDARİKCİLİ TALEPLERİ BAĞIMSIZ SATIRLARA BÖL MİGRASYONU (249001-1, 249001-2)
+    try {
+      const multiReqs = await pool.query("SELECT * FROM requests WHERE \"multiSuppliers\" IS NOT NULL OR supplier LIKE '%,%'");
+      for (const r of multiReqs.rows) {
+        let items = [];
+        if (r.multiSuppliers) {
+          try {
+            const parsed = typeof r.multiSuppliers === 'string' ? JSON.parse(r.multiSuppliers) : r.multiSuppliers;
+            if (Array.isArray(parsed) && parsed.length > 0) items = parsed;
+          } catch (e) {}
+        }
+        if (items.length === 0 && r.supplier && r.supplier.includes(',')) {
+          const parts = r.supplier.split(',').map(s => s.trim()).filter(Boolean);
+          const splitAmt = (parseFloat(r.actualAmount) || 0) / (parts.length || 1);
+          items = parts.map(p => ({ supplier: p, amount: splitAmt }));
+        }
+
+        if (items.length > 1) {
+          const rawBc = String(r.requestBarcode || r.id).replace(/-[0-9]+$/, '');
+          const rawOrdBc = String(r.orderBarcode || '').replace(/-[0-9]+$/, '');
+
+          // Update primary row
+          const item1 = items[0];
+          const bc1 = `${rawBc}-1`;
+          const ord1 = rawOrdBc ? `${rawOrdBc}-1` : '';
+          await pool.query(
+            `UPDATE requests SET "requestBarcode" = $1, supplier = $2, "actualAmount" = $3, "orderBarcode" = $4, "multiSuppliers" = NULL WHERE id = $5`,
+            [bc1, item1.supplier, item1.amount || 0, ord1, r.id]
+          );
+
+          // Insert sub-rows for items 2, 3, etc.
+          for (let idx = 1; idx < items.length; idx++) {
+            const it = items[idx];
+            const subBc = `${rawBc}-${idx + 1}`;
+            const subOrd = rawOrdBc ? `${rawOrdBc}-${idx + 1}` : '';
+            await pool.query(
+              `INSERT INTO requests (
+                "sequenceNo", "requestBarcode", subject, unit, "arrivalDate", "requestDate",
+                "assignedTo", priority, status, "estimatedAmount", "budgetAmount", "actualAmount",
+                currency, supplier, "orderBarcode", "orderDate", regulation, description,
+                "purchaseType", "academicYear"
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+              [
+                r.sequenceNo, subBc, r.subject, r.unit, r.arrivalDate, r.requestDate,
+                r.assignedTo, r.priority, r.status, r.estimatedAmount, r.budgetAmount, it.amount || 0,
+                r.currency || 'TRY', it.supplier, subOrd, r.orderDate, r.regulation, r.description,
+                r.purchaseType || 'MAL', r.academicYear
+              ]
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Request split migration warning:', e.message);
+    }
   } catch (err) {
     console.error('Veritabanı ilklendirme hatası:', err.message);
   }
