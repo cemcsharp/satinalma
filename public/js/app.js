@@ -10067,6 +10067,40 @@ const App = {
     this.openModal('modal-new-request');
   },
 
+  addSupplierRowToEditModal(suppName = '', suppAmount = '') {
+    const container = document.getElementById('er-suppliers-container');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = 'er-supplier-row';
+    div.style.cssText = 'display: flex; gap: 0.5rem; align-items: center;';
+    const safeName = String(suppName || '').replace(/"/g, '&quot;');
+    div.innerHTML = `
+      <input type="text" class="er-supplier-name" list="supplier-datalist" placeholder="Tedarikçi firma adı..." value="${safeName}" style="flex: 2; font-weight: 600;">
+      <input type="text" inputmode="decimal" class="er-supplier-amount" placeholder="Tutar (₺)" value="${suppAmount}" oninput="App.onAmountInput(this, 'er-currency', true); App.recalcMultiSupplierAmounts();" style="flex: 1; font-weight: 700; text-align: right;">
+      <button type="button" class="btn-icon" onclick="this.closest('.er-supplier-row').remove(); App.recalcMultiSupplierAmounts();" title="Sil" style="color: #ef4444; width: 34px; height: 34px; flex-shrink: 0;">🗑️</button>
+    `;
+    container.appendChild(div);
+    this.recalcMultiSupplierAmounts();
+  },
+
+  recalcMultiSupplierAmounts() {
+    const rows = document.querySelectorAll('.er-supplier-row');
+    let total = 0;
+    rows.forEach(r => {
+      const valInput = r.querySelector('.er-supplier-amount');
+      if (valInput) {
+        const val = this.parseMoney(valInput.value);
+        if (val && !isNaN(val)) total += val;
+      }
+    });
+
+    const actInput = document.getElementById('er-actual-amount');
+    if (actInput) {
+      actInput.value = total > 0 ? total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      this.onAmountInput(actInput, 'er-currency', true);
+    }
+  },
+
   openEditModal(reqId) {
     const req = this.state.requests.find(r => String(r.id) === String(reqId));
     if (!req) {
