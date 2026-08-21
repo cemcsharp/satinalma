@@ -290,25 +290,25 @@
           </div>
         </div>
 
-        <!-- 4 TEMEL STRATEJİK TALEP GÖSTERGESİ (TOPLAM, AÇIK, KRİTİK, TAMAMLANAN) -->
+        <!-- 4 TEMEL STRATEJİK TALEP, HARCAMA VE TASARRUF GÖSTERGESİ -->
         <div class="grid-4" style="margin-bottom: 1.25rem;">
-          <!-- 1.1 Toplam Talep -->
+          <!-- 1.1 Toplam Talep & Harcama -->
           <div class="glass-card kpi-card" style="border-left: 4px solid var(--accent-primary); cursor: pointer;" onclick="App.switchView('requests')" title="Tüm Talepleri Listele">
             <div class="kpi-icon blue">📋</div>
             <div class="kpi-data">
               <h3 id="dash-kpi-total-val">0</h3>
               <p>Toplam Talep</p>
-              <div class="kpi-sub" id="dash-kpi-total-sub">0 ₺ Toplam Hacim</div>
+              <div class="kpi-sub" id="dash-kpi-total-sub" style="font-weight: 600; color: var(--text-main);">💰 0 ₺ Harcama</div>
             </div>
           </div>
 
-          <!-- 1.2 Açık / İşlemdeki Talep -->
+          <!-- 1.2 Açık / İşlemdeki Talep & Bütçe -->
           <div class="glass-card kpi-card" style="border-left: 4px solid #3b82f6; cursor: pointer;" onclick="App.filterRequestsByDashboard('Açık')" title="Açık ve Süreçteki Talepleri Filtrele">
             <div class="kpi-icon blue">🔵</div>
             <div class="kpi-data">
               <h3 id="dash-kpi-open-val" style="color: #3b82f6;">0</h3>
               <p style="color: #3b82f6; font-weight: 700;">Açık / İşlemde</p>
-              <div class="kpi-sub" id="dash-kpi-open-sub">Teklif, Onay & Siparişte</div>
+              <div class="kpi-sub" id="dash-kpi-open-sub" style="font-weight: 600;">⏳ 0 ₺ Süreçte</div>
             </div>
           </div>
 
@@ -322,13 +322,13 @@
             </div>
           </div>
 
-          <!-- 1.4 Tamamlanan Talep -->
+          <!-- 1.4 Tamamlanan Talep & Tasarruf -->
           <div class="glass-card kpi-card" style="border-left: 4px solid var(--status-completed); background: rgba(16, 185, 129, 0.04); cursor: pointer;" onclick="App.filterRequestsByDashboard('Tamamlandı')" title="Tamamlanan Talepleri Filtrele">
-            <div class="kpi-icon green">✅</div>
+            <div class="kpi-icon green">🎯</div>
             <div class="kpi-data">
               <h3 id="dash-kpi-completed-val" style="color: var(--status-completed);">0</h3>
-              <p style="color: var(--status-completed); font-weight: 700;">Tamamlanan</p>
-              <div class="kpi-sub" id="dash-kpi-completed-sub" style="color: var(--status-completed); font-weight: 600;">%0 Tamamlanma Oranı</div>
+              <p style="color: var(--status-completed); font-weight: 700;">Tamamlanan & Tasarruf</p>
+              <div class="kpi-sub" id="dash-kpi-completed-sub" style="color: var(--status-completed); font-weight: 600;">🎯 0 ₺ Tasarruf (%0)</div>
             </div>
           </div>
         </div>

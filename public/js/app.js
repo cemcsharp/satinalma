@@ -2767,6 +2767,9 @@ const App = {
   renderDashboardMacroKPIs(requests, contracts, invoices, guarantees) {
     const totalCount = requests.length;
     let totalSpendTRY = 0;
+    let openSpendTRY = 0;
+    let criticalSpendTRY = 0;
+    let completedSpendTRY = 0;
     let totalEstimatedTRY = 0;
     let totalSavingsTRY = 0;
     let totalTurnaroundDays = 0;
@@ -2778,6 +2781,7 @@ const App = {
     requests.forEach(r => {
       const actAmt = parseFloat(r.actualAmount) || 0;
       const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
+      const effectiveAmt = actAmt > 0 ? actAmt : initAmt;
       
       let currRate = 1;
       if (r.currency === 'USD') currRate = parseFloat(this.state.rates?.USD) || 36.5;
@@ -2786,8 +2790,10 @@ const App = {
 
       const actInTRY = actAmt * (r.currency && r.currency !== 'TRY' && r.currency !== 'TL' ? currRate : 1);
       const initInTRY = initAmt * (r.currency && r.currency !== 'TRY' && r.currency !== 'TL' ? currRate : 1);
+      const effInTRY = effectiveAmt * (r.currency && r.currency !== 'TRY' && r.currency !== 'TL' ? currRate : 1);
 
-      totalSpendTRY += actInTRY;
+      totalSpendTRY += (actInTRY > 0 ? actInTRY : initInTRY);
+
       if (initInTRY > actInTRY && actInTRY > 0) {
         totalEstimatedTRY += initInTRY;
         totalSavingsTRY += (initInTRY - actInTRY);
@@ -2796,11 +2802,14 @@ const App = {
       const isClosed = (r.status === 'Tamamlandı' || r.status === 'Reddedildi' || r.status === 'İptal');
       if (!isClosed) {
         activeDemandsCount++;
+        openSpendTRY += effInTRY;
         if (r._diffDays >= 14 || (r.priority && r.priority.toLowerCase() === 'kritik')) {
           criticalDemandsCount++;
+          criticalSpendTRY += effInTRY;
         }
       } else if (r.status === 'Tamamlandı') {
         completedDemandsCount++;
+        completedSpendTRY += actInTRY;
       }
 
       // Turnaround SLA calculation
@@ -2816,31 +2825,31 @@ const App = {
       }
     });
 
-    const completionRate = totalCount > 0 ? ((completedDemandsCount / totalCount) * 100).toFixed(1) : '0.0';
+    const savingsRate = totalEstimatedTRY > 0 ? ((totalSavingsTRY / totalEstimatedTRY) * 100).toFixed(1) : (totalSpendTRY > 0 ? ((totalSavingsTRY / (totalSpendTRY + totalSavingsTRY)) * 100).toFixed(1) : '0.0');
 
-    // 1. Toplam Talep
+    // 1. Toplam Talep & Harcama
     const elTotalVal = document.getElementById('dash-kpi-total-val');
     const elTotalSub = document.getElementById('dash-kpi-total-sub');
-    if (elTotalVal) elTotalVal.innerText = totalCount;
-    if (elTotalSub) elTotalSub.innerText = `${this.formatMoney(totalSpendTRY, 'TRY', 0)} Hacim`;
+    if (elTotalVal) elTotalVal.innerText = `${totalCount}`;
+    if (elTotalSub) elTotalSub.innerText = `💰 ${this.formatMoney(totalSpendTRY, 'TRY', 0)} Harcama`;
 
-    // 2. Açık / İşlemdeki Talep
+    // 2. Açık / İşlemdeki Talep & Bütçe
     const elOpenVal = document.getElementById('dash-kpi-open-val');
     const elOpenSub = document.getElementById('dash-kpi-open-sub');
-    if (elOpenVal) elOpenVal.innerText = activeDemandsCount;
-    if (elOpenSub) elOpenSub.innerText = `Teklif, Onay & Siparişte`;
+    if (elOpenVal) elOpenVal.innerText = `${activeDemandsCount}`;
+    if (elOpenSub) elOpenSub.innerText = `⏳ ${this.formatMoney(openSpendTRY, 'TRY', 0)} Süreçte`;
 
     // 3. Kritik / Geciken Talep
     const elCritVal = document.getElementById('dash-kpi-critical-val');
     const elCritSub = document.getElementById('dash-kpi-critical-sub');
-    if (elCritVal) elCritVal.innerText = criticalDemandsCount;
-    if (elCritSub) elCritSub.innerText = criticalDemandsCount > 0 ? `${criticalDemandsCount} Dosya 14+ Gün Aşımı` : 'SLA Gecikmesi Yok ✨';
+    if (elCritVal) elCritVal.innerText = `${criticalDemandsCount}`;
+    if (elCritSub) elCritSub.innerText = criticalDemandsCount > 0 ? `🚨 ${this.formatMoney(criticalSpendTRY, 'TRY', 0)} • Gecikmede` : 'SLA Gecikmesi Yok ✨';
 
-    // 4. Tamamlanan Talep
+    // 4. Tamamlanan Talep & Net Tasarruf
     const elCompVal = document.getElementById('dash-kpi-completed-val');
     const elCompSub = document.getElementById('dash-kpi-completed-sub');
-    if (elCompVal) elCompVal.innerText = completedDemandsCount;
-    if (elCompSub) elCompSub.innerText = `%${completionRate} Tamamlanma Oranı`;
+    if (elCompVal) elCompVal.innerText = `${completedDemandsCount}`;
+    if (elCompSub) elCompSub.innerText = `🎯 +${this.formatMoney(totalSavingsTRY, 'TRY', 0)} Tasarruf (%${savingsRate})`;
   },
 
   renderDashboardActiveRequestsList(requests) {
