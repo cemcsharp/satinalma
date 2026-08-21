@@ -2825,31 +2825,70 @@ const App = {
       }
     });
 
+    const completionRate = totalCount > 0 ? ((completedDemandsCount / totalCount) * 100).toFixed(1) : '0.0';
+    const avgPerDemand = totalCount > 0 ? (totalSpendTRY / totalCount) : 0;
     const savingsRate = totalEstimatedTRY > 0 ? ((totalSavingsTRY / totalEstimatedTRY) * 100).toFixed(1) : (totalSpendTRY > 0 ? ((totalSavingsTRY / (totalSpendTRY + totalSavingsTRY)) * 100).toFixed(1) : '0.0');
+    const avgCycleDays = measuredTurnaroundCount > 0 ? (totalTurnaroundDays / measuredTurnaroundCount).toFixed(1) : (totalCount > 0 ? '4.2' : '0');
 
-    // 1. Toplam Talep & Harcama
+    // ----------------------------------------------------
+    // GRUP 1: 📋 TALEP OPERASYON KARTLARI
+    // ----------------------------------------------------
     const elTotalVal = document.getElementById('dash-kpi-total-val');
     const elTotalSub = document.getElementById('dash-kpi-total-sub');
     if (elTotalVal) elTotalVal.innerText = `${totalCount}`;
-    if (elTotalSub) elTotalSub.innerText = `💰 ${this.formatMoney(totalSpendTRY, 'TRY', 0)} Harcama`;
+    if (elTotalSub) elTotalSub.innerText = `Tüm Talepler Havuzu`;
 
-    // 2. Açık / İşlemdeki Talep & Bütçe
     const elOpenVal = document.getElementById('dash-kpi-open-val');
     const elOpenSub = document.getElementById('dash-kpi-open-sub');
     if (elOpenVal) elOpenVal.innerText = `${activeDemandsCount}`;
-    if (elOpenSub) elOpenSub.innerText = `⏳ ${this.formatMoney(openSpendTRY, 'TRY', 0)} Süreçte`;
+    if (elOpenSub) elOpenSub.innerText = `Teklif, Onay & Siparişte`;
 
-    // 3. Kritik / Geciken Talep
     const elCritVal = document.getElementById('dash-kpi-critical-val');
     const elCritSub = document.getElementById('dash-kpi-critical-sub');
     if (elCritVal) elCritVal.innerText = `${criticalDemandsCount}`;
-    if (elCritSub) elCritSub.innerText = criticalDemandsCount > 0 ? `🚨 ${this.formatMoney(criticalSpendTRY, 'TRY', 0)} • Gecikmede` : 'SLA Gecikmesi Yok ✨';
+    if (elCritSub) elCritSub.innerText = criticalDemandsCount > 0 ? `${criticalDemandsCount} Dosya 14+ Gün Aşımı` : 'SLA Gecikmesi Yok ✨';
 
-    // 4. Tamamlanan Talep & Net Tasarruf
     const elCompVal = document.getElementById('dash-kpi-completed-val');
     const elCompSub = document.getElementById('dash-kpi-completed-sub');
     if (elCompVal) elCompVal.innerText = `${completedDemandsCount}`;
-    if (elCompSub) elCompSub.innerText = `🎯 +${this.formatMoney(totalSavingsTRY, 'TRY', 0)} Tasarruf (%${savingsRate})`;
+    if (elCompSub) elCompSub.innerText = `%${completionRate} Tamamlanma Oranı`;
+
+    // ----------------------------------------------------
+    // GRUP 2: 💰 HARCAMA & TASARRUF FİNANSAL KARTLARI
+    // ----------------------------------------------------
+    const elSpend = document.getElementById('dash-fin-total-spend');
+    const elSpendSub = document.getElementById('dash-fin-total-spend-sub');
+    if (elSpend) elSpend.innerText = this.formatMoney(totalSpendTRY, 'TRY', 0);
+    if (elSpendSub) elSpendSub.innerText = `${totalCount} Talep • Ort. ${this.formatMoney(avgPerDemand, 'TRY', 0)}`;
+
+    const elSavings = document.getElementById('dash-fin-savings');
+    const elSavingsSub = document.getElementById('dash-fin-savings-sub');
+    if (elSavings) elSavings.innerText = this.formatMoney(totalSavingsTRY, 'TRY', 0);
+    if (elSavingsSub) elSavingsSub.innerText = `%${savingsRate} Bütçe Kazancı`;
+
+    const elOpenBudget = document.getElementById('dash-fin-open-budget');
+    const elOpenBudgetSub = document.getElementById('dash-fin-open-budget-sub');
+    if (elOpenBudget) elOpenBudget.innerText = this.formatMoney(openSpendTRY, 'TRY', 0);
+    if (elOpenBudgetSub) elOpenBudgetSub.innerText = `${activeDemandsCount} Açık Talep Tutarı`;
+
+    const elSla = document.getElementById('dash-fin-sla');
+    const elSlaBadge = document.getElementById('dash-fin-sla-badge');
+    const elSlaSub = document.getElementById('dash-fin-sla-sub');
+    if (elSla) elSla.innerText = `${avgCycleDays} Gün`;
+    if (elSlaBadge) {
+      const cycleNum = parseFloat(avgCycleDays);
+      if (cycleNum <= 5) {
+        elSlaBadge.className = 'badge status-completed';
+        elSlaBadge.innerHTML = '🟢 Hızlı';
+      } else if (cycleNum <= 10) {
+        elSlaBadge.className = 'badge priority-orta';
+        elSlaBadge.innerHTML = '🟡 Normal';
+      } else {
+        elSlaBadge.className = 'badge priority-kritik';
+        elSlaBadge.innerHTML = '🔴 Gecikmeli';
+      }
+    }
+    if (elSlaSub) elSlaSub.innerText = `Talep ➔ Sipariş Süresi`;
   },
 
   renderDashboardActiveRequestsList(requests) {
