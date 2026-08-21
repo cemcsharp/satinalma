@@ -290,48 +290,45 @@
           </div>
         </div>
 
-        <!-- 4 TEMEL STRATEJİK FİNANS, TALEP & HIZ GÖSTERGESİ -->
+        <!-- 4 TEMEL STRATEJİK TALEP GÖSTERGESİ (TOPLAM, AÇIK, KRİTİK, TAMAMLANAN) -->
         <div class="grid-4" style="margin-bottom: 1.25rem;">
-          <!-- 1.1 Toplam Satınalma Hacmi -->
-          <div class="glass-card kpi-card" style="border-left: 4px solid var(--accent-primary);">
-            <div class="kpi-icon blue">💰</div>
+          <!-- 1.1 Toplam Talep -->
+          <div class="glass-card kpi-card" style="border-left: 4px solid var(--accent-primary); cursor: pointer;" onclick="App.switchView('requests')" title="Tüm Talepleri Listele">
+            <div class="kpi-icon blue">📋</div>
             <div class="kpi-data">
-              <h3 id="dash-macro-spend">0 ₺</h3>
-              <p>Toplam Satınalma</p>
-              <div class="kpi-sub" id="dash-macro-spend-sub">0 Talep • Ort. 0 ₺</div>
+              <h3 id="dash-kpi-total-val">0</h3>
+              <p>Toplam Talep</p>
+              <div class="kpi-sub" id="dash-kpi-total-sub">0 ₺ Toplam Hacim</div>
             </div>
           </div>
 
-          <!-- 1.2 Net Pazarlık Tasarrufu -->
-          <div class="glass-card kpi-card" style="border-left: 4px solid var(--status-completed); background: rgba(16, 185, 129, 0.04);">
-            <div class="kpi-icon green">🎯</div>
+          <!-- 1.2 Açık / İşlemdeki Talep -->
+          <div class="glass-card kpi-card" style="border-left: 4px solid #3b82f6; cursor: pointer;" onclick="App.filterRequestsByDashboard('Açık')" title="Açık ve Süreçteki Talepleri Filtrele">
+            <div class="kpi-icon blue">🔵</div>
             <div class="kpi-data">
-              <h3 id="dash-macro-savings" style="color: var(--status-completed);">0 ₺</h3>
-              <p style="color: var(--status-completed); font-weight:700;">Pazarlık Tasarrufu</p>
-              <div class="kpi-sub" id="dash-macro-savings-sub" style="color: var(--status-completed); font-weight:600;">%0 Bütçe Kazancı</div>
+              <h3 id="dash-kpi-open-val" style="color: #3b82f6;">0</h3>
+              <p style="color: #3b82f6; font-weight: 700;">Açık / İşlemde</p>
+              <div class="kpi-sub" id="dash-kpi-open-sub">Teklif, Onay & Siparişte</div>
             </div>
           </div>
 
-          <!-- 1.3 Aktif Talep Havuzu -->
-          <div class="glass-card kpi-card" style="border-left: 4px solid #f59e0b; cursor: pointer;" onclick="App.switchView('requests')" title="Talepleri Görüntüle">
-            <div class="kpi-icon yellow">📋</div>
+          <!-- 1.3 Kritik / Geciken Talep -->
+          <div class="glass-card kpi-card" style="border-left: 4px solid var(--status-rejected); background: rgba(239, 68, 68, 0.04); cursor: pointer;" onclick="App.filterRequestsByDashboard('OVERDUE_14')" title="14+ Gündür Bekleyen Talepleri Filtrele">
+            <div class="kpi-icon red">🚨</div>
             <div class="kpi-data">
-              <h3 id="dash-macro-demands">0</h3>
-              <p>Aktif / Toplam Talep</p>
-              <div class="kpi-sub" id="dash-macro-demands-sub">%0 Tamamlanma Oranı</div>
+              <h3 id="dash-kpi-critical-val" style="color: var(--status-rejected);">0</h3>
+              <p style="color: var(--status-rejected); font-weight: 700;">Kritik / Geciken</p>
+              <div class="kpi-sub" id="dash-kpi-critical-sub" style="color: var(--status-rejected); font-weight: 600;">14+ Gün SLA Alarmı</div>
             </div>
           </div>
 
-          <!-- 1.4 İş Bitirme Hızı (SLA) -->
-          <div class="glass-card kpi-card" style="border-left: 4px solid #8b5cf6;">
-            <div class="kpi-icon purple">⚡</div>
+          <!-- 1.4 Tamamlanan Talep -->
+          <div class="glass-card kpi-card" style="border-left: 4px solid var(--status-completed); background: rgba(16, 185, 129, 0.04); cursor: pointer;" onclick="App.filterRequestsByDashboard('Tamamlandı')" title="Tamamlanan Talepleri Filtrele">
+            <div class="kpi-icon green">✅</div>
             <div class="kpi-data">
-              <div style="display: flex; align-items: baseline; gap: 0.4rem;">
-                <h3 id="dash-macro-sla">0 Gün</h3>
-                <span id="dash-macro-sla-badge" class="badge status-completed" style="font-size:0.7rem; padding:0.1rem 0.4rem;">🟢 Hızlı</span>
-              </div>
-              <p>Ort. Temin Hızı (SLA)</p>
-              <div class="kpi-sub" id="dash-macro-sla-sub">Talep -> Sipariş Süresi</div>
+              <h3 id="dash-kpi-completed-val" style="color: var(--status-completed);">0</h3>
+              <p style="color: var(--status-completed); font-weight: 700;">Tamamlanan</p>
+              <div class="kpi-sub" id="dash-kpi-completed-sub" style="color: var(--status-completed); font-weight: 600;">%0 Tamamlanma Oranı</div>
             </div>
           </div>
         </div>
