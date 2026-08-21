@@ -267,10 +267,31 @@
       <!-- View Containers -->
 
       <!-- 1. DASHBOARD VIEW (ZENGİN & GÖRSEL SATINALMA YÖNETİM KOKPİTİ) -->
+      <!-- 1. DASHBOARD VIEW (SADE, ŞIK VE MODERN YÖNETİCİ KOKPİTİ) -->
       <section id="view-dashboard" class="view-section">
         
-        <!-- SIRA 1: 4 TEMEL STRATEJİK FİNANS, TALEP & HIZ GÖSTERGESİ -->
-        <div class="grid-4" style="margin-bottom: 1.5rem;">
+        <!-- ÜST KARŞILAMA VE GÜNCEL BİLGİ KARTI -->
+        <div class="glass-card dash-welcome-box" style="display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem; margin-bottom: 1.25rem; border-left: 4px solid var(--accent-primary); flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+              <span>👋</span> <span id="dash-welcome-user">Hoş Geldiniz</span>
+            </h3>
+            <p id="dash-welcome-subtext" style="font-size: 0.84rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+              Sistemdeki aktif süreçler ve dikkat gerektiren işlemler özetlenmektedir.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.6rem; align-items: center;">
+            <button class="btn-secondary" onclick="App.switchView('notifications')" style="font-size: 0.8rem; padding: 0.45rem 0.8rem;">
+              <span>🔔</span> Bildirimler (<span id="dash-quick-notif-count">0</span>)
+            </button>
+            <button class="btn-primary" onclick="App.openNewRequestModal()" style="font-size: 0.8rem; padding: 0.45rem 0.85rem;">
+              <span>➕</span> Yeni Talep
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 TEMEL STRATEJİK FİNANS, TALEP & HIZ GÖSTERGESİ -->
+        <div class="grid-4" style="margin-bottom: 1.25rem;">
           <!-- 1.1 Toplam Satınalma Hacmi -->
           <div class="glass-card kpi-card" style="border-left: 4px solid var(--accent-primary);">
             <div class="kpi-icon blue">💰</div>
@@ -315,342 +336,51 @@
           </div>
         </div>
 
-        <!-- BÖLÜM 1: 📋 TALEP VE SÜREÇ YÖNETİMİ ÖZETİ -->
-        <div class="dashboard-section-box">
-          <div class="dashboard-section-header">
-            <div class="section-title-group">
-              <h3>📋 Talep & Satınalma Süreci Özeti</h3>
-              <p>Tüm birimlerden gelen taleplerin aşamaları, canlı durum sayaçları ve son işlemler</p>
-            </div>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-              <button class="btn-secondary" onclick="App.switchView('requests')" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;">
-                <span>Tüm Talepler</span> &rarr;
+        <!-- 2 KOLONLU ZARİF ÖZET DÜZENİ -->
+        <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.25rem;">
+          
+          <!-- SOL: İşlemdeki Son Aktif Talepler (Kompakt Liste) -->
+          <div class="glass-card" style="padding: 1.25rem; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border-color);">
+              <div>
+                <h3 style="font-size: 0.98rem; font-weight: 700; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+                  <span>📋</span> İşlemdeki Aktif Talepler
+                </h3>
+                <p style="font-size: 0.76rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">
+                  İşlemde olan ve öncelikli son satınalma dosyaları
+                </p>
+              </div>
+              <button class="btn-secondary" onclick="App.switchView('requests')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">
+                Tüm Talepler &rarr;
               </button>
             </div>
-          </div>
 
-          <!-- Talep Aşamaları Sayısal Sayaç Hapları -->
-          <div class="dashboard-status-pills-grid">
-            <div class="dashboard-status-pill" onclick="App.filterRequestsByDashboard('Açık')" title="Açık / İşlemdeki Talepleri Filtrele">
-              <div class="pill-label"><span>🔵</span> Açık / Teklif</div>
-              <div class="pill-count" id="dash-status-count-open">0</div>
-              <div class="pill-amount" id="dash-status-amt-open">0 ₺</div>
-            </div>
-            <div class="dashboard-status-pill" onclick="App.filterRequestsByDashboard('Rektörlük Onayında')" title="Rektörlük Onayındaki Talepleri Filtrele">
-              <div class="pill-label"><span>🏛️</span> Rektörlükte</div>
-              <div class="pill-count" style="color: #8b5cf6;" id="dash-status-count-rectorate">0</div>
-              <div class="pill-amount" id="dash-status-amt-rectorate">0 ₺</div>
-            </div>
-            <div class="dashboard-status-pill" onclick="App.filterRequestsByDashboard('Sözleşme Aşamasında')" title="Sözleşme Aşamasındaki Talepleri Filtrele">
-              <div class="pill-label"><span>📑</span> Sözleşmede</div>
-              <div class="pill-count" style="color: #0891b2;" id="dash-status-count-contract">0</div>
-              <div class="pill-amount" id="dash-status-amt-contract">0 ₺</div>
-            </div>
-            <div class="dashboard-status-pill" onclick="App.filterRequestsByDashboard('Sipariş Verildi')" title="Siparişi Geçilen Talepleri Filtrele">
-              <div class="pill-label"><span>🚚</span> Sipariş Verildi</div>
-              <div class="pill-count" style="color: #d97706;" id="dash-status-count-order">0</div>
-              <div class="pill-amount" id="dash-status-amt-order">0 ₺</div>
-            </div>
-            <div class="dashboard-status-pill" onclick="App.filterRequestsByDashboard('OVERDUE_14')" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.05);" title="14+ Gündür Bekleyen Talepleri Filtrele">
-              <div class="pill-label" style="color: #ef4444;"><span>🚨</span> 14+ Gün Geciken</div>
-              <div class="pill-count" style="color: #ef4444;" id="dash-status-count-overdue">0</div>
-              <div class="pill-amount" style="color: #ef4444;" id="dash-status-amt-overdue">SLA Alarmı</div>
-            </div>
-            <div class="dashboard-status-pill" onclick="App.filterRequestsByDashboard('Revize İstendi')" title="Birimden Revize Beklenenler">
-              <div class="pill-label"><span>⚠️</span> Revize Bekleyen</div>
-              <div class="pill-count" style="color: #ea580c;" id="dash-status-count-revision">0</div>
-              <div class="pill-amount" id="dash-status-amt-revision">Şartname</div>
-            </div>
-            <div class="dashboard-status-pill" onclick="App.filterRequestsByDashboard('Tamamlandı')" title="Tamamlanan Talepleri Filtrele">
-              <div class="pill-label"><span>✅</span> Tamamlanan</div>
-              <div class="pill-count" style="color: var(--status-completed);" id="dash-status-count-completed">0</div>
-              <div class="pill-amount" id="dash-status-amt-completed">0 ₺</div>
+            <div id="dash-active-requests-list" style="display: flex; flex-direction: column; gap: 0.45rem; flex: 1;">
+              <!-- JS dinamik olarak en son aktif talepleri yerleştirecek -->
             </div>
           </div>
 
-          <!-- Son / Öncelikli Talepler Mini Tablosu -->
-          <div class="dashboard-mini-table-wrapper">
-            <table class="dashboard-mini-table" id="dash-table-recent-requests">
-              <thead>
-                <tr>
-                  <th style="width: 110px;">Barkod</th>
-                  <th>Talep Eden Birim</th>
-                  <th>Talep Konusu</th>
-                  <th>Sorumlu Uzman</th>
-                  <th>Geliş Tarihi</th>
-                  <th>Durum</th>
-                  <th style="text-align: right;">Bütçe / Tutar</th>
-                  <th style="text-align: center; width: 80px;">İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">⏳ Talepler yükleniyor...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- BÖLÜM 2: 👥 PERSONEL İŞ YÜKÜ, KOTA & TASARRUF TABLOSU -->
-        <div class="dashboard-section-box">
-          <div class="dashboard-section-header">
-            <div class="section-title-group">
-              <h3>👥 Personel İş Yükü, Kota & Pazarlık Performansı</h3>
-              <p>Uzmanların açık iş kotaları, tamamlanan dosya sayıları ve kuruma kazandırdıkları net pazarlık tasarrufları</p>
-            </div>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-              <button class="btn-secondary" onclick="App.switchView('workload')" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;">
-                <span>İş Yükü & Delegasyon</span> &rarr;
+          <!-- SAĞ: Kritik Uyarılar & Hızlı Durum Kartları -->
+          <div class="glass-card" style="padding: 1.25rem; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border-color);">
+              <div>
+                <h3 style="font-size: 0.98rem; font-weight: 700; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+                  <span>⚡</span> Hızlı Durum & Kritik Uyarılar
+                </h3>
+                <p style="font-size: 0.76rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">
+                  Dikkat ve onay gerektiren kilit noktalar
+                </p>
+              </div>
+              <button class="btn-secondary" onclick="App.switchView('notifications')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">
+                Tüm Bildirimler &rarr;
               </button>
             </div>
-          </div>
 
-          <!-- Personel Sayısal Metrikleri -->
-          <div class="dashboard-num-stat-grid">
-            <div class="dashboard-num-stat-card">
-              <div class="stat-icon">👤</div>
-              <div class="stat-info">
-                <div class="stat-val" id="dash-personnel-count">0</div>
-                <div class="stat-lbl">Aktif Satınalma Uzmanı</div>
-              </div>
-            </div>
-            <div class="dashboard-num-stat-card">
-              <div class="stat-icon">⚖️</div>
-              <div class="stat-info">
-                <div class="stat-val" id="dash-personnel-avg-load">0 İş</div>
-                <div class="stat-lbl">Uzman Başına Ort. Açık İş</div>
-              </div>
-            </div>
-            <div class="dashboard-num-stat-card">
-              <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">🏆</div>
-              <div class="stat-info">
-                <div class="stat-val" style="color: var(--status-completed);" id="dash-personnel-top-saver">-</div>
-                <div class="stat-lbl">Tasarruf Şampiyonu Uzman</div>
-              </div>
-            </div>
-            <div class="dashboard-num-stat-card">
-              <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">🤝</div>
-              <div class="stat-info">
-                <div class="stat-val" style="color: #8b5cf6;" id="dash-personnel-negotiated-jobs">0 Adet</div>
-                <div class="stat-lbl">Pazarlık Yapılan Başarılı Dosya</div>
-              </div>
+            <div id="dash-action-alerts-list" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1;">
+              <!-- JS dinamik olarak akıllı durum haplarını yerleştirecek -->
             </div>
           </div>
 
-          <!-- Personel Özet Tablosu -->
-          <div class="dashboard-mini-table-wrapper">
-            <table class="dashboard-mini-table" id="dash-table-personnel-workload">
-              <thead>
-                <tr>
-                  <th>Satınalma Uzmanı</th>
-                  <th>Görev / Unvan</th>
-                  <th style="min-width: 170px;">Açık İş & Kota Doluluk Barı</th>
-                  <th style="text-align: center;">Biten İş</th>
-                  <th style="text-align: center;">Pazarlıklı İş</th>
-                  <th style="text-align: right;">Pazarlık Tasarrufu (₺)</th>
-                  <th style="text-align: center;">Tasarruf Oranı</th>
-                  <th style="text-align: center; width: 90px;">Rapor</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">⏳ Personel verileri yükleniyor...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- BÖLÜM 3 & 4 (YAN YANA 2 KOLON): FATURALAR & SÖZLEŞMELER -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
-          
-          <!-- SOL: 🧾 Fatura & Nakit Akışı Özeti -->
-          <div class="dashboard-section-box" style="margin-bottom: 0;">
-            <div class="dashboard-section-header">
-              <div class="section-title-group">
-                <h3>🧾 Fatura & Nakit Akışı Özeti</h3>
-                <p>Muhasebeye teslim bekleyen ve vadesi yaklaşan faturalar</p>
-              </div>
-              <button class="btn-secondary" onclick="App.switchView('invoices')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Faturalar &rarr;</button>
-            </div>
-
-            <!-- Fatura Sayısal Sayaçları -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.85rem;">
-              <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">📤 Teslim Bekleyen</div>
-                <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #6366f1;" id="dash-inv-stat-pending">0</div>
-                <div style="font-size: 0.7rem; color: #6366f1; font-weight: 600;" id="dash-inv-amt-pending">0 ₺</div>
-              </div>
-              <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">💳 Bu Hafta Vade</div>
-                <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #10b981;" id="dash-inv-stat-weekly">0</div>
-                <div style="font-size: 0.7rem; color: #10b981; font-weight: 600;" id="dash-inv-amt-weekly">0 ₺</div>
-              </div>
-              <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">🔴 Gecikmiş Fatura</div>
-                <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #ef4444;" id="dash-inv-stat-overdue">0</div>
-                <div style="font-size: 0.7rem; color: #ef4444; font-weight: 600;" id="dash-inv-amt-overdue">0 ₺</div>
-              </div>
-            </div>
-
-            <!-- Fatura Mini Tablosu -->
-            <div class="dashboard-mini-table-wrapper">
-              <table class="dashboard-mini-table" id="dash-table-pending-invoices">
-                <thead>
-                  <tr>
-                    <th>Fatura No</th>
-                    <th>Tedarikçi</th>
-                    <th>Vade / Kalan</th>
-                    <th>Teslimat</th>
-                    <th style="text-align: right;">Tutar</th>
-                    <th style="text-align: center;">Durum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Fatura verileri yükleniyor...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- SAĞ: 📑 Sözleşmeler & Durum Özeti -->
-          <div class="dashboard-section-box" style="margin-bottom: 0;">
-            <div class="dashboard-section-header">
-              <div class="section-title-group">
-                <h3>📑 Sözleşme Yönetimi & Durum Özeti</h3>
-                <p>Aktif, süresi yaklaşan ve tamamlanmış kurumsal sözleşmeler</p>
-              </div>
-              <button class="btn-secondary" onclick="App.switchView('contracts')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Sözleşmeler &rarr;</button>
-            </div>
-
-            <!-- Sözleşme Sayısal Sayaçları -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.85rem;">
-              <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">📑 Aktif Sözleşme</div>
-                <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #3b82f6;" id="dash-cont-stat-active">0</div>
-                <div style="font-size: 0.7rem; color: #3b82f6; font-weight: 600;" id="dash-cont-amt-active">0 ₺</div>
-              </div>
-              <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">🟠 30 Günde Biten</div>
-                <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #d97706;" id="dash-cont-stat-expiring">0</div>
-                <div style="font-size: 0.7rem; color: #d97706; font-weight: 600;">Yenileme</div>
-              </div>
-              <div style="background: rgba(100, 116, 139, 0.08); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">🔒 Kapanan Sözleşme</div>
-                <div style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: var(--text-muted);" id="dash-cont-stat-closed">0</div>
-                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">Kapatıldı</div>
-              </div>
-            </div>
-
-            <!-- Sözleşme Mini Tablosu -->
-            <div class="dashboard-mini-table-wrapper">
-              <table class="dashboard-mini-table" id="dash-table-expiring-contracts">
-                <thead>
-                  <tr>
-                    <th>Sözleşme No</th>
-                    <th>Konu / Kapsam</th>
-                    <th>Yüklenici Firma</th>
-                    <th>Bitiş Tarihi</th>
-                    <th style="text-align: right;">Sözleşme Bedeli</th>
-                    <th style="text-align: center;">Durum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Sözleşme verileri yükleniyor...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- BÖLÜM 5 & 6 (YAN YANA 2 KOLON): BİRİMLER & TEDARİKÇİLER -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
-          
-          <!-- SOL: 🏢 Birim Harcama Liderleri -->
-          <div class="dashboard-section-box" style="margin-bottom: 0;">
-            <div class="dashboard-section-header">
-              <div class="section-title-group">
-                <h3>🏢 En Çok Harcama Yapan Birimler</h3>
-                <p>Üniversite birimlerinin talep hacimleri, harcama tutarları ve SLA hızları</p>
-              </div>
-              <button class="btn-secondary" onclick="App.switchView('unit-analysis')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Birim Analizi &rarr;</button>
-            </div>
-
-            <div class="dashboard-mini-table-wrapper">
-              <table class="dashboard-mini-table" id="dash-table-top-units">
-                <thead>
-                  <tr>
-                    <th style="width: 35px;">#</th>
-                    <th>Birim Adı</th>
-                    <th style="text-align: center;">Talep</th>
-                    <th style="text-align: center;">SLA Hızı</th>
-                    <th style="text-align: right;">Toplam Harcama</th>
-                    <th style="width: 110px;">Bütçe Payı</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Birim verileri yükleniyor...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- SAĞ: 🏭 Ana Tedarikçi Ortaklar & Kalite Karnesi -->
-          <div class="dashboard-section-box" style="margin-bottom: 0;">
-            <div class="dashboard-section-header">
-              <div class="section-title-group">
-                <h3>🏭 Ana Tedarikçiler & Kalite Karnesi</h3>
-                <p>En yüksek iş hacmine sahip tedarikçiler ve birim memnuniyet puanları</p>
-              </div>
-              <button class="btn-secondary" onclick="App.switchView('supplier-analysis')" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">Tedarikçi Analizi &rarr;</button>
-            </div>
-
-            <div class="dashboard-mini-table-wrapper">
-              <table class="dashboard-mini-table" id="dash-table-top-suppliers">
-                <thead>
-                  <tr>
-                    <th style="width: 35px;">#</th>
-                    <th>Tedarikçi Firma</th>
-                    <th style="text-align: center;">Segment</th>
-                    <th style="text-align: center;">Puan</th>
-                    <th style="text-align: center;">Sipariş</th>
-                    <th style="text-align: right;">İş Hacmi (₺)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Tedarikçi verileri yükleniyor...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- BÖLÜM 7: 📈 CANLI TREND VE DAĞILIM GRAFİKLERİ -->
-        <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem;">
-          <!-- 7.1 Aylık Finans & Talep Akışı -->
-          <div class="glass-card" style="padding: 1.25rem;">
-            <div class="card-header" style="margin-bottom: 0.75rem;">
-              <div>
-                <h3 style="font-size: 0.98rem;">📈 Aylık Satınalma & Tasarruf Akışı</h3>
-                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.1rem 0 0 0;">Akademik yıl boyunca gerçekleşen harcama ve pazarlık kazancı eğrisi</p>
-              </div>
-            </div>
-            <div style="height: 240px; position: relative; width: 100%; min-width: 0;">
-              <canvas id="chart-monthly-trend"></canvas>
-            </div>
-          </div>
-
-          <!-- 7.2 Alım Türü Donut Grafiği -->
-          <div class="glass-card" style="padding: 1.25rem;">
-            <div class="card-header" style="margin-bottom: 0.75rem;">
-              <div>
-                <h3 style="font-size: 0.98rem;">🍩 Alım Türü Dağılımı</h3>
-                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.1rem 0 0 0;">Mal, Hizmet, İhale ve Doğrudan Temin harcama payları</p>
-              </div>
-            </div>
-            <div style="height: 240px; position: relative; width: 100%; min-width: 0; display: flex; align-items: center; justify-content: center;">
-              <canvas id="chart-category-donut"></canvas>
-            </div>
-          </div>
         </div>
 
       </section>

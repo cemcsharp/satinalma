@@ -2705,7 +2705,7 @@ const App = {
     }
   },
 
-  // 1. DASHBOARD RENDERER (ZENGİN & GÖRSEL SATINALMA YÖNETİM KOKPİTİ)
+  // 1. DASHBOARD RENDERER (SADE, ŞIK VE MODERN YÖNETİCİ KOKPİTİ)
   renderDashboard() {
     const requests = this.getFilteredRequests();
     const contracts = this.state.contracts || [];
@@ -2725,30 +2725,34 @@ const App = {
       }
     });
 
-    // 1.1 Tepe Stratejik Finans & Güvence Metrikleri
+    const allNotifs = this.getAllNotifications ? this.getAllNotifications() : [];
+    const activeDemands = requests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal');
+
+    // 1.1 Üst Karşılama ve Durum Kartı
+    const curUser = this.state.currentUser;
+    const userName = curUser?.name || 'Değerli Kullanıcı';
+    const welcomeEl = document.getElementById('dash-welcome-user');
+    const welcomeSubEl = document.getElementById('dash-welcome-subtext');
+    const quickNotifCountEl = document.getElementById('dash-quick-notif-count');
+
+    if (welcomeEl) welcomeEl.innerText = `Hoş Geldiniz, ${userName}`;
+    if (quickNotifCountEl) quickNotifCountEl.innerText = allNotifs.length;
+    if (welcomeSubEl) {
+      if (activeDemands.length === 0 && allNotifs.length === 0) {
+        welcomeSubEl.innerText = 'Harika! Şu an bekleyen acil bir işlem veya bildirim bulunmuyor.';
+      } else {
+        welcomeSubEl.innerText = `Bugün sistemde aktif ${activeDemands.length} talep işlem görüyor, ${allNotifs.length} bildirim ve aksiyon bekleyen durum mevcut.`;
+      }
+    }
+
+    // 1.2 4 Temel Stratejik Finans & Hız Göstergesi
     this.renderDashboardMacroKPIs(requests, contracts, invoices, guarantees);
 
-    // 1.2 Talep & Satınalma Süreci Özeti & Canlı Sayaçlar + Mini Tablo
-    this.renderDashboardRequestsSummary(requests);
+    // 1.3 İşlemdeki Aktif Talepler Listesi (Sol Kolon)
+    this.renderDashboardActiveRequestsList(requests);
 
-    // 1.3 Personel İş Yükü, Kota & Pazarlık Performansı Tablosu
-    this.renderDashboardPersonnelSummary(requests);
-
-    // 1.4 Fatura & Nakit Akışı Özeti Tablosu
-    this.renderDashboardInvoicesSummary(invoices, today);
-
-    // 1.5 Sözleşme & Teminat Mektupları Özeti Tablosu
-    this.renderDashboardContractsSummary(contracts, guarantees, today);
-
-    // 1.6 Birim Harcama Liderleri Tablosu
-    this.renderDashboardUnitsSummary(requests);
-
-    // 1.7 Ana Tedarikçi Ortaklar & Kalite Karnesi Tablosu
-    this.renderDashboardSuppliersSummary(requests);
-
-    // 1.8 Canlı Trend & Dağılım Grafikleri
-    this.renderDashboardMonthlyTrend(requests);
-    this.renderDashboardCategoryDonut(requests);
+    // 1.4 Hızlı Durum & Kritik Uyarılar (Sağ Kolon)
+    this.renderDashboardActionAlerts(requests, contracts, invoices, guarantees, allNotifs);
   },
 
   filterRequestsByDashboard(statusVal) {
@@ -2848,580 +2852,223 @@ const App = {
     if (elSlaSub) elSlaSub.innerText = `Talep -> Sipariş (${measuredTurnaroundCount} Ölçüm)`;
   },
 
-  renderDashboardRequestsSummary(requests) {
-    let countOpen = 0, amtOpen = 0;
-    let countRectorate = 0, amtRectorate = 0;
-    let countContract = 0, amtContract = 0;
-    let countOrder = 0, amtOrder = 0;
-    let countOverdue = 0;
-    let countRevision = 0;
-    let countCompleted = 0, amtCompleted = 0;
+  renderDashboardActiveRequestsList(requests) {
+    const listEl = document.getElementById('dash-active-requests-list');
+    if (!listEl) return;
 
-    requests.forEach(r => {
-      const amt = (parseFloat(r.actualAmount) || parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0);
-      const isClosed = (r.status === 'Tamamlandı' || r.status === 'Reddedildi' || r.status === 'İptal');
+    // Filter active/in-progress requests (or recent if none active)
+    let displayReqs = requests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal');
+    if (displayReqs.length === 0) {
+      displayReqs = [...requests].slice(0, 5);
+    } else {
+      // Sort by SLA delay or most recent
+      displayReqs = displayReqs.sort((a, b) => (b._diffDays || 0) - (a._diffDays || 0)).slice(0, 5);
+    }
 
-      if (r.status === 'Açık') {
-        countOpen++;
-        amtOpen += amt;
-      } else if (r.status === 'Rektörlük Onayında') {
-        countRectorate++;
-        amtRectorate += amt;
-      } else if (r.status === 'Sözleşme Aşamasında') {
-        countContract++;
-        amtContract += amt;
-      } else if (r.status === 'Sipariş Verildi' || (!isClosed && (r.orderBarcode || r.orderDate))) {
-        countOrder++;
-        amtOrder += amt;
-      } else if (r.status === 'Revize İstendi') {
-        countRevision++;
-      } else if (r.status === 'Tamamlandı') {
-        countCompleted++;
-        amtCompleted += amt;
-      }
+    if (displayReqs.length === 0) {
+      listEl.innerHTML = `
+        <div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+          ✨ Şu anda sistemde bekleyen aktif talep kaydı bulunmamaktadır.
+        </div>
+      `;
+      return;
+    }
 
-      if (!isClosed && r._diffDays >= 14) {
-        countOverdue++;
+    listEl.innerHTML = displayReqs.map(r => {
+      const amt = r.actualAmount > 0 ? r.actualAmount : (r.budgetAmount || r.estimatedAmount || 0);
+      const isOverdue = r._diffDays >= 14 && r.status !== 'Tamamlandı';
+
+      return `
+        <div class="dash-compact-request-row" onclick="App.openEditModal('${r.id}')" title="Detayları İncele (#${r.requestBarcode || r.id})">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <span style="font-family: var(--font-mono); font-weight: 800; color: var(--accent-primary); font-size: 0.82rem; background: rgba(59, 130, 246, 0.08); padding: 0.2rem 0.45rem; border-radius: 4px; flex-shrink: 0;">
+              #${r.requestBarcode || r.id}
+            </span>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${r.subject || 'Konu Belirtilmemiş'}
+              </div>
+              <div style="font-size: 0.73rem; color: var(--text-muted); display: flex; gap: 0.5rem; align-items: center; margin-top: 0.15rem;">
+                <span style="font-weight: 600; color: var(--text-main);">🏢 ${r.unit || '-'}</span>
+                <span>•</span>
+                <span>👤 ${r.assignedTo || 'Atanmadı'}</span>
+                ${isOverdue ? `<span style="color:#ef4444; font-weight:700;">• 🚨 ${r._diffDays} Gün</span>` : ''}
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.65rem; flex-shrink: 0;">
+            ${this.getStatusBadge(r)}
+            <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.84rem; color: var(--text-main); text-align: right; min-width: 80px;">
+              ${amt > 0 ? this.formatMoney(amt, r.currency || 'TRY', 0) : '-'}
+            </div>
+            <span style="color: var(--text-muted); font-size: 0.8rem;">&rsaquo;</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  renderDashboardActionAlerts(requests, contracts, invoices, guarantees, allNotifs) {
+    const alertsBox = document.getElementById('dash-action-alerts-list');
+    if (!alertsBox) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 1. Overdue requests (14+ days)
+    const overdueReqs = requests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal' && r._diffDays >= 14);
+
+    // 2. Expiring / Overdue guarantees
+    const activeGuarantees = (guarantees || []).filter(g => {
+      const st = (g.status || '').toLowerCase();
+      return st !== 'iade edildi' && st !== 'iade' && st !== 'nakte çevrildi' && st !== 'iptal' && st !== 'hükümsüz' && st !== 'kapandı';
+    });
+    let criticalGuaranteesCount = 0;
+    activeGuarantees.forEach(g => {
+      const exp = this.parseDate(g.expiryDate);
+      if (exp) {
+        exp.setHours(0, 0, 0, 0);
+        const diff = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+        if (diff <= 30) criticalGuaranteesCount++;
       }
     });
 
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-    setVal('dash-status-count-open', countOpen);
-    setVal('dash-status-amt-open', this.formatMoney(amtOpen, 'TRY', 0));
-    setVal('dash-status-count-rectorate', countRectorate);
-    setVal('dash-status-amt-rectorate', this.formatMoney(amtRectorate, 'TRY', 0));
-    setVal('dash-status-count-contract', countContract);
-    setVal('dash-status-amt-contract', this.formatMoney(amtContract, 'TRY', 0));
-    setVal('dash-status-count-order', countOrder);
-    setVal('dash-status-amt-order', this.formatMoney(amtOrder, 'TRY', 0));
-    setVal('dash-status-count-overdue', countOverdue);
-    setVal('dash-status-count-revision', countRevision);
-    setVal('dash-status-count-completed', countCompleted);
-    setVal('dash-status-amt-completed', this.formatMoney(amtCompleted, 'TRY', 0));
-
-    // Mini Table of Recent / Critical Demands (Top 6)
-    const recentDemands = [...requests].sort((a, b) => {
-      // Prioritize overdue/active over completed
-      const scoreA = (a.status !== 'Tamamlandı' ? 100 : 0) + (a._diffDays || 0);
-      const scoreB = (b.status !== 'Tamamlandı' ? 100 : 0) + (b._diffDays || 0);
-      return scoreB - scoreA;
-    }).slice(0, 6);
-
-    const tbody = document.querySelector('#dash-table-recent-requests tbody');
-    if (tbody) {
-      if (recentDemands.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1.25rem; color:var(--text-muted);">Henüz talep kaydı bulunmamaktadır.</td></tr>';
-      } else {
-        tbody.innerHTML = recentDemands.map(r => {
-          const amt = r.actualAmount > 0 ? r.actualAmount : (r.budgetAmount || r.estimatedAmount || 0);
-          return `
-            <tr>
-              <td>
-                <span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary); cursor:pointer;" onclick="App.openEditModal('${r.id}')" title="Detayları İncele">
-                  #${r.requestBarcode || r.id}
-                </span>
-              </td>
-              <td><strong style="color:var(--text-main); font-size:0.82rem;">${r.unit || '-'}</strong></td>
-              <td>
-                <div style="font-weight:600; color:var(--text-main); max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${r.subject}">
-                  ${r.subject}
-                </div>
-              </td>
-              <td><span style="font-size:0.78rem; color:var(--text-muted);">👤 ${r.assignedTo || 'Atanmadı'}</span></td>
-              <td style="font-size:0.78rem; color:var(--text-muted);">${r.arrivalDate || r.requestDate || '-'}</td>
-              <td>${this.getStatusBadge(r)}</td>
-              <td style="text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--status-completed);">
-                ${amt > 0 ? this.formatMoney(amt, r.currency || 'TRY', 0) : '-'}
-              </td>
-              <td style="text-align:center;">
-                <button class="btn-icon" onclick="App.openEditModal('${r.id}')" title="İncele / Düzenle" style="padding:0.2rem 0.4rem; font-size:0.8rem;">👁️</button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
-  },
-
-  renderDashboardPersonnelSummary(requests) {
-    const operationalUsers = (this.state.users || []).filter(u => u.isActive !== false && u.role !== 'EXECUTIVE');
-    const maxQuota = parseInt(this.state.settings?.maxOpenRequestsPerUser || 15);
-
-    let totalOpen = 0;
-    let totalCompleted = 0;
-    let totalSavingsCount = 0;
-    let topSaver = { name: '-', savings: 0 };
-
-    const personStats = operationalUsers.map(u => {
-      const uReqs = requests.filter(r => r.assignedTo === u.name);
-      const openCount = uReqs.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal').length;
-      const completedCount = uReqs.filter(r => r.status === 'Tamamlandı').length;
-      let savingsTRY = 0;
-      let savingsCount = 0;
-      let initTotal = 0;
-
-      uReqs.forEach(r => {
-        const initAmt = parseFloat(r.budgetAmount || r.estimatedAmount) || 0;
-        const actAmt = parseFloat(r.actualAmount) || 0;
-        if (initAmt > actAmt && actAmt > 0) {
-          savingsTRY += (initAmt - actAmt);
-          savingsCount++;
-          initTotal += initAmt;
-        }
-      });
-
-      totalOpen += openCount;
-      totalCompleted += completedCount;
-      totalSavingsCount += savingsCount;
-
-      if (savingsTRY > topSaver.savings) {
-        topSaver = { name: u.name, savings: savingsTRY };
-      }
-
-      const quotaPct = Math.min(100, Math.round((openCount / maxQuota) * 100));
-      const ratePct = initTotal > 0 ? ((savingsTRY / initTotal) * 100).toFixed(1) : '0.0';
-      const score = (openCount * 2) + (savingsCount * 3) + (completedCount * 2);
-
-      return {
-        user: u,
-        openCount,
-        completedCount,
-        savingsCount,
-        savingsTRY,
-        quotaPct,
-        ratePct,
-        score
-      };
-    });
-
-    // Populate numerical indicators
-    const elCount = document.getElementById('dash-personnel-count');
-    const elAvgLoad = document.getElementById('dash-personnel-avg-load');
-    const elTopSaver = document.getElementById('dash-personnel-top-saver');
-    const elNegotiated = document.getElementById('dash-personnel-negotiated-jobs');
-
-    if (elCount) elCount.innerText = operationalUsers.length;
-    if (elAvgLoad) elAvgLoad.innerText = operationalUsers.length > 0 ? `${(totalOpen / operationalUsers.length).toFixed(1)} İş` : '0 İş';
-    if (elTopSaver) elTopSaver.innerText = topSaver.savings > 0 ? `${topSaver.name.split(' ')[0]} (${this.formatMoney(topSaver.savings, 'TRY', 0)})` : 'Henüz Yok';
-    if (elNegotiated) elNegotiated.innerText = `${totalSavingsCount} Adet`;
-
-    // Render table
-    const tbody = document.querySelector('#dash-table-personnel-workload tbody');
-    if (tbody) {
-      if (personStats.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1.25rem; color:var(--text-muted);">Aktif uzman bulunamadı.</td></tr>';
-      } else {
-        tbody.innerHTML = personStats.map(p => {
-          let barColor = p.openCount >= maxQuota ? '#ef4444' : (p.openCount >= Math.floor(maxQuota * 0.65) ? '#f59e0b' : '#10b981');
-          let statusText = p.openCount >= maxQuota ? '🔴 Dolu' : (p.openCount >= Math.floor(maxQuota * 0.65) ? '🟡 Yoğun' : '🟢 Müsait');
-
-          return `
-            <tr>
-              <td>
-                <strong style="color:var(--text-main); font-size:0.86rem; cursor:pointer;" onclick="App.openPersonnelSavingsDetailView('${p.user.name.replace(/'/g, "\\'")}')" title="Detaylı karne aç">
-                  👤 ${p.user.name}
-                </strong>
-              </td>
-              <td style="font-size:0.78rem; color:var(--text-muted);">${p.user.title || 'Satınalma Uzmanı'}</td>
-              <td>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; margin-bottom:0.25rem;">
-                  <span style="font-weight:700; color:var(--text-main);">${p.openCount} / ${maxQuota} Açık</span>
-                  <span style="color:${barColor}; font-weight:700;">${statusText}</span>
-                </div>
-                <div style="height:6px; background:var(--bg-hover, rgba(0,0,0,0.06)); border-radius:999px; overflow:hidden;">
-                  <div style="height:100%; width:${p.quotaPct}%; background:${barColor}; border-radius:999px; transition:width 0.4s ease;"></div>
-                </div>
-              </td>
-              <td style="text-align:center; font-weight:700; color:var(--status-completed);">${p.completedCount}</td>
-              <td style="text-align:center;"><span class="badge status-open" style="font-size:0.72rem;">${p.savingsCount} İş</span></td>
-              <td style="text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.88rem;">
-                ${p.savingsTRY > 0 ? '+' + this.formatMoney(p.savingsTRY, 'TRY', 0) : '0 ₺'}
-              </td>
-              <td style="text-align:center;">
-                <span class="badge" style="background:${p.savingsTRY > 0 ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-hover)'}; color:${p.savingsTRY > 0 ? 'var(--status-completed)' : 'var(--text-muted)'}; font-weight:700;">
-                  %${p.ratePct}
-                </span>
-              </td>
-              <td style="text-align:center;">
-                <button class="btn-secondary" onclick="App.openPersonnelSavingsDetailView('${p.user.name.replace(/'/g, "\\'")}')" style="font-size:0.72rem; padding:0.2rem 0.5rem;" title="Performans Raporu">
-                  📊 Rapor
-                </button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
-  },
-
-  renderDashboardInvoicesSummary(invoices, today) {
+    // 3. Invoices pending delivery or overdue
     let pendingDeliveryCount = 0, pendingDeliveryAmount = 0;
-    let overdueCount = 0, overdueAmount = 0;
-    let weeklyCount = 0, weeklyAmount = 0;
-
-    const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
-    const mondayThisWeek = new Date(today);
-    mondayThisWeek.setDate(today.getDate() - (dayOfWeek - 1));
-    const sundayThisWeek = new Date(mondayThisWeek);
-    sundayThisWeek.setDate(mondayThisWeek.getDate() + 6);
-    sundayThisWeek.setHours(23,59,59,999);
-
-    invoices.forEach(inv => {
-      const amt = (inv.amount || 0);
-      if (!inv.accountingDeliveryDate) {
+    (invoices || []).forEach(inv => {
+      if (!inv.accountingDeliveryDate && inv.paymentStatus !== 'Ödendi') {
         pendingDeliveryCount++;
-        pendingDeliveryAmount += amt;
-      }
-      if (inv.paymentStatus !== 'Ödendi' && inv.dueDate) {
-        const due = new Date(inv.dueDate);
-        due.setHours(0,0,0,0);
-        if (due < today) {
-          overdueCount++;
-          overdueAmount += amt;
-        } else if (due >= mondayThisWeek && due <= sundayThisWeek) {
-          weeklyCount++;
-          weeklyAmount += amt;
-        }
+        pendingDeliveryAmount += (inv.amount || 0);
       }
     });
 
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-    setVal('dash-inv-stat-pending', `${pendingDeliveryCount} Fatura`);
-    setVal('dash-inv-amt-pending', this.formatMoney(pendingDeliveryAmount, 'TRY', 0));
-    setVal('dash-inv-stat-weekly', `${weeklyCount} Fatura`);
-    setVal('dash-inv-amt-weekly', this.formatMoney(weeklyAmount, 'TRY', 0));
-    setVal('dash-inv-stat-overdue', `${overdueCount} Fatura`);
-    setVal('dash-inv-amt-overdue', this.formatMoney(overdueAmount, 'TRY', 0));
-
-    // Mini Table: Top 5 pending handover or due invoices
-    const priorityInvoices = [...invoices].filter(i => i.paymentStatus !== 'Ödendi' || !i.accountingDeliveryDate).slice(0, 5);
-    const tbody = document.querySelector('#dash-table-pending-invoices tbody');
-    if (tbody) {
-      if (priorityInvoices.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Ödeme veya teslimat bekleyen fatura bulunmamaktadır.</td></tr>';
-      } else {
-        tbody.innerHTML = priorityInvoices.map(inv => {
-          let deliveryBadge = inv.accountingDeliveryDate 
-            ? `<span class="badge status-completed" style="font-size:0.68rem;">📥 Teslim Edildi</span>` 
-            : `<span class="badge priority-yüksek" style="font-size:0.68rem;">📤 Satınalmada</span>`;
-
-          let dueBadge = '-';
-          if (inv.dueDate) {
-            const dDue = new Date(inv.dueDate);
-            dDue.setHours(0,0,0,0);
-            const diff = Math.ceil((dDue - today) / (1000 * 60 * 60 * 24));
-            if (diff < 0) dueBadge = `<span class="badge priority-kritik" style="font-size:0.68rem;">🔴 ${Math.abs(diff)}g Gecikmede</span>`;
-            else if (diff <= 7) dueBadge = `<span class="badge priority-orta" style="font-size:0.68rem;">🟡 ${diff} Gün Kaldı</span>`;
-            else dueBadge = `<span style="font-size:0.75rem; color:var(--text-muted);">${inv.dueDate}</span>`;
-          }
-
-          return `
-            <tr>
-              <td><strong style="font-family:var(--font-mono); color:var(--accent-primary); font-size:0.8rem;">${inv.invoiceNo || '-'}</strong></td>
-              <td><div style="font-weight:600; max-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${inv.supplier}">${inv.supplier || '-'}</div></td>
-              <td>${dueBadge}</td>
-              <td>${deliveryBadge}</td>
-              <td style="text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--text-main);">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 0)}</td>
-              <td style="text-align:center;"><span class="badge ${inv.paymentStatus === 'Ödendi' ? 'status-completed' : 'status-open'}" style="font-size:0.68rem;">${inv.paymentStatus || 'Bekliyor'}</span></td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
-  },
-
-  renderDashboardContractsSummary(contracts, guarantees, today) {
-    let activeContractsCount = 0, activeContractsAmount = 0;
-    let expiring30ContractsCount = 0;
-    let vaultGuaranteesCount = 0, vaultGuaranteesAmount = 0;
-
-    contracts.forEach(c => {
+    // 4. Contracts expiring in 30 days
+    let expiringContractsCount = 0;
+    (contracts || []).forEach(c => {
       const isClosed = (c.status === 'Tamamlandı' || c.status === 'Pasif' || c.status === 'Feshedildi' || c.status === 'İptal');
-      if (isClosed) {
-        closedContractsCount++;
-      } else {
-        activeContractsCount++;
-        activeContractsAmount += (c.contractAmount || 0);
-        if (c.endDate) {
-          const dEnd = new Date(c.endDate);
-          dEnd.setHours(0,0,0,0);
-          const diff = Math.ceil((dEnd - today) / (1000 * 60 * 60 * 24));
-          if (diff <= 0) {
-            closedContractsCount++;
-            activeContractsCount--;
-            activeContractsAmount -= (c.contractAmount || 0);
-          } else if (diff <= 30) {
-            expiring30ContractsCount++;
-          }
-        }
+      if (!isClosed && c.endDate) {
+        const dEnd = new Date(c.endDate);
+        dEnd.setHours(0, 0, 0, 0);
+        const diff = Math.ceil((dEnd - today) / (1000 * 60 * 60 * 24));
+        if (diff > 0 && diff <= 30) expiringContractsCount++;
       }
     });
 
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-    setVal('dash-cont-stat-active', `${activeContractsCount} Sözleşme`);
-    setVal('dash-cont-amt-active', this.formatMoney(activeContractsAmount, 'TRY', 0));
-    setVal('dash-cont-stat-expiring', `${expiring30ContractsCount} Sözleşme`);
-    setVal('dash-cont-stat-closed', `${closedContractsCount} Sözleşme`);
+    // 5. Active Personnel Workload
+    const activeUsers = (this.state.users || []).filter(u => u.isActive !== false && u.role !== 'EXECUTIVE');
+    const openDemands = requests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal');
+    const avgLoad = activeUsers.length > 0 ? (openDemands.length / activeUsers.length).toFixed(1) : '0';
 
-    // Mini Table: Top 5 contracts
-    const displayContracts = [...contracts].sort((a, b) => {
-      if (a.status === 'Aktif' && b.status !== 'Aktif') return -1;
-      if (b.status === 'Aktif' && a.status !== 'Aktif') return 1;
-      return 0;
-    }).slice(0, 5);
+    const items = [];
 
-    const tbody = document.querySelector('#dash-table-expiring-contracts tbody');
-    if (tbody) {
-      if (displayContracts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Sözleşme kaydı bulunamadı.</td></tr>';
-      } else {
-        tbody.innerHTML = displayContracts.map(c => {
-          let dateBadge = c.endDate || 'Süresiz';
-          let statusBadge = `<span class="badge status-completed" style="font-size:0.68rem;">Aktif</span>`;
-          if (c.status === 'Tamamlandı' || c.status === 'Pasif' || c.status === 'Feshedildi') {
-            statusBadge = `<span class="badge" style="background:var(--bg-hover); color:var(--text-muted); font-size:0.68rem;">Kapandı</span>`;
-          } else if (c.endDate) {
-            const dEnd = new Date(c.endDate);
-            dEnd.setHours(0,0,0,0);
-            const diff = Math.ceil((dEnd - today) / (1000 * 60 * 60 * 24));
-            if (diff <= 0) {
-              dateBadge = `<span class="badge priority-kritik" style="font-size:0.68rem;">🔴 Süresi Doldu</span>`;
-              statusBadge = `<span class="badge priority-kritik" style="font-size:0.68rem;">Bitti</span>`;
-            } else if (diff <= 30) {
-              dateBadge = `<span class="badge priority-orta" style="font-size:0.68rem;">🟠 ${diff} Gün</span>`;
-              statusBadge = `<span class="badge priority-orta" style="font-size:0.68rem;">Yenileme</span>`;
-            }
-          }
-
-          return `
-            <tr>
-              <td><strong style="font-family:var(--font-mono); color:var(--accent-primary); font-size:0.8rem;">${c.contractNo || `#${c.id}`}</strong></td>
-              <td><div style="font-weight:600; max-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.subject}">${c.subject}</div></td>
-              <td><div style="font-size:0.78rem; color:var(--text-muted); max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.supplier}">${c.supplier || '-'}</div></td>
-              <td>${dateBadge}</td>
-              <td style="text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--text-main);">${this.formatMoney(c.contractAmount || 0, c.currency || 'TRY', 0)}</td>
-              <td style="text-align:center;">${statusBadge}</td>
-            </tr>
-          `;
-        }).join('');
-      }
+    // Alert 1: Overdue Requests
+    if (overdueReqs.length > 0) {
+      items.push(`
+        <div class="dash-compact-alert-item alert-red" onclick="App.filterRequestsByDashboard('OVERDUE_14')" title="14+ Gündür Bekleyen Talepleri Filtrele">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.15rem;">🚨</span>
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: var(--status-rejected);">
+                ${overdueReqs.length} Talep 14+ Günü Aştı (SLA Alarmı)
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Süresi uzayan dosyalara müdahale edilmesi önerilir.</div>
+            </div>
+          </div>
+          <span class="badge priority-kritik" style="font-size: 0.7rem; font-weight: 700;">Gecikmede</span>
+        </div>
+      `);
     }
-  },
 
-  renderDashboardUnitsSummary(requests) {
-    const unitMap = {};
-    let grandSpend = 0;
-
-    requests.forEach(r => {
-      const uName = r.unit || 'Diğer';
-      const amt = parseFloat(r.actualAmount) || 0;
-      grandSpend += amt;
-
-      if (!unitMap[uName]) {
-        unitMap[uName] = { name: uName, count: 0, spend: 0, totalDays: 0, measuredDaysCount: 0 };
-      }
-      unitMap[uName].count++;
-      unitMap[uName].spend += amt;
-
-      const startDateStr = r.arrivalDate || r.requestDate;
-      const endDateStr = r.orderDate;
-      if (startDateStr && endDateStr) {
-        const dStart = new Date(startDateStr);
-        const dEnd = new Date(endDateStr);
-        if (!isNaN(dStart.getTime()) && !isNaN(dEnd.getTime()) && dEnd >= dStart) {
-          unitMap[uName].totalDays += Math.ceil((dEnd - dStart) / (1000 * 60 * 60 * 24));
-          unitMap[uName].measuredDaysCount++;
-        }
-      }
-    });
-
-    const topUnits = Object.values(unitMap).sort((a, b) => b.spend - a.spend).slice(0, 5);
-    const tbody = document.querySelector('#dash-table-top-units tbody');
-    if (tbody) {
-      if (topUnits.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Birim verisi bulunamadı.</td></tr>';
-      } else {
-        tbody.innerHTML = topUnits.map((u, idx) => {
-          const sharePct = grandSpend > 0 ? ((u.spend / grandSpend) * 100).toFixed(1) : '0.0';
-          const avgDays = u.measuredDaysCount > 0 ? (u.totalDays / u.measuredDaysCount).toFixed(1) : '-';
-
-          return `
-            <tr>
-              <td style="font-weight:700; color:var(--text-muted); font-size:0.75rem;">${idx + 1}</td>
-              <td><strong style="color:var(--text-main); font-size:0.82rem;">${u.name}</strong></td>
-              <td style="text-align:center;"><span class="badge" style="background:var(--bg-hover); font-size:0.72rem;">${u.count} Talep</span></td>
-              <td style="text-align:center; font-size:0.78rem; color:var(--accent-purple); font-weight:600;">⚡ ${avgDays}g</td>
-              <td style="text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.85rem;">
-                ${this.formatMoney(u.spend, 'TRY', 0)}
-              </td>
-              <td>
-                <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <div style="flex:1; height:5px; background:var(--bg-hover, rgba(0,0,0,0.06)); border-radius:999px; overflow:hidden;">
-                    <div style="height:100%; width:${sharePct}%; background:var(--accent-primary); border-radius:999px;"></div>
-                  </div>
-                  <span style="font-size:0.72rem; font-weight:700; font-family:var(--font-mono); color:var(--text-muted);">%${sharePct}</span>
-                </div>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
+    // Alert 2: Guarantees
+    if (criticalGuaranteesCount > 0) {
+      items.push(`
+        <div class="dash-compact-alert-item alert-yellow" onclick="App.switchView('guarantees')" title="Teminat Mektuplarını İncele">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.15rem;">🛡️</span>
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #d97706;">
+                ${criticalGuaranteesCount} Teminat Mektubu Vadesi Yaklaşıyor
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Önümüzdeki 30 gün içinde vadesi dolacak mektuplar.</div>
+            </div>
+          </div>
+          <span class="badge priority-orta" style="font-size: 0.7rem; font-weight: 700;">Vade Takibi</span>
+        </div>
+      `);
     }
-  },
 
-  renderDashboardSuppliersSummary(requests) {
-    const suppMap = {};
-    requests.forEach(r => {
-      if (r.supplier && r.supplier !== '-' && r.supplier.trim() !== '') {
-        const s = r.supplier.trim();
-        if (!suppMap[s]) {
-          suppMap[s] = { name: s, count: 0, spend: 0 };
-        }
-        suppMap[s].count++;
-        suppMap[s].spend += (parseFloat(r.actualAmount) || 0);
-      }
-    });
-
-    const topSupps = Object.values(suppMap).sort((a, b) => b.spend - a.spend).slice(0, 5);
-    const tbody = document.querySelector('#dash-table-top-suppliers tbody');
-    if (tbody) {
-      if (topSupps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Tedarikçi verisi bulunamadı.</td></tr>';
-      } else {
-        tbody.innerHTML = topSupps.map((s, idx) => {
-          // Check vendor rating
-          const ratings = (this.state.vendorRatings || []).filter(v => v.supplierName === s.name);
-          let avgScore = 'Yeni';
-          if (ratings.length > 0) {
-            const sum = ratings.reduce((acc, v) => acc + (parseFloat(v.overallScore) || 0), 0);
-            avgScore = `⭐ ${(sum / ratings.length).toFixed(1)}`;
-          }
-
-          let tierBadge = idx === 0 
-            ? `<span class="badge" style="background:rgba(234,179,8,0.18); color:#b45309; border:1px solid rgba(234,179,8,0.4); font-size:0.68rem; font-weight:700;">🥇 Tier 1 (Stratejik)</span>`
-            : (idx <= 2 
-              ? `<span class="badge" style="background:rgba(148,163,184,0.18); color:#475569; border:1px solid rgba(148,163,184,0.4); font-size:0.68rem;">🥈 Tier 2 (Ana)</span>`
-              : `<span class="badge" style="background:rgba(59,130,246,0.1); color:#2563eb; font-size:0.68rem;">🥉 Tier 3 (Onaylı)</span>`);
-
-          return `
-            <tr>
-              <td style="font-weight:700; color:var(--text-muted); font-size:0.75rem;">${idx + 1}</td>
-              <td>
-                <strong style="color:var(--text-main); font-size:0.82rem; cursor:pointer;" onclick="App.openVendorProfile('${s.name.replace(/'/g, "\\'")}')" title="Tedarikçi karnesini aç">
-                  🏢 ${s.name}
-                </strong>
-              </td>
-              <td style="text-align:center;">${tierBadge}</td>
-              <td style="text-align:center; font-weight:700; color:#d97706; font-size:0.78rem;">${avgScore}</td>
-              <td style="text-align:center;"><span class="badge" style="background:var(--bg-hover); font-size:0.72rem;">${s.count} Sipariş</span></td>
-              <td style="text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--status-completed); font-size:0.85rem;">
-                ${this.formatMoney(s.spend, 'TRY', 0)}
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
+    // Alert 3: Invoices
+    if (pendingDeliveryCount > 0) {
+      items.push(`
+        <div class="dash-compact-alert-item alert-blue" onclick="App.switchView('invoices')" title="Faturalar Sayfasına Git">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.15rem;">🧾</span>
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: var(--accent-primary);">
+                ${pendingDeliveryCount} Fatura Muhasebeye Teslim Bekliyor
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Toplam: ${this.formatMoney(pendingDeliveryAmount, 'TRY', 0)}</div>
+            </div>
+          </div>
+          <span class="badge status-open" style="font-size: 0.7rem; font-weight: 700;">Teslimat</span>
+        </div>
+      `);
     }
-  },
 
-  renderDashboardMonthlyTrend(requests) {
-    const months = ['Eyl', 'Eki', 'Kas', 'Ara', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu'];
-    const monthlyCounts = Array(12).fill(0);
-    const monthlySpend = Array(12).fill(0);
+    // Alert 4: Expiring Contracts
+    if (expiringContractsCount > 0) {
+      items.push(`
+        <div class="dash-compact-alert-item alert-yellow" onclick="App.switchView('contracts')" title="Sözleşmeleri İncele">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.15rem;">📑</span>
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #d97706;">
+                ${expiringContractsCount} Sözleşmenin Bitiş Süresi Yaklaşıyor
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Yenileme ve ihale hazırlığı gerekebilir.</div>
+            </div>
+          </div>
+          <span class="badge priority-orta" style="font-size: 0.7rem; font-weight: 700;">Yenileme</span>
+        </div>
+      `);
+    }
 
-    requests.forEach(r => {
-      const dStr = r.arrivalDate || r.requestDate;
-      if (dStr) {
-        let m = -1;
-        if (dStr.includes('-')) m = parseInt(dStr.split('-')[1]) - 1;
-        else if (dStr.includes('.')) m = parseInt(dStr.split('.')[1]) - 1;
-        if (m >= 0 && m < 12) {
-          const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
-          monthlyCounts[acadIdx]++;
-          monthlySpend[acadIdx] += (parseFloat(r.actualAmount) || parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0);
-        }
-      }
-    });
+    // Always include: Personnel Workload pulse item
+    items.push(`
+      <div class="dash-compact-alert-item alert-green" onclick="App.switchView('workload')" title="İş Yükü ve Delegasyon Sayfasını Aç">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span style="font-size: 1.15rem;">👥</span>
+          <div>
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--status-completed);">
+              ${activeUsers.length} Aktif Uzman • Ort. ${avgLoad} Açık Dosya
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Ekip iş yükü ve kota dağılımı stabil durumda.</div>
+          </div>
+        </div>
+        <span class="badge status-completed" style="font-size: 0.7rem; font-weight: 700;">Dengeli</span>
+      </div>
+    `);
 
-    this.createOrUpdateChart('chart-monthly-trend', 'line', {
-      labels: months,
-      datasets: [
-        {
-          label: 'Açılan Talep Sayısı',
-          data: monthlyCounts,
-          borderColor: '#8b5cf6',
-          backgroundColor: 'rgba(139, 92, 246, 0.12)',
-          fill: true,
-          tension: 0.35,
-          borderWidth: 2.5,
-          pointRadius: 4,
-          pointBackgroundColor: '#8b5cf6',
-          yAxisID: 'y'
-        }
-      ]
-    }, {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 11, weight: '600' } } },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${ctx.raw} Talep`
-          }
-        }
-      },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: {
-          type: 'linear',
-          display: true,
-          position: 'left',
-          beginAtZero: true,
-          grid: { color: 'rgba(0, 0, 0, 0.05)' },
-          ticks: { font: { size: 10 }, precision: 0 }
-        }
-      }
-    });
-  },
+    // If no critical alerts at all
+    if (overdueReqs.length === 0 && criticalGuaranteesCount === 0 && pendingDeliveryCount === 0 && expiringContractsCount === 0) {
+      items.unshift(`
+        <div class="dash-compact-alert-item alert-green" style="cursor: default;">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.15rem;">✨</span>
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: var(--status-completed);">
+                Tüm Süreçler Yolunda
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Geciken talep veya süresi yaklaşan kritik uyarı bulunmuyor.</div>
+            </div>
+          </div>
+          <span class="badge status-completed" style="font-size: 0.7rem;">Normal</span>
+        </div>
+      `);
+    }
 
-  renderDashboardCategoryDonut(requests) {
-    const categoryMap = { 'Mal Alımı': 0, 'Hizmet Alımı': 0, 'Doğrudan Temin': 0, 'İhale': 0, 'Diğer': 0 };
-
-    requests.forEach(r => {
-      const type = (r.purchaseType || '').toLowerCase();
-      const amt = parseFloat(r.actualAmount) || parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0;
-      if (type.includes('mal')) categoryMap['Mal Alımı'] += (amt || 1);
-      else if (type.includes('hizmet')) categoryMap['Hizmet Alımı'] += (amt || 1);
-      else if (type.includes('doğrudan') || type.includes('dogrudan')) categoryMap['Doğrudan Temin'] += (amt || 1);
-      else if (type.includes('ihale')) categoryMap['İhale'] += (amt || 1);
-      else categoryMap['Diğer'] += (amt || 1);
-    });
-
-    const labels = Object.keys(categoryMap);
-    const dataValues = Object.values(categoryMap);
-
-    this.createOrUpdateChart('chart-category-donut', 'doughnut', {
-      labels: labels,
-      datasets: [{
-        data: dataValues,
-        backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#06b6d4'],
-        borderWidth: 2,
-        borderColor: 'var(--bg-card, #ffffff)'
-      }]
-    }, {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, weight: '600' }, padding: 10 } },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => `${ctx.label}: ${Number(ctx.raw || 0).toLocaleString('tr-TR')} ₺`
-          }
-        }
-      },
-      cutout: '65%'
-    });
+    alertsBox.innerHTML = items.join('');
   },
 
   createOrUpdateChart(canvasId, type, data, options) {

@@ -3826,3 +3826,79 @@ html.has-auth-token #app {
   display: flex !important;
 }
 
+/* ✨ Ultra-Sleek Executive Dashboard Components */
+.dash-compact-request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.dash-compact-request-row:hover {
+  transform: translateY(-1.5px);
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.dash-compact-alert-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.95rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.02));
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dash-compact-alert-item:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.dash-compact-alert-item.alert-red {
+  border-left: 3.5px solid var(--status-rejected);
+  background: rgba(239, 68, 68, 0.04);
+}
+.dash-compact-alert-item.alert-red:hover {
+  border-color: var(--status-rejected);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.dash-compact-alert-item.alert-yellow {
+  border-left: 3.5px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.04);
+}
+.dash-compact-alert-item.alert-yellow:hover {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.dash-compact-alert-item.alert-blue {
+  border-left: 3.5px solid var(--accent-primary);
+  background: rgba(59, 130, 246, 0.04);
+}
+.dash-compact-alert-item.alert-blue:hover {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.dash-compact-alert-item.alert-green {
+  border-left: 3.5px solid var(--status-completed);
+  background: rgba(16, 185, 129, 0.04);
+}
+.dash-compact-alert-item.alert-green:hover {
+  border-color: var(--status-completed);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+
