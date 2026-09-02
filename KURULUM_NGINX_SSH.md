@@ -1,5 +1,5 @@
 # 🏛️ Piri Reis Üniversitesi — Satınalma Takip Sistemi
-## 📋 Bilgi İşlem (IT) Adım Adım Sunucu Kurulum & İşletim Rehberi (v2.1.0)
+## 📋 Bilgi İşlem (IT) Adım Adım Sunucu Kurulum & İşletim Rehberi (v2.2.0)
 
 Bu doküman, **Ubuntu 20.04 / 22.04 / 24.04 LTS** veya **Debian** Linux sunucularda Satınalma Takip Sistemi'nin sıfırdan adım adım kurulumu, yapılandırılması ve yönetimi için hazırlanmıştır.
 
@@ -19,7 +19,7 @@ Bu doküman, **Ubuntu 20.04 / 22.04 / 24.04 LTS** veya **Debian** Linux sunucula
 4. [Domain & SSL (HTTPS) Yapılandırması](#4-domain--ssl-https-yapılandırması)
 5. [Sistem Güncelleme (Update) İşlemleri](#5-sistem-güncelleme-update-işlemleri)
 6. [Yedekleme ve Geri Yükleme (Backup & Restore)](#6-yedekleme-ve-geri-yükleme-backup--restore)
-7. [Faydalı IT Yönetim Komutları](#7-faydalı-it-yönetim-komutları)
+7. [Faydalı IT Yönetim ve Güvenlik Test Komutları](#7-faydalı-it-yönetim-ve-güvenlik-test-komutları)
 8. [Güvenlik Mimarisi ve İlk Giriş Bilgileri](#8-güvenlik-mimarisi-ve-ilk-giriş-bilgileri)
 
 ---
@@ -270,18 +270,26 @@ sudo -u postgres pg_dump satinalma_db > satinalma_yedek_$(date +%Y%m%d).sql
 
 ### Veritabanı Yedeğini Geri Yükleme (Restore):
 ```bash
-sudo -u postgres psql satinalma_db < satinalma_yedek_20260813.sql
+sudo -u postgres psql satinalma_db < satinalma_yedek_DOSYA_ADI.sql
+```
+
+### Excel'den Veri İçe Aktarma (İsteğe Bağlı):
+Eğer toplu talep Excel dosyası aktarılmak istenirse:
+```bash
+cd /opt/satinalma
+node import-excel.js
 ```
 
 ---
 
-## 7. FAYDALI IT YÖNETİM KOMUTLARI
+## 7. FAYDALI IT YÖNETİM VE GÜVENLİK TEST KOMUTLARI
 
 | İşlem | Komut |
 |-------|-------|
 | **Uygulama Durumu** | `pm2 status` |
 | **Canlı Log İzleme** | `pm2 logs satinalma` |
 | **Uygulama Restart** | `pm2 reload satinalma` |
+| **Otomatik Güvenlik & Doğrulama Testi** | `node test-audit.js` |
 | **Nginx Status/Restart** | `sudo systemctl status nginx` / `sudo systemctl restart nginx` |
 | **PostgreSQL Status** | `sudo systemctl status postgresql` |
 
@@ -290,11 +298,21 @@ sudo -u postgres psql satinalma_db < satinalma_yedek_20260813.sql
 ## 8. GÜVENLİK MİMARİSİ VE İLK GİRİŞ BİLGİLERİ
 
 - **Kimlik Doğrulama:** HMAC-SHA256 imzalı oturum Token'ları (JWT) ile yetkilendirme.
-- **Şifreleme:** Kullanıcı şifreleri veritabanında PBKDF2 (tuzlu hash) formatında saklanır.
-- **Roller:** `ADMIN` (Tam Yetkili) ve `STAFF` (Operasyonel Uzman).
+- **Şifreleme:** Kullanıcı şifreleri veritabanında PBKDF2 (10.000 iterasyon, tuzlu SHA-512) formatında saklanır.
+- **SQL & Enjeksiyon Koruması:** Dinamik sorgular için katı Whitelist ve parametreli bağlama (`$1, $2`).
+- **Roller:**
+  - `ADMIN` (Satınalma Yöneticisi — Tam Yetkili)
+  - `STAFF` (Satınalma Uzmanı — Operasyonel Yetki)
+  - `EXECUTIVE` (Yönetim / Rektörlük & Genel Sekreterlik — İzleme, Analiz ve Raporlama Modu)
 - **Public Portal:** Şifresiz giriş sayfasından yalnızca talep barkodu ile süreç durumu sorgulanabilir.
 
-### Varsayılan Giriş Bilgileri:
-- **Sistem Yöneticisi (Admin):** Cem TUR
-- **Ünvan:** Satınalma Mdr. Yrd.
-- **Varsayılan Şifre:** `1234` (veya `123456`)
+### Varsayılan Giriş Hesapları:
+1. **Sistem Yöneticisi:**
+   - **Kullanıcı:** `Cem TUR`
+   - **Ünvan:** Satınalma Mdr. Yrd.
+   - **Şifre:** `123456`
+2. **Üst Yönetim:**
+   - **Kullanıcı:** `Yönetim` (veya giriş için `yonetim`)
+   - **Ünvan:** Yönetim
+   - **Şifre:** `123456`
+
