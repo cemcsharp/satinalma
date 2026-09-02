@@ -96,12 +96,6 @@ sudo chmod -R 775 uploads backups 2>/dev/null || true
 npm install --production
 log_ok "Proje npm bağımlılıkları yüklendi."
 
-# Talepler.xlsx varsa otomatik aktarım yap
-if [ -f "import-excel.js" ] && [ -f "Talepler.xlsx" ]; then
-  echo "   → Talepler.xlsx verileri veritabanına aktarılıyor..."
-  node import-excel.js || true
-fi
-
 # ─── 6. PM2 İLE UYGULAMANIN 7/24 BAŞLATILMASI ───
 log_step "[6/7] PM2 Süreç Yöneticisi yapılandırılıyor..."
 if ! command -v pm2 &> /dev/null; then

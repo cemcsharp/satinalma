@@ -190,12 +190,17 @@ async function importExcel() {
       }
     }
 
-    // Üst Yönetim (Executive) kullanıcısını kontrol et ve ekle
-    const execCheck = await client.query("SELECT id FROM users WHERE role = 'EXECUTIVE' OR LOWER(TRIM(name)) = LOWER(TRIM('Rektörlük / Üst Yönetim')) LIMIT 1");
+    // Üst Yönetim (Executive) kullanıcısını 'Yönetim' adıyla kontrol et ve ekle
+    const execCheck = await client.query("SELECT id FROM users WHERE role = 'EXECUTIVE' OR LOWER(TRIM(name)) = LOWER(TRIM('Yönetim')) LIMIT 1");
     if (execCheck.rowCount === 0) {
       await client.query(
         'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
-        ['Rektörlük / Üst Yönetim', 'Rektörlük & Genel Sekreterlik', 'EXECUTIVE', true, '123456']
+        ['Yönetim', 'Yönetim', 'EXECUTIVE', true, '123456']
+      );
+    } else {
+      await client.query(
+        'UPDATE users SET name = $1, title = $2, role = $3, "isActive" = true WHERE id = $4',
+        ['Yönetim', 'Yönetim', 'EXECUTIVE', execCheck.rows[0].id]
       );
     }
 

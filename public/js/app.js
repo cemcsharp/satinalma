@@ -7880,7 +7880,7 @@ const App = {
         if (u.role === 'ADMIN') {
           roleBadge = '<span class="badge priority-kritik">🛡️ Satınalma Yöneticisi (ADMIN)</span>';
         } else if (u.role === 'EXECUTIVE') {
-          roleBadge = '<span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:700; border:1px solid rgba(245,158,11,0.35);">🏛️ Üst Yönetim (EXECUTIVE)</span>';
+          roleBadge = '<span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:700; border:1px solid rgba(245,158,11,0.35);">🏛️ Yönetim</span>';
         }
         return `
           <tr>

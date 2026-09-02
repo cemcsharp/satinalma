@@ -1229,7 +1229,7 @@ const server = http.createServer(async (req, res) => {
       let userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE id = $1';
       let queryParams = [parseInt(userId, 10) || 0];
 
-      if (String(userId).toLowerCase() === 'exec' || String(userId).toLowerCase() === 'executive') {
+      if (['exec', 'executive', 'yonetim', 'yönetim'].includes(String(userId).toLowerCase())) {
         userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE role = \'EXECUTIVE\' LIMIT 1';
         queryParams = [];
       }
@@ -2810,11 +2810,18 @@ async function initDatabaseSchema() {
       WHERE LOWER(name) LIKE '%merih%' AND role != 'ADMIN'
     `).catch(() => {});
 
+    // Üst Yönetim kullanıcısını 'Yönetim' adıyla senkronize et
+    await pool.query(`
+      UPDATE users 
+      SET name = 'Yönetim', title = 'Yönetim' 
+      WHERE role = 'EXECUTIVE' OR LOWER(name) LIKE '%rektör%' OR LOWER(name) LIKE '%üst yönetim%'
+    `).catch(() => {});
+
     const execCheck = await pool.query("SELECT id FROM users WHERE role = 'EXECUTIVE' LIMIT 1").catch(() => ({ rowCount: 0 }));
     if (execCheck.rowCount === 0) {
       await pool.query(
         'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
-        ['Rektörlük / Üst Yönetim', 'Rektörlük & Genel Sekreterlik', 'EXECUTIVE', true, hashPassword('123456')]
+        ['Yönetim', 'Yönetim', 'EXECUTIVE', true, hashPassword('123456')]
       ).catch(() => {});
     }
 
