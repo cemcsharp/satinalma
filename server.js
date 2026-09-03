@@ -2806,6 +2806,18 @@ async function initDatabaseSchema() {
           'INSERT INTO users (name, title, role, "isActive", password) VALUES ($1, $2, $3, $4, $5)',
           ['Cem TUR', 'Satınalma Mdr. Yrd.', 'ADMIN', true, hashPassword('123456')]
         );
+
+        // Eğer Talepler.xlsx mevcutsa ve veritabanı sıfırsa otomatik içe aktar
+        const excelPath = path.join(__dirname, 'Talepler.xlsx');
+        if (fs.existsSync(excelPath)) {
+          try {
+            console.log('📊 Talepler.xlsx bulundu, ilk açılışta veriler otomatik aktarılıyor...');
+            const { execSync } = require('child_process');
+            execSync('node import-excel.js', { stdio: 'inherit', cwd: __dirname });
+          } catch (exErr) {
+            console.error('Talepler.xlsx otomatik aktarım uyarısı:', exErr.message);
+          }
+        }
       }
     }
 
