@@ -231,8 +231,7 @@ const App = {
       { id: 2, name: 'Merih AVCI', title: 'Satınalma Müdürü', role: 'ADMIN', isActive: true },
       { id: 3, name: 'Gülsüm YILDIRIM', title: 'Satınalma Kd. Uz.', role: 'USER', isActive: true },
       { id: 4, name: 'Sultan MERİÇ', title: 'Satınalma Uzmanı', role: 'USER', isActive: true },
-      { id: 5, name: 'Caner TÜRKMEN', title: 'IT Uzmanı', role: 'USER', isActive: true },
-      { id: 6, name: 'Hilal AKYOL', title: 'Satınalma Asistanı', role: 'USER', isActive: true }
+      { id: 5, name: 'Yönetim', title: 'Rektörlük & Genel Sekreterlik', role: 'EXECUTIVE', isActive: true }
     ];
 
     const sortedUsers = [...usersList].sort((a,b) => {
