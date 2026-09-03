@@ -87,7 +87,7 @@ node -v
 npm -v
 ```
 
-### Adım 4: PostgreSQL Veritabanı Kurulumu ve Ayarları
+### Adım 4: PostgreSQL Veritabanı ve Kullanıcı Ayarları
 ```bash
 # PostgreSQL sunucusunu kurun
 sudo apt-get install -y postgresql postgresql-contrib
@@ -96,18 +96,28 @@ sudo apt-get install -y postgresql postgresql-contrib
 sudo systemctl enable postgresql
 sudo systemctl restart postgresql
 
-# PostgreSQL 'postgres' kullanıcısına şifre atayın (Şifre: 123456)
-sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '123456';"
-
-# Veritabanını UTF-8 kodlaması ile oluşturun
-sudo -u postgres psql -c "CREATE DATABASE satinalma_db ENCODING 'UTF8';"
-
-# Yetkileri verin
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE satinalma_db TO postgres;"
+# Uygulamaya özel güvenli veritabanı kullanıcısı ve veritabanı oluşturun
+sudo -u postgres psql -c "CREATE USER satinalma_user WITH PASSWORD 'GUCLU_VERITABANI_SIFRENIZ';"
+sudo -u postgres psql -c "CREATE DATABASE satinalma_db WITH OWNER = satinalma_user ENCODING 'UTF8';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE satinalma_db TO satinalma_user;"
+sudo -u postgres psql -d satinalma_db -c "GRANT ALL ON SCHEMA public TO satinalma_user;"
 ```
 
-### Adım 5: Proje Bağımlılıkları ve Dizin İzinleri
+### Adım 5: Ortam Değişkenleri (.env), Bağımlılıklar ve Dizin İzinleri
 ```bash
+# Proje dizininde gizli .env yapılandırma dosyasını oluşturun
+cat << 'EOF' > .env
+PORT=3000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=satinalma_db
+DB_USER=satinalma_user
+DB_PASSWORD=GUCLU_VERITABANI_SIFRENIZ
+JWT_SECRET=pruni-satinalma-sec-key-2026-auth-jwt
+EOF
+
+chmod 600 .env
+
 # Evrak ve yedek dizinlerini oluşturun
 mkdir -p uploads backups
 sudo chmod -R 775 uploads backups

@@ -12,12 +12,33 @@ const pg = require('pg');
 const archiver = require('archiver');
 const nodemailer = require('nodemailer');
 
+// Load .env configuration file if present
+const envFilePath = path.join(__dirname, '.env');
+if (fs.existsSync(envFilePath)) {
+  try {
+    const envLines = fs.readFileSync(envFilePath, 'utf8').split('\n');
+    for (const line of envLines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+        const eqIdx = trimmed.indexOf('=');
+        const k = trimmed.substring(0, eqIdx).trim();
+        const v = trimmed.substring(eqIdx + 1).trim().replace(/^['"]|['"]$/g, '');
+        if (!process.env[k]) {
+          process.env[k] = v;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('.env okuma hatası:', e.message);
+  }
+}
+
 // Parse NUMERIC / DECIMAL database fields as numbers instead of strings
 pg.types.setTypeParser(1700, (val) => (val === null ? null : parseFloat(val)));
 pg.types.setTypeParser(20, (val) => (val === null ? null : parseInt(val, 10)));
 const { Pool, Client } = pg;
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const BACKUP_DIR = path.join(__dirname, 'backups');

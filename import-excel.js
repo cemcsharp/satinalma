@@ -8,13 +8,32 @@ const path = require('path');
 const pg = require('pg');
 const XLSX = require('xlsx');
 
+// Load .env configuration file if present
+const envFilePath = path.join(__dirname, '.env');
+if (fs.existsSync(envFilePath)) {
+  try {
+    const envLines = fs.readFileSync(envFilePath, 'utf8').split('\n');
+    for (const line of envLines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+        const eqIdx = trimmed.indexOf('=');
+        const k = trimmed.substring(0, eqIdx).trim();
+        const v = trimmed.substring(eqIdx + 1).trim().replace(/^['"]|['"]$/g, '');
+        if (!process.env[k]) {
+          process.env[k] = v;
+        }
+      }
+    }
+  } catch (e) {}
+}
+
 // PostgreSQL Bağlantı Havuzu
 const pool = new pg.Pool({
-  user: process.env.PGUSER || 'postgres',
-  host: process.env.PGHOST || 'localhost',
-  database: process.env.PGDATABASE || 'satinalma_db',
-  password: process.env.PGPASSWORD || '123456',
-  port: parseInt(process.env.PGPORT, 10) || 5432,
+  user: process.env.DB_USER || process.env.PGUSER || 'postgres',
+  host: process.env.DB_HOST || process.env.PGHOST || 'localhost',
+  database: process.env.DB_NAME || process.env.PGDATABASE || 'satinalma_db',
+  password: process.env.DB_PASSWORD || process.env.PGPASSWORD || '123456',
+  port: parseInt(process.env.DB_PORT || process.env.PGPORT, 10) || 5432,
 });
 
 function parseExcelDate(val) {

@@ -50,8 +50,8 @@ else
   exit 1
 fi
 
-# ─── 3. POSTGRESQL VERİTABANI KURULUMU ───
-log_step "[3/7] PostgreSQL kuruluyor ve yapılandırılıyor..."
+# ─── 3. POSTGRESQL VERİTABANI VE KULLANICI YAPILANDIRMASI ───
+log_step "[3/7] PostgreSQL kuruluyor ve güvenli kullanıcı oluşturuluyor..."
 sudo apt-get install -y postgresql postgresql-contrib
 
 # PostgreSQL servisini başlat ve açılışa ekle
@@ -66,20 +66,72 @@ for i in {1..10}; do
   sleep 1
 done
 
-# PostgreSQL kullanıcısı ve veritabanı ayarları
-sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '123456';" 2>/dev/null || true
+echo ""
+echo "  ┌──────────────────────────────────────────────────────────┐"
+echo "  │ 🗄️  VERİTABANI (POSTGRESQL) YAPILANDIRMASI               │"
+echo "  └──────────────────────────────────────────────────────────┘"
+
+# Veritabanı Adı
+if [ -t 0 ]; then
+  read -r -p "  • Veritabanı Adı [Varsayılan: satinalma_db]: " INPUT_DB_NAME
+  DB_NAME="${INPUT_DB_NAME:-satinalma_db}"
+  
+  read -r -p "  • Veritabanı Kullanıcısı [Varsayılan: satinalma_user]: " INPUT_DB_USER
+  DB_USER="${INPUT_DB_USER:-satinalma_user}"
+  
+  read -r -s -p "  • Veritabanı Şifresi [Boş bırakırsanız otomatik güçlü üretilir]: " INPUT_DB_PASS
+  echo ""
+else
+  DB_NAME="satinalma_db"
+  DB_USER="satinalma_user"
+  INPUT_DB_PASS=""
+fi
+
+if [ -z "$INPUT_DB_PASS" ]; then
+  DB_PASS=$(openssl rand -base64 18 2>/dev/null | tr -dc 'a-zA-Z0-9' | head -c 24)
+  if [ -z "$DB_PASS" ]; then DB_PASS="PrUni_SecDB_${RANDOM}_2026"; fi
+  echo "    ↳ 🔑 Otomatik Güçlü Veritabanı Şifresi Üretildi."
+else
+  DB_PASS="$INPUT_DB_PASS"
+fi
+
+# PostgreSQL kullanıcı ve veritabanı oluşturma / yetkilendirme
+sudo -u postgres psql -c "DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$DB_USER') THEN
+    CREATE ROLE $DB_USER WITH LOGIN PASSWORD '$DB_PASS';
+  ELSE
+    ALTER ROLE $DB_USER WITH PASSWORD '$DB_PASS';
+  END IF;
+END
+\$\$;" 2>/dev/null || true
 
 # Veritabanı oluşturma (varsa devam et, yoksa UTF8 ile oluştur)
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'satinalma_db'" | grep -q 1 || \
-  sudo -u postgres psql -c "CREATE DATABASE satinalma_db ENCODING 'UTF8';" 2>/dev/null || true
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
+  sudo -u postgres psql -c "CREATE DATABASE $DB_NAME WITH OWNER = $DB_USER ENCODING = 'UTF8';" 2>/dev/null || true
 
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE satinalma_db TO postgres;" 2>/dev/null || true
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" 2>/dev/null || true
+sudo -u postgres psql -d $DB_NAME -c "GRANT ALL ON SCHEMA public TO $DB_USER;" 2>/dev/null || true
 
-if sudo -u postgres psql -d satinalma_db -c '\q' 2>/dev/null; then
-  log_ok "PostgreSQL veritabanı 'satinalma_db' başarıyla hazırlandı."
-else
-  log_warn "Veritabanı kontrol edilemedi, ancak servis çalışıyor."
-fi
+# Gizli Ortam Değişkenleri (.env) Dosyasını Oluştur
+JWT_SEC=$(openssl rand -hex 24 2>/dev/null || echo "pruni-satinalma-sec-key-2026-auth-jwt")
+
+cat << EOF > .env
+# ============================================================
+#  Piri Reis Üniversitesi — Satınalma Takip Sistemi
+#  Ortam Değişkenleri (.env) — Gizli Yapılandırma Dosyası
+# ============================================================
+PORT=3000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASS
+JWT_SECRET=$JWT_SEC
+EOF
+
+chmod 600 .env 2>/dev/null || true
+log_ok "PostgreSQL veritabanı '$DB_NAME' ve '$DB_USER' kullanıcısı hazırlandı (.env kaydedildi)."
 
 # ─── 4. NGINX WEB SUNUCUSU KURULUMU ───
 log_step "[4/7] Nginx web sunucusu kuruluyor..."
@@ -169,14 +221,15 @@ echo "=========================================================="
 echo -e "${GREEN} ✅ KURULUM BAŞARIYLA TAMAMLANDI!${NC}"
 echo "=========================================================="
 echo ""
-echo " 🌐 Web Arayüzü  : http://$SERVER_IP/ veya http://localhost/"
-echo " 🗄️  Veritabanı   : PostgreSQL → satinalma_db (Port 5432)"
-echo " 🛡️  Güvenlik     : JWT Token + PBKDF2 Şifreleme Aktif"
-echo " ⚡ Süreç Yöneticisi: PM2 (Otomatik restart 7/24)"
-echo " 🔄 Güncelleme   : bash update.sh"
+echo " 🌐 Web Arayüzü     : http://$SERVER_IP/ veya http://localhost/"
+echo " 🗄️  Veritabanı      : PostgreSQL → $DB_NAME ($DB_USER)"
+echo " 🔒 Gizli Ayarlar   : /opt/satinalma/.env dosyasında saklanmaktadır"
+echo " 🛡️  Güvenlik        : JWT Token + PBKDF2 Şifreleme Aktif"
+echo " ⚡ Süreç Yöneticisi : PM2 (Otomatik restart 7/24)"
+echo " 🔄 Güncelleme      : bash update.sh"
 echo ""
-echo " 👤 Varsayılan Giriş Bilgileri:"
-echo "    Kullanıcı : Cem TUR (Admin)"
-echo "    Şifre     : 1234 (veya 123456)"
+echo " 👤 Varsayılan Giriş Hesapları:"
+echo "    1. Sistem Yöneticisi : Cem TUR (Şifre: 123456)"
+echo "    2. Üst Yönetim       : Yönetim (Şifre: 123456)"
 echo ""
 echo "=========================================================="
