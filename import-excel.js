@@ -132,6 +132,7 @@ async function importExcel() {
 
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "requestDate" VARCHAR(100);
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "budgetAmount" NUMERIC;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "exchangeRate" NUMERIC;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "academicYear" VARCHAR(50);
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "estimatedDeliveryDate" VARCHAR(100);
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "multiSuppliers" TEXT;

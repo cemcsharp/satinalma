@@ -99,7 +99,7 @@ const TABLE_COLUMNS = {
   requests: [
     'sequenceNo', 'requestBarcode', 'subject', 'unit', 'arrivalDate', 'requestDate',
     'assignedTo', 'priority', 'status', 'estimatedAmount', 'budgetAmount', 'actualAmount',
-    'currency', 'supplier', 'orderBarcode', 'orderDate', 'estimatedDeliveryDate', 'regulation', 'description',
+    'currency', 'exchangeRate', 'supplier', 'orderBarcode', 'orderDate', 'estimatedDeliveryDate', 'regulation', 'description',
     'purchaseType', 'academicYear', 'multiSuppliers'
   ],
   contracts: [
@@ -2667,6 +2667,7 @@ async function initDatabaseSchema() {
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "sequenceNo" INTEGER;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "requestDate" VARCHAR(100);
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "budgetAmount" NUMERIC;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "exchangeRate" NUMERIC;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "academicYear" VARCHAR(50);
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "orderBarcode" VARCHAR(100);
