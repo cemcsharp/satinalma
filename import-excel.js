@@ -110,20 +110,31 @@ async function importExcel() {
         subject VARCHAR(550),
         unit VARCHAR(255),
         "arrivalDate" VARCHAR(100),
+        "requestDate" VARCHAR(100),
         "assignedTo" VARCHAR(255),
         priority VARCHAR(50),
         status VARCHAR(50),
         "estimatedAmount" NUMERIC,
+        "budgetAmount" NUMERIC,
         "actualAmount" NUMERIC,
         currency VARCHAR(20) DEFAULT 'TRY',
         "exchangeRate" NUMERIC,
         supplier VARCHAR(255),
         "orderBarcode" VARCHAR(100),
         "orderDate" VARCHAR(100),
+        "estimatedDeliveryDate" VARCHAR(100),
         regulation VARCHAR(100),
         description TEXT,
-        "purchaseType" VARCHAR(50) DEFAULT 'MAL'
+        "purchaseType" VARCHAR(50) DEFAULT 'MAL',
+        "academicYear" VARCHAR(50),
+        "multiSuppliers" TEXT
       );
+
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "requestDate" VARCHAR(100);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "budgetAmount" NUMERIC;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "academicYear" VARCHAR(50);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "estimatedDeliveryDate" VARCHAR(100);
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "multiSuppliers" TEXT;
     `);
 
     // Birimler, Kullanıcılar ve Yönetmelikler kümeleri
