@@ -156,12 +156,24 @@ async function importExcel() {
       if (assignedTo && assignedTo !== 'Henüz Atanmadı') usersSet.add(assignedTo);
       if (regulation) regulationsSet.add(regulation);
 
+      function getAcademicYearFromDate(dateStr) {
+        if (!dateStr) return '2025-2026';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '2025-2026';
+        const yr = d.getFullYear();
+        const m = d.getMonth();
+        return m >= 8 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
+      }
+
+      const calcYear = getAcademicYearFromDate(orderDate || arrivalDate);
+
       requests.push({
         sequenceNo: seqNo,
         requestBarcode,
         subject,
         unit,
         arrivalDate,
+        requestDate: arrivalDate,
         assignedTo,
         priority,
         status,
@@ -174,7 +186,8 @@ async function importExcel() {
         orderDate,
         regulation,
         description,
-        purchaseType: 'MAL'
+        purchaseType: 'MAL',
+        academicYear: calcYear
       });
     }
 

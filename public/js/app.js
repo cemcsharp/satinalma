@@ -250,8 +250,17 @@ const App = {
 
   getAcademicYearFromDate(dateStr) {
     if (!dateStr) return this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear;
+    let d = null;
+    if (typeof dateStr === 'string' && dateStr.includes('.')) {
+      const parts = dateStr.trim().split('.');
+      if (parts.length === 3) {
+        const y = parts[2].length === 4 ? parts[2] : `20${parts[2]}`;
+        d = new Date(`${y}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+      }
+    } else {
+      d = new Date(dateStr);
+    }
+    if (!d || isNaN(d.getTime())) return this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear;
     const yr = d.getFullYear();
     const m = d.getMonth();
     if (m >= 8) {
@@ -6770,14 +6779,27 @@ const App = {
         totalEstimated += est;
         totalSavings += sav;
 
-        if (r.requestDate) {
-          const m = parseInt(r.requestDate.split('-')[1]) - 1;
-          const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
-          if (acadIdx >= 0 && acadIdx < 12) {
-            monthlyData[acadIdx].count++;
-            monthlyData[acadIdx].est += est;
-            monthlyData[acadIdx].act += act;
-            monthlyData[acadIdx].sav += sav;
+        const dtStr = r.orderDate || r.arrivalDate || r.requestDate;
+        if (dtStr) {
+          let d = null;
+          if (typeof dtStr === 'string' && dtStr.includes('.')) {
+            const parts = dtStr.trim().split('.');
+            if (parts.length === 3) {
+              const y = parts[2].length === 4 ? parts[2] : `20${parts[2]}`;
+              d = new Date(`${y}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+            }
+          } else {
+            d = new Date(dtStr);
+          }
+          if (d && !isNaN(d.getTime())) {
+            const m = d.getMonth();
+            const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
+            if (acadIdx >= 0 && acadIdx < 12) {
+              monthlyData[acadIdx].count++;
+              monthlyData[acadIdx].est += est;
+              monthlyData[acadIdx].act += act;
+              monthlyData[acadIdx].sav += sav;
+            }
           }
         }
       });
@@ -6864,28 +6886,49 @@ const App = {
       requests.forEach(r => {
         if (r.status === 'Tamamlandı') completedCount++;
 
-        let arrDt = r.arrivalDate || r.requestDate;
+        let arrDt = r.arrivalDate || r.requestDate || r.orderDate;
         if (arrDt) {
-          const d1 = new Date(arrDt);
-          const d2 = r.orderDate ? new Date(r.orderDate) : new Date();
-          const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
-
-          if (!isNaN(diffDays) && diffDays >= 0) {
-            if (r.orderDate) {
-              totalWaitDays += diffDays;
-              completedWithDates++;
+          let d1 = null;
+          if (typeof arrDt === 'string' && arrDt.includes('.')) {
+            const parts = arrDt.trim().split('.');
+            if (parts.length === 3) {
+              const y = parts[2].length === 4 ? parts[2] : `20${parts[2]}`;
+              d1 = new Date(`${y}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
             }
+          } else {
+            d1 = new Date(arrDt);
+          }
 
-            if (diffDays <= 7) slaBins['0-7 Gün']++;
-            else if (diffDays <= 14) slaBins['8-14 Gün']++;
-            else {
-              slaBins['14+ Gün Gecikme']++;
-              if (r.status === 'Açık') overdueCount++;
+          let d2 = new Date();
+          if (r.orderDate) {
+            if (typeof r.orderDate === 'string' && r.orderDate.includes('.')) {
+              const parts = r.orderDate.trim().split('.');
+              if (parts.length === 3) {
+                const y = parts[2].length === 4 ? parts[2] : `20${parts[2]}`;
+                d2 = new Date(`${y}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+              }
+            } else {
+              d2 = new Date(r.orderDate);
             }
           }
 
-          if (r.requestDate) {
-            const m = parseInt(r.requestDate.split('-')[1]) - 1;
+          if (d1 && !isNaN(d1.getTime())) {
+            const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+            if (!isNaN(diffDays) && diffDays >= 0) {
+              if (r.orderDate) {
+                totalWaitDays += diffDays;
+                completedWithDates++;
+              }
+
+              if (diffDays <= 7) slaBins['0-7 Gün']++;
+              else if (diffDays <= 14) slaBins['8-14 Gün']++;
+              else {
+                slaBins['14+ Gün Gecikme']++;
+                if (r.status === 'Açık') overdueCount++;
+              }
+            }
+
+            const m = d1.getMonth();
             const acadIdx = (m >= 8) ? (m - 8) : (m + 4);
             if (acadIdx >= 0 && acadIdx < 12) {
               monthlySLA[acadIdx].opened++;
