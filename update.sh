@@ -10,13 +10,17 @@ echo "=========================================================="
 echo " 🔄 Satınalma Takip Sistemi Güncelleniyor..."
 echo "=========================================================="
 
-# 1. GitHub'dan şifresiz ve temiz güncelleme çek
+# 1. GitHub'dan güncellemeleri çek (Git ve Hızlı Arşiv Çift Motorlu)
 echo ""
 echo "📥 [1/3] GitHub'dan güncellemeler çekiliyor..."
 export GIT_TERMINAL_PROMPT=0
-git remote set-url origin https://github.com/cemcsharp/satinalma.git 2>/dev/null || true
-git -c credential.helper= fetch origin main
-git reset --hard origin/main
+
+if ! git fetch origin main 2>/dev/null; then
+  echo "⚠️ Git doğrudan erişimi sınırlı, güvenli web kanalıyla dosyalar güncelleniyor..."
+  curl -sL https://github.com/cemcsharp/satinalma/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 -C /opt/satinalma
+else
+  git reset --hard origin/main
+fi
 
 # 2. Yeni npm bağımlılıkları kontrolü
 echo ""
