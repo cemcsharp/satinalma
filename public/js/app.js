@@ -4552,6 +4552,7 @@ const App = {
             <div><strong>Sorumlu Uzman:</strong> ${data.assignedTo || '-'}</div>
             <div><strong>Geliş Tarihi:</strong> ${data.arrivalDate || data.requestDate || '-'}</div>
             <div><strong>Sipariş Tarihi:</strong> ${data.orderDate || '-'}</div>
+            <div><strong>Tahmini Teslim Tarihi:</strong> ${data.estimatedDeliveryDate ? '🚚 ' + data.estimatedDeliveryDate : '-'}</div>
             <div><strong>Sipariş No:</strong> ${data.orderBarcode || '-'}</div>
             <div><strong>Tedarikçi Firma:</strong> ${data.supplier || '-'}</div>
             <div><strong>Yönetmelik Maddesi:</strong> ${data.regulation ? (data.regulation.startsWith('Madde ') ? data.regulation : 'Madde ' + data.regulation) : '-'}</div>

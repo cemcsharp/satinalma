@@ -681,6 +681,7 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
         <div style="font-size:0.85rem; color:#475569; line-height:1.6;">
           <div>• <strong>Sipariş No / Barkod:</strong> #${demand.orderBarcode}</div>
           ${demand.orderDate ? `<div>• <strong>Sipariş Tarihi:</strong> ${demand.orderDate}</div>` : ''}
+          ${demand.estimatedDeliveryDate ? `<div>• <strong>Tahmini Teslim Tarihi:</strong> 🚚 ${demand.estimatedDeliveryDate}</div>` : ''}
           ${demand.supplier ? `<div>• <strong>Tedarikçi Firma:</strong> ${demand.supplier}</div>` : ''}
           ${demand.actualAmount ? `<div>• <strong>Tutar:</strong> ${Number(demand.actualAmount).toLocaleString('tr-TR')} ${demand.currency || 'TRY'}</div>` : ''}
         </div>
