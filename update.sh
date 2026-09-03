@@ -15,7 +15,7 @@ echo ""
 echo "📥 [1/3] GitHub'dan güncellemeler çekiliyor..."
 export GIT_TERMINAL_PROMPT=0
 git remote set-url origin https://github.com/cemcsharp/satinalma.git 2>/dev/null || true
-git fetch origin main
+git -c credential.helper= fetch origin main
 git reset --hard origin/main
 
 # 2. Yeni npm bağımlılıkları kontrolü
