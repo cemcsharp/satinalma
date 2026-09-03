@@ -10,20 +10,23 @@ echo "=========================================================="
 echo " 🔄 Satınalma Takip Sistemi Güncelleniyor..."
 echo "=========================================================="
 
-# 1. GitHub'dan son değişiklikleri çek
+# 1. GitHub'dan şifresiz ve temiz güncelleme çek
 echo ""
 echo "📥 [1/3] GitHub'dan güncellemeler çekiliyor..."
-git pull origin main || git pull
+export GIT_TERMINAL_PROMPT=0
+git remote set-url origin https://github.com/cemcsharp/satinalma.git 2>/dev/null || true
+git fetch origin main
+git reset --hard origin/main
 
-# 2. Yeni npm bağımlılığı eklenmiş olabilir
+# 2. Yeni npm bağımlılıkları kontrolü
 echo ""
 echo "📦 [2/3] Bağımlılıklar kontrol ediliyor..."
 npm install --production
 
-# 3. PM2 servisini kesintisiz yeniden başlat
+# 3. PM2 servisini yeniden başlat
 echo ""
 echo "⚡ [3/3] Uygulama yeniden başlatılıyor..."
-pm2 reload satinalma || pm2 restart satinalma
+pm2 restart satinalma --update-env
 
 echo ""
 echo "=========================================================="
