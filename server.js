@@ -49,6 +49,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'pruni-satinalma-sec-key-2026-auth-
 // 🛠️ OTOMATİK VERİTABANI OLUŞTURMA (AUTO-HEALING)
 // ----------------------------------------------------
 async function ensureDatabaseExists() {
+  if (process.env.DB_USER && process.env.DB_USER !== 'postgres') {
+    return; // Dedicated user connects directly to DB_NAME
+  }
   const dbName = process.env.DB_NAME || 'satinalma_db';
   const defaultClient = new Client({
     user: process.env.DB_USER || 'postgres',
@@ -67,9 +70,9 @@ async function ensureDatabaseExists() {
       console.log(`✅ "${dbName}" veritabanı başarıyla oluşturuldu!`);
     }
   } catch (err) {
-    console.error('Veritabanı varlık kontrolü uyarısı:', err.message);
+    console.warn('Veritabanı varlık kontrolü uyarısı:', err.message);
   } finally {
-    await defaultClient.end().catch(() => {});
+    try { await defaultClient.end(); } catch (e) {}
   }
 }
 
@@ -2956,24 +2959,27 @@ async function initDatabaseSchema() {
   }
 }
 
-initDatabaseSchema().then(() => {
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log('==========================================================');
-    console.log(' 🛡️ SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (Güvenli REST API)');
-    console.log(` 🌐 Erişim: http://localhost:${PORT}/`);
-    console.log('==========================================================');
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('==========================================================');
+  console.log(' 🛡️ SATINALMA TAKİP SUNUCUSU ÇALIŞIYOR (Güvenli REST API)');
+  console.log(` 🌐 Erişim: http://localhost:${PORT}/`);
+  console.log('==========================================================');
 
-    // 💱 Otomatik Canlı Döviz Kurları (Sunucu açılışında 5 sn sonra çekilir)
-    setTimeout(() => {
-      fetchTCMBRates().catch(e => console.error('Başlangıç kur çekme hatası:', e.message));
-    }, 5000);
-
-    // ⏳ Otomatik Sözleşme Vade & Bitiş Uyarı Motoru (Başlangıçta ve 12 saatte bir çalışır)
-    setTimeout(() => {
-      checkContractExpirationsAndNotify().catch(e => console.error('Sözleşme kontrolü hatası:', e.message));
-    }, 15000);
-    setInterval(() => {
-      checkContractExpirationsAndNotify().catch(e => console.error('Sözleşme kontrolü hatası:', e.message));
-    }, 12 * 60 * 60 * 1000);
+  // Arka planda şema ve başlangıç verilerini güvenle yükle
+  initDatabaseSchema().catch(err => {
+    console.error('Veritabanı başlatma hatası:', err.message);
   });
+
+  // 💱 Otomatik Canlı Döviz Kurları (Sunucu açılışında 5 sn sonra çekilir)
+  setTimeout(() => {
+    fetchTCMBRates().catch(e => console.error('Başlangıç kur çekme hatası:', e.message));
+  }, 5000);
+
+  // ⏳ Otomatik Sözleşme Vade & Bitiş Uyarı Motoru (Başlangıçta ve 12 saatte bir çalışır)
+  setTimeout(() => {
+    checkContractExpirationsAndNotify().catch(e => console.error('Sözleşme kontrolü hatası:', e.message));
+  }, 15000);
+  setInterval(() => {
+    checkContractExpirationsAndNotify().catch(e => console.error('Sözleşme kontrolü hatası:', e.message));
+  }, 12 * 60 * 60 * 1000);
 });
