@@ -2037,6 +2037,58 @@ const App = {
               setTimeout(() => this.viewRequestDetails(r.id), 120);
             }
           });
+    // 5. DELIVERIES (Tahmini Teslimat & Tedarikçi Gecikme Uyarısı)
+    const pendingDeliveries = (this.state.requests || []).filter(r => 
+      r.estimatedDeliveryDate && 
+      r.status !== 'Tamamlandı' && 
+      r.status !== 'İptal' && 
+      r.status !== 'Reddedildi'
+    );
+
+    pendingDeliveries.forEach(r => {
+      const delDt = this.parseDate(r.estimatedDeliveryDate);
+      if (delDt) {
+        delDt.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((delDt - today) / (1000 * 60 * 60 * 24));
+        
+        let level = null;
+        let countdownText = '';
+        let tagClass = '';
+
+        if (diffDays < 0) {
+          level = 'CRITICAL';
+          countdownText = `${Math.abs(diffDays)} Gün Teslimat Gecikti! 🚨`;
+          tagClass = 'critical';
+        } else if (diffDays === 0) {
+          level = 'WARNING';
+          countdownText = 'Bugün Teslim Günü! 🚚';
+          tagClass = 'warning';
+        } else if (diffDays <= 3) {
+          level = 'INFO';
+          countdownText = `${diffDays} Gün Kaldı 📦`;
+          tagClass = 'info';
+        }
+
+        if (level) {
+          const id = `delivery_${r.id}`;
+          allNotifs.push({
+            id,
+            category: 'REQUEST',
+            categoryName: 'Teslimat & Tedarikçi',
+            level,
+            icon: '🚚',
+            title: `Teslimat Takibi #${r.requestBarcode || r.id} — ${r.supplier || 'Tedarikçi'}`,
+            sub: `Konu: ${r.subject || '-'} | Termin: ${r.estimatedDeliveryDate} | Atanan: ${r.assignedTo || 'Atanmadı'}`,
+            date: r.estimatedDeliveryDate,
+            diffDays,
+            tag: countdownText,
+            tagClass,
+            isRead: dismissed.includes(id),
+            action: () => {
+              this.switchView('requests');
+              setTimeout(() => this.viewRequestDetails(r.id), 120);
+            }
+          });
         }
       }
     });
@@ -4174,6 +4226,10 @@ const App = {
           <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">SİPARİŞ TARİHİ</div>
             <div style="color: var(--text-main); font-weight: 500;">${req.orderDate || '-'}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">TAHMİNİ TESLİMAT TARİHİ</div>
+            <div style="color: var(--text-main); font-weight: 600;">${req.estimatedDeliveryDate ? '🚚 ' + req.estimatedDeliveryDate : '-'}</div>
           </div>
           <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">SİPARİŞ BARKODU</div>
@@ -9881,6 +9937,28 @@ const App = {
     const elOrderDate = document.getElementById('er-order-date');
     if (elOrderDate) elOrderDate.value = orderDateVal;
 
+    let deliveryDateVal = req.estimatedDeliveryDate || '';
+    if (deliveryDateVal) {
+      const dParts = String(deliveryDateVal).trim().split(/[./-]/);
+      if (dParts.length === 3) {
+        if (dParts[0].length <= 2 && dParts[2].length >= 4) {
+          const day = dParts[0].padStart(2, '0');
+          const month = dParts[1].padStart(2, '0');
+          let year = dParts[2].trim();
+          if (year.length > 4) year = year.slice(0, 4);
+          deliveryDateVal = `${year}-${month}-${day}`;
+        } else if (dParts[0].length >= 4) {
+          let year = dParts[0].trim();
+          if (year.length > 4) year = year.slice(0, 4);
+          const month = dParts[1].padStart(2, '0');
+          const day = dParts[2].padStart(2, '0');
+          deliveryDateVal = `${year}-${month}-${day}`;
+        }
+      }
+    }
+    const elDeliveryDate = document.getElementById('er-estimated-delivery-date');
+    if (elDeliveryDate) elDeliveryDate.value = deliveryDateVal;
+
     const elCurr = document.getElementById('er-currency');
     if (elCurr) elCurr.value = req.currency || 'TRY';
 
@@ -9961,6 +10039,7 @@ const App = {
     // Sipariş ve Çoklu Tedarikçi alanları
     const orderBarcode = document.getElementById('er-order-barcode')?.value.trim();
     const orderDate = document.getElementById('er-order-date')?.value.trim();
+    const estimatedDeliveryDate = document.getElementById('er-estimated-delivery-date')?.value.trim() || '';
     
     const supplierRows = document.querySelectorAll('.er-supplier-row');
     const multiSuppliers = [];
@@ -10093,6 +10172,7 @@ const App = {
       req.currency = currency;
       req.orderBarcode = baseOrdBc ? `${baseOrdBc}-1` : '';
       req.orderDate = orderDate || '';
+      req.estimatedDeliveryDate = estimatedDeliveryDate || '';
       req.supplier = multiSuppliers[0].supplier;
       req.actualAmount = multiSuppliers[0].amount || 0;
       req.multiSuppliers = null;
@@ -10128,6 +10208,7 @@ const App = {
           supplier: subItem.supplier,
           orderBarcode: subOrd,
           orderDate: orderDate || '',
+          estimatedDeliveryDate: estimatedDeliveryDate || '',
           regulation: regulation || '',
           description: desc || '',
           purchaseType: purchaseType,
@@ -10152,6 +10233,7 @@ const App = {
       req.currency = currency;
       req.orderBarcode = orderBarcode || '';
       req.orderDate = orderDate || '';
+      req.estimatedDeliveryDate = estimatedDeliveryDate || '';
       req.supplier = multiSuppliers[0]?.supplier || supplier || '';
       req.actualAmount = multiSuppliers[0]?.amount || actualAmt || 0;
       req.multiSuppliers = null;
