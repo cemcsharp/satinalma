@@ -2037,6 +2037,10 @@ const App = {
               setTimeout(() => this.viewRequestDetails(r.id), 120);
             }
           });
+        }
+      }
+    });
+
     // 5. DELIVERIES (Tahmini Teslimat & Tedarikçi Gecikme Uyarısı)
     const pendingDeliveries = (this.state.requests || []).filter(r => 
       r.estimatedDeliveryDate && 
