@@ -1,9 +1,14 @@
-// Satınalma Takip App - Frontend Controller
+function getCurrentAcademicYear() {
+  const now = new Date();
+  const yr = now.getFullYear();
+  const m = now.getMonth(); // 0 = Jan .. 8 = Sept .. 11 = Dec
+  return m >= 8 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
+}
 
 const App = {
   state: {
     currentView: 'dashboard',
-    selectedYear: '2025-2026',
+    selectedYear: getCurrentAcademicYear(),
     currentUser: null,
     isLoggedIn: false,
     theme: 'dark',
@@ -1761,8 +1766,8 @@ const App = {
   },
 
   getAcademicYear(dateStr) {
-    if (!dateStr) return '2025-2026';
-    let y = 2026, m = 2;
+    if (!dateStr) return getCurrentAcademicYear();
+    let y = 2026, m = 8;
     const str = dateStr.toString().trim();
     if (str.includes('-')) {
       const parts = str.split('-');
@@ -1773,7 +1778,7 @@ const App = {
       if (parts[2] && parts[2].length === 4) y = parseInt(parts[2], 10);
       m = parseInt(parts[1], 10) - 1;
     }
-    if (isNaN(y) || isNaN(m)) return '2025-2026';
+    if (isNaN(y) || isNaN(m)) return getCurrentAcademicYear();
     if (m >= 8) return `${y}-${y + 1}`;
     return `${y - 1}-${y}`;
   },
