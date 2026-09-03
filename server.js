@@ -1223,6 +1223,19 @@ const server = http.createServer(async (req, res) => {
     // ----------------------------------------------------
     // 🔑 AUTHENTICATION & LOGIN ENDPOINTS (PUBLIC)
     // ----------------------------------------------------
+    if (urlPath === '/api/auth/users' && method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      try {
+        const userRes = await pool.query('SELECT id, name, title, role, "isActive" FROM users WHERE "isActive" = true ORDER BY id ASC');
+        res.writeHead(200);
+        res.end(JSON.stringify(userRes.rows));
+      } catch (e) {
+        res.writeHead(200);
+        res.end(JSON.stringify([]));
+      }
+      return;
+    }
+
     if (urlPath === '/api/auth/users-list' && method === 'GET') {
       // Login dropdown için güvenli personel listesi (Şifresiz)
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -1257,6 +1270,9 @@ const server = http.createServer(async (req, res) => {
       if (['exec', 'executive', 'yonetim', 'yönetim'].includes(String(userId).toLowerCase())) {
         userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE role = \'EXECUTIVE\' LIMIT 1';
         queryParams = [];
+      } else if (isNaN(parseInt(userId, 10))) {
+        userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1';
+        queryParams = [String(userId).trim()];
       }
 
       const userRes = await pool.query(userQuery, queryParams);
