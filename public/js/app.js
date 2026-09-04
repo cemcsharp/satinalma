@@ -8,7 +8,7 @@ function getCurrentAcademicYear() {
 const App = {
   state: {
     currentView: 'dashboard',
-    selectedYear: getCurrentAcademicYear(),
+    selectedYear: 'ALL',
     currentUser: null,
     isLoggedIn: false,
     theme: 'dark',
@@ -375,8 +375,8 @@ const App = {
     // Sıralı, benzersiz liste
     const sortedYears = Array.from(existingYears).sort((a, b) => b.localeCompare(a));
 
-    const currentVal = this.state.selectedYear || yearSelect.value || currentAcademicYear;
-    yearSelect.innerHTML = '<option value="ALL">Tüm Yıllar</option>' +
+    const currentVal = this.state.selectedYear || yearSelect.value || 'ALL';
+    yearSelect.innerHTML = `<option value="ALL"${currentVal === 'ALL' ? ' selected' : ''}>Tüm Yıllar</option>` +
       sortedYears.map(y => `<option value="${y}"${y === currentVal ? ' selected' : ''}>${y}</option>`).join('');
     
     if (currentVal && Array.from(yearSelect.options).some(o => o.value === currentVal)) {
