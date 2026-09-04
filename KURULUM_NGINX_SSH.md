@@ -48,15 +48,17 @@ Kurulum bittiğinde tarayıcınızdan `http://SUNUCU_IP/` adresine girerek aşa�
 
 ### 🔒 5. DOMAIN & SSL (HTTPS) BAĞLAMA *(İsteğe Bağlı)*
 
-Kurumsal alan adınızı (örn: `satinalma.pirireis.edu.tr`) bağlayıp ücretsiz otomatik SSL kurmak için:
+Bilgi İşlem Daire Başkanlığı'nın belirleyeceği herhangi bir kurumsal alt alan adını (örneğin: `satinalma.pirireis.edu.tr`, `talep.pirireis.edu.tr` veya `ihale.pirireis.edu.tr`) bağlayıp ücretsiz otomatik SSL (yeşil kilit) kurmak için:
+
+1. **DNS Yönlendirmesi:** Bilgi İşlem ekibi belirlenen alan adını sunucu IP'sine (`109.236.48.236`) yönlendirir.
+2. **Tek Komutla SSL Kurulumu:** Aşağıdaki komutta alan adını yazıp çalıştırmanız yeterlidir (Nginx ayarını otomatik yapar ve sertifikayı bağlar):
 
 ```bash
-# 1. Certbot paketini kurun
-sudo apt-get install -y certbot python3-certbot-nginx
-
-# 2. SSL sertifikanızı tek komutla oluşturun (Nginx ayarını otomatik yapar)
-sudo certbot --nginx -d satinalma.pirireis.edu.tr
+# Örnek: Bilgi İşlem'in tahsis ettiği alan adı ile çalıştırma
+sudo certbot --nginx -d ALAN_ADINIZ.pirireis.edu.tr
 ```
+
+*(Not: Alan adı tanımlanmasa dahi sistem doğrudan `http://109.236.48.236/` IP adresi üzerinden tüm özellikleriyle kesintisiz kullanılabilir).*
 
 ---
 
