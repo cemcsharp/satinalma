@@ -152,7 +152,7 @@ log_step "[5/7] Proje bağımlılıkları ve dizin izinleri yapılandırılıyor
 mkdir -p uploads backups
 sudo chmod -R 775 uploads backups 2>/dev/null || true
 
-npm install --production
+npm install --omit=dev --no-audit --no-fund --prefer-offline
 log_ok "Proje npm bağımlılıkları yüklendi."
 
 # ─── 5.1 GEÇMİŞ TALEPLERİN OTOMATİK AKTARILMASI (TALEPLER.XLSX) ───
