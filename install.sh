@@ -26,33 +26,32 @@ log_err() { echo -e "   ${RED}✗ $1${NC}"; }
 log_step() { echo -e "\n${BLUE}▶ $1${NC}"; }
 
 # ─── 1. SİSTEM PAKETLERİ VE DİL DESTEĞİ ───
-log_step "[1/7] Sistem paketleri ve Türkçe dil desteği güncelleniyor..."
-sudo apt-get update -o Acquire::http::Timeout="10" -y 2>/dev/null || true
-sudo apt-get install -y -o Acquire::http::Timeout="10" locales curl git build-essential software-properties-common 2>/dev/null || true
-
-# Türkçe UTF-8 dil desteğini oluştur (PostgreSQL hatasını önler)
+log_step "[1/7] Sistem yerel ayarları ve Türkçe dil desteği yapılandırılıyor..."
 sudo locale-gen tr_TR.UTF-8 2>/dev/null || true
 sudo update-locale LANG=tr_TR.UTF-8 LC_ALL=tr_TR.UTF-8 2>/dev/null || true
-log_ok "Sistem paketleri ve UTF-8 yerel ayarları hazırlandı."
+log_ok "Türkçe UTF-8 yerel ayarları hazırlandı."
 
 # ─── 2. NODE.JS 20 LTS KURULUMU ───
-log_step "[2/7] Node.js 20 LTS kontrol ediliyor / kuruluyor..."
+log_step "[2/7] Node.js 20 LTS kontrol ediliyor..."
 if ! command -v node &> /dev/null || [ $(node -v | cut -d'.' -f1 | tr -d 'v') -lt 18 ]; then
-  echo "   → NodeSource reposu ekleniyor ve Node.js kuruluyor..."
+  echo "   → Node.js bulunamadı, NodeSource reposundan kuruluyor..."
   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - 2>/dev/null || true
-  sudo apt-get install -y -o Acquire::http::Timeout="10" nodejs 2>/dev/null || true
+  sudo apt-get install -y nodejs 2>/dev/null || true
 fi
 
 if command -v node &> /dev/null; then
   log_ok "Node.js hazır: $(node -v) | npm: $(npm -v)"
 else
-  log_err "Node.js kurulamadı! Lütfen internet bağlantısını kontrol edin."
+  log_err "Node.js bulunamadı! Lütfen sunucu bağlantısını kontrol edin."
   exit 1
 fi
 
 # ─── 3. POSTGRESQL VERİTABANI VE KULLANICI YAPILANDIRMASI ───
-log_step "[3/7] PostgreSQL kuruluyor ve güvenli kullanıcı oluşturuluyor..."
-sudo apt-get install -y -o Acquire::http::Timeout="10" postgresql postgresql-contrib 2>/dev/null || true
+log_step "[3/7] PostgreSQL veritabanı ve güvenli kullanıcı yapılandırılıyor..."
+if ! command -v psql &> /dev/null; then
+  echo "   → PostgreSQL kuruluyor..."
+  sudo apt-get install -y postgresql postgresql-contrib 2>/dev/null || true
+fi
 
 # PostgreSQL servisini başlat ve açılışa ekle
 sudo systemctl enable postgresql 2>/dev/null || true
@@ -139,8 +138,11 @@ chmod 600 .env 2>/dev/null || true
 log_ok "PostgreSQL veritabanı '$DB_NAME' ve '$DB_USER' kullanıcısı hazırlandı (.env kaydedildi)."
 
 # ─── 4. NGINX WEB SUNUCUSU KURULUMU ───
-log_step "[4/7] Nginx web sunucusu kuruluyor..."
-sudo apt-get install -y -o Acquire::http::Timeout="10" nginx 2>/dev/null || true
+log_step "[4/7] Nginx web sunucusu yapılandırılıyor..."
+if ! command -v nginx &> /dev/null; then
+  echo "   → Nginx kuruluyor..."
+  sudo apt-get install -y nginx 2>/dev/null || true
+fi
 sudo systemctl enable nginx 2>/dev/null || true
 sudo systemctl restart nginx 2>/dev/null || true
 log_ok "Nginx web sunucusu kuruldu ve çalıştırıldı."
