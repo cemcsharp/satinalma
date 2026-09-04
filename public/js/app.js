@@ -1,8 +1,5 @@
 function getCurrentAcademicYear() {
-  const now = new Date();
-  const yr = now.getFullYear();
-  const m = now.getMonth(); // 0 = Jan .. 8 = Sept .. 11 = Dec
-  return m >= 8 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
+  return '2025-2026';
 }
 
 const App = {
@@ -253,7 +250,7 @@ const App = {
   },
 
   getAcademicYearFromDate(dateStr) {
-    if (!dateStr) return this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear;
+    if (!dateStr) return '2025-2026';
     let d = null;
     if (typeof dateStr === 'string' && dateStr.includes('.')) {
       const parts = dateStr.trim().split('.');
@@ -264,8 +261,9 @@ const App = {
     } else {
       d = new Date(dateStr);
     }
-    if (!d || isNaN(d.getTime())) return this.state.selectedYear === 'ALL' ? '2025-2026' : this.state.selectedYear;
+    if (!d || isNaN(d.getTime())) return '2025-2026';
     const yr = d.getFullYear();
+    if (yr < 2020 || yr > 2030) return '2025-2026';
     const m = d.getMonth();
     if (m >= 8) {
       return `${yr}-${yr + 1}`;
@@ -353,31 +351,28 @@ const App = {
   },
 
   populateYearSelect() {
-    // Akademik yılı Ağustos 1 başlangıç - Temmuz 31 bitiş olarak hesapla
     const yearSelect = document.getElementById('global-year-select');
     if (!yearSelect) return;
 
-    // Sistemdeki tüm kayıtlardaki academicYear değerlerini topla
+    // Sistemdeki tüm kayıtlardaki geçerli (20XX-20YY formatında) academicYear değerlerini topla
     const existingYears = new Set();
-    (this.state.requests || []).forEach(r => { if (r.academicYear) existingYears.add(r.academicYear); });
-    (this.state.contracts || []).forEach(c => { if (c.academicYear) existingYears.add(c.academicYear); });
-    (this.state.invoices || []).forEach(i => { if (i.academicYear) existingYears.add(i.academicYear); });
+    const isValidYear = y => typeof y === 'string' && /^20[2-3]\d-20[2-3]\d$/.test(y) && parseInt(y, 10) <= 2030 && parseInt(y, 10) >= 2020;
 
-    // Bugünün tarihine göre mevcut akademik yılı hesapla (Eylül 1 = yeni yıl başlangıcı)
-    const now = new Date();
-    const curCalYear = now.getFullYear();
-    const isNewAcademicYear = now.getMonth() >= 8; // Eylül = 8 (0-indexed)
-    const currentAcademicYear = isNewAcademicYear
-      ? `${curCalYear}-${curCalYear + 1}`
-      : `${curCalYear - 1}-${curCalYear}`;
-    existingYears.add(currentAcademicYear);
+    (this.state.requests || []).forEach(r => { if (isValidYear(r.academicYear)) existingYears.add(r.academicYear); });
+    (this.state.contracts || []).forEach(c => { if (isValidYear(c.academicYear)) existingYears.add(c.academicYear); });
+    (this.state.invoices || []).forEach(i => { if (isValidYear(i.academicYear)) existingYears.add(i.academicYear); });
 
-    // Sıralı, benzersiz liste
-    const sortedYears = Array.from(existingYears).sort((a, b) => b.localeCompare(a));
+    // Temel akademik yıllar (2025-2026 başta olmak üzere)
+    existingYears.add('2025-2026');
+    existingYears.add('2024-2025');
+    existingYears.add('2023-2024');
 
-    const currentVal = this.state.selectedYear || yearSelect.value || 'ALL';
+    // 2025-2026 en üstte olacak şekilde azalan sıralama (2025-2026'dan büyük olanları hariç tut)
+    const validYearsList = Array.from(existingYears).filter(y => y <= '2025-2026').sort((a, b) => b.localeCompare(a));
+
+    const currentVal = this.state.selectedYear || 'ALL';
     yearSelect.innerHTML = `<option value="ALL"${currentVal === 'ALL' ? ' selected' : ''}>Tüm Yıllar</option>` +
-      sortedYears.map(y => `<option value="${y}"${y === currentVal ? ' selected' : ''}>${y}</option>`).join('');
+      validYearsList.map(y => `<option value="${y}"${y === currentVal ? ' selected' : ''}>${y}</option>`).join('');
     
     if (currentVal && Array.from(yearSelect.options).some(o => o.value === currentVal)) {
       yearSelect.value = currentVal;

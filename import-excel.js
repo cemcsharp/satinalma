@@ -39,17 +39,27 @@ const pool = new pg.Pool({
 function parseExcelDate(val) {
   if (!val) return null;
   if (typeof val === 'number') {
+    if (val < 1000 || val > 60000) return null; // Anormal Excel tarih seri numaralarını engelle
     const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    const yr = d.getFullYear();
+    if (yr < 2020 || yr > 2030) return null;
     return d.toISOString().split('T')[0];
   }
   if (typeof val === 'string' && val.includes('.')) {
     const parts = val.trim().split('.');
     if (parts.length === 3) {
-      const year = parts[2].length === 4 ? parts[2] : `20${parts[2]}`;
+      let year = parts[2].length === 4 ? parts[2] : `20${parts[2]}`;
+      const yrNum = parseInt(year, 10);
+      if (yrNum < 2020 || yrNum > 2030) return null;
       return `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
     }
   }
-  return String(val);
+  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim())) {
+    const yrNum = parseInt(val.substring(0, 4), 10);
+    if (yrNum < 2020 || yrNum > 2030) return null;
+    return val.trim();
+  }
+  return null;
 }
 
 function sanitizeVal(val, k) {
@@ -173,6 +183,7 @@ async function importExcel() {
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return '2025-2026';
         const yr = d.getFullYear();
+        if (yr < 2020 || yr > 2030) return '2025-2026';
         const m = d.getMonth();
         return m >= 8 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
       }

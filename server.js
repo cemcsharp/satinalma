@@ -2852,6 +2852,12 @@ async function initDatabaseSchema() {
       WHERE a.id > b.id AND LOWER(TRIM(a.name)) = LOWER(TRIM(b.name))
     `).catch(() => {});
 
+    // 🛡️ AKADEMİK YIL TARİH HATALARINI TEMİZLE (3025-3026 vb. engelle)
+    await pool.query(`
+      UPDATE requests SET "academicYear" = '2025-2026' 
+      WHERE "academicYear" IS NULL OR "academicYear" LIKE '30%' OR "academicYear" > '2030-2031' OR "academicYear" < '2020-2021';
+    `).catch(() => {});
+
     // 🛡️ YÖNETİCİ VE ÜST YÖNETİM ROLLERİNİ GARANTİ ALTINA AL
     await pool.query(`
       UPDATE users 
