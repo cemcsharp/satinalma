@@ -25,7 +25,7 @@ fi
 # 2. Yeni npm bağımlılıkları kontrolü
 echo ""
 echo "📦 [2/3] Bağımlılıklar kontrol ediliyor..."
-npm install --production
+npm install --omit=dev --no-audit --no-fund --prefer-offline
 
 # 3. PM2 servisini yeniden başlat
 echo ""

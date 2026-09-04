@@ -38,17 +38,8 @@ Bu doküman, **Ubuntu 20.04 / 22.04 / 24.04 LTS** veya **Debian** Linux sunucula
 Sistemi tüm bağımlılıklarıyla (PostgreSQL, Node.js 20, Nginx, PM2) tek komutta otomatik kurmak için:
 
 ```bash
-# 1. Proje dizinine gidin
-cd /opt
-
-# 2. Kodları GitHub'dan çekin
-sudo git clone https://github.com/cemcsharp/satinalma.git
-
-# 3. Proje klasörüne girin
-cd satinalma
-
-# 4. Sağlamlaştırılmış otomatik kurulum betiğini çalıştırın
-sudo bash install.sh
+# Tek Komutla Hızlı ve Eksiksiz Kurulum
+cd ~ && mkdir -p /opt/satinalma && curl -sL https://github.com/cemcsharp/satinalma/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 -C /opt/satinalma && cd /opt/satinalma && bash install.sh
 ```
 
 ---
