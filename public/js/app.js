@@ -1,11 +1,14 @@
 function getCurrentAcademicYear() {
-  return '2025-2026';
+  const now = new Date();
+  const yr = now.getFullYear();
+  const m = now.getMonth(); // 0 = Jan .. 8 = Sept .. 11 = Dec
+  return m >= 8 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
 }
 
 const App = {
   state: {
     currentView: 'dashboard',
-    selectedYear: 'ALL',
+    selectedYear: getCurrentAcademicYear(),
     currentUser: null,
     isLoggedIn: false,
     theme: 'dark',
@@ -370,7 +373,7 @@ const App = {
 
     const validYearsList = Array.from(existingYears).sort((a, b) => b.localeCompare(a));
 
-    const currentVal = this.state.selectedYear || 'ALL';
+    const currentVal = this.state.selectedYear || getCurrentAcademicYear();
     yearSelect.innerHTML = `<option value="ALL"${currentVal === 'ALL' ? ' selected' : ''}>Tüm Yıllar</option>` +
       validYearsList.map(y => `<option value="${y}"${y === currentVal ? ' selected' : ''}>${y}</option>`).join('');
     
