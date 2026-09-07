@@ -362,13 +362,13 @@ const App = {
     (this.state.contracts || []).forEach(c => { if (isValidYear(c.academicYear)) existingYears.add(c.academicYear); });
     (this.state.invoices || []).forEach(i => { if (isValidYear(i.academicYear)) existingYears.add(i.academicYear); });
 
-    // Temel akademik yıllar (2025-2026 başta olmak üzere)
+    // Temel akademik yıllar (Güncel dönem ve geçmiş dönemler)
+    existingYears.add('2026-2027');
     existingYears.add('2025-2026');
     existingYears.add('2024-2025');
     existingYears.add('2023-2024');
 
-    // 2025-2026 en üstte olacak şekilde azalan sıralama (2025-2026'dan büyük olanları hariç tut)
-    const validYearsList = Array.from(existingYears).filter(y => y <= '2025-2026').sort((a, b) => b.localeCompare(a));
+    const validYearsList = Array.from(existingYears).sort((a, b) => b.localeCompare(a));
 
     const currentVal = this.state.selectedYear || 'ALL';
     yearSelect.innerHTML = `<option value="ALL"${currentVal === 'ALL' ? ' selected' : ''}>Tüm Yıllar</option>` +
@@ -9757,9 +9757,9 @@ const App = {
       }
     }
 
+    const reqAcadYear = this.getAcademicYear(arrDate);
     const newReq = {
-      id: this.state.requests.length + 1,
-      sequenceNo: this.state.requests.length + 1,
+      sequenceNo: (this.state.requests[0]?.sequenceNo || this.state.requests.length) + 1,
       requestBarcode: barcode,
       arrivalDate: arrDate,
       requestDate: arrDate,
@@ -9775,18 +9775,37 @@ const App = {
       budgetAmount: estAmt,
       actualAmount: 0,
       currency: currency,
-      academicYear: this.getAcademicYear(arrDate)
+      academicYear: reqAcadYear
     };
 
     const savedReq = await this.apiSync('requests', 'POST', newReq);
-    if (savedReq) newReq.id = savedReq.id;
+    if (savedReq && savedReq.id) {
+      Object.assign(newReq, savedReq);
+    }
     this.state.requests.unshift(newReq);
+
+    // Eğer filtre aktifse ve yeni talebin akademik yılı seçili filtreye uymuyorsa, görünürlüğü sağlamak için 'ALL' yap
+    if (this.state.selectedYear !== 'ALL' && this.state.selectedYear !== reqAcadYear) {
+      this.state.selectedYear = 'ALL';
+    }
+
     this.populateYearSelect();
 
-    this.showToast("Yeni talep başarıyla oluşturuldu!", "success");
+    // Filtreleri temizle ki yeni talep en üstte doğrudan görünsün
+    const searchEl = document.getElementById('filter-search');
+    if (searchEl) searchEl.value = '';
+    const statusEl = document.getElementById('filter-status');
+    if (statusEl) statusEl.value = 'ALL';
+    const unitEl = document.getElementById('filter-unit');
+    if (unitEl) unitEl.value = 'ALL';
+    const personEl = document.getElementById('filter-person');
+    if (personEl) personEl.value = 'ALL';
+    this.state.currentPage = 1;
+
+    this.showToast(`Yeni talep (${barcode}) başarıyla oluşturuldu!`, "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     document.getElementById('form-new-request').reset();
-    this.render();
+    this.switchView('requests');
   },
 
   openNewRequestModal() {
