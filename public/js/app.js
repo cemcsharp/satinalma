@@ -5792,6 +5792,18 @@ const App = {
       this.state.invoices.push(newInvoice);
     }
 
+    const invAcadYear = this.getAcademicYearFromDate(invoiceDate || dueDate);
+    if (this.state.selectedYear !== 'ALL' && this.state.selectedYear !== invAcadYear) {
+      this.state.selectedYear = 'ALL';
+    }
+
+    // Faturanın teslimat durumuna göre doğru sekmeyi otomatik aktif et ki kullanıcı faturayı hemen görebilsin
+    if (accountingDeliveryDate && this.state.invoiceDatePeriod === 'PENDING_DELIVERY') {
+      this.setInvoiceDeliveryTab('DELIVERED');
+    } else if (!accountingDeliveryDate && this.state.invoiceDatePeriod === 'DELIVERED') {
+      this.setInvoiceDeliveryTab('PENDING_DELIVERY');
+    }
+
     this.populateYearSelect();
     this.showToast("Fatura bilgileri başarıyla kaydedildi!", "success");
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
@@ -5809,6 +5821,22 @@ const App = {
       this.showToast("Fatura ödenmiş olarak güncellendi!", "success", "✅");
       this.renderInvoices();
     }, '💳');
+  },
+
+  async deleteInvoice(invoiceId) {
+    const inv = (this.state.invoices || []).find(item => String(item.id) === String(invoiceId));
+    if (!inv) {
+      this.showToast(`Silinecek fatura kaydı (#${invoiceId}) bulunamadı.`, "error");
+      return;
+    }
+
+    this.showConfirm("Faturayı Sil", `Fatura #${inv.invoiceNo} (${inv.supplier || 'Tedarikçi'}) kaydı silinecektir. Bu işlem geri alınamaz. Emin misiniz?`, async () => {
+      await this.apiSync('invoices', 'DELETE', inv.id);
+      this.state.invoices = (this.state.invoices || []).filter(item => String(item.id) !== String(invoiceId));
+      this.logAction('Fatura Silindi', `Fatura No: ${inv.invoiceNo}, Tedarikçi: ${inv.supplier || '-'}, Tutar: ${inv.amount} ${inv.currency || 'TRY'}`);
+      this.showToast("Fatura kaydı başarıyla silindi!", "success");
+      this.renderInvoices();
+    }, '🗑️');
   },
 
   exportWeeklyPaymentsToCSV() {
