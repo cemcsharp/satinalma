@@ -3549,7 +3549,23 @@ body.role-executive .btn-delete-action,
 body.role-executive .btn-edit-action,
 body.role-executive .chk-invoice-item,
 body.role-executive #chk-select-all-invoices,
-body.role-executive .btn-invoice-handover-action {
+body.role-executive .btn-invoice-handover-action,
+body.role-unit #btn-open-bulk-modal,
+body.role-unit #btn-import-excel,
+body.role-unit #btn-backup-now,
+body.role-unit #btn-restore-backup,
+body.role-unit #btn-save-rates,
+body.role-unit #btn-save-rates-custom,
+body.role-unit #btn-vp-rate-now,
+body.role-unit #btn-open-add-invoice,
+body.role-unit #btn-invoice-handover,
+body.role-unit li[data-view="delegation"],
+body.role-unit .btn-delete-action,
+body.role-unit .btn-edit-action,
+body.role-unit .chk-invoice-item,
+body.role-unit .chk-select-invoice,
+body.role-unit #chk-select-all-invoices,
+body.role-unit .btn-invoice-handover-action {
   display: none !important;
 }
 

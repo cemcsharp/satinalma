@@ -604,7 +604,7 @@ const App = {
     allNavItems.forEach(item => {
       const view = item.getAttribute('data-view');
       if (isUnit) {
-        if (['requests', 'contracts', 'notifications'].includes(view)) {
+        if (['requests', 'contracts', 'invoices', 'notifications'].includes(view)) {
           item.style.display = '';
         } else {
           item.style.display = 'none';
@@ -625,7 +625,7 @@ const App = {
     });
 
     // If unit user is currently on an unauthorized view, redirect to requests
-    if (isUnit && (!['requests', 'contracts', 'notifications'].includes(this.state.currentView))) {
+    if (isUnit && (!['requests', 'contracts', 'invoices', 'notifications'].includes(this.state.currentView))) {
       this.switchView('requests');
     }
 
@@ -1844,6 +1844,38 @@ const App = {
       }
       return true;
     });
+  },
+
+  getFilteredInvoices() {
+    let invoices = this.state.invoices || [];
+
+    if (this.state.selectedYear !== 'ALL') {
+      invoices = invoices.filter(i => i.academicYear === this.state.selectedYear || !i.academicYear);
+    }
+
+    // Birim Kullanıcısı (UNIT) için sadece kendi birimine ait taleplerle ilişkili faturaları filtrele
+    if (this.state.currentUser?.role === 'UNIT' && this.state.currentUser?.unit) {
+      const userUnit = (this.state.currentUser.unit || '').trim().toLowerCase();
+      const unitRequests = (this.state.requests || []).filter(r => (r.unit || '').trim().toLowerCase() === userUnit);
+      const unitBarcodes = new Set();
+      unitRequests.forEach(r => {
+        if (r.barcode) unitBarcodes.add(String(r.barcode).toLowerCase().trim());
+        if (r.requestBarcode) unitBarcodes.add(String(r.requestBarcode).toLowerCase().trim());
+        if (r.orderBarcode) unitBarcodes.add(String(r.orderBarcode).toLowerCase().trim());
+        if (r.id) unitBarcodes.add(String(r.id));
+      });
+
+      invoices = invoices.filter(inv => {
+        if (inv.unit && inv.unit.trim().toLowerCase() === userUnit) return true;
+        const rel = String(inv.relatedBarcode || inv.requestBarcode || '').toLowerCase().trim();
+        if (rel && (unitBarcodes.has(rel) || [...unitBarcodes].some(bc => bc && (rel.includes(bc) || bc.includes(rel))))) {
+          return true;
+        }
+        return false;
+      });
+    }
+
+    return invoices;
   },
 
   render() {
@@ -4425,6 +4457,57 @@ const App = {
           <div style="font-size: 0.92rem; color: var(--text-main); white-space: pre-wrap; line-height: 1.6; border-top: 1px solid var(--border-color); padding-top: 0.65rem;">${req.description || 'Açıklama veya not girilmemiş.'}</div>
         </div>
 
+        ${(() => {
+          const reqBarcodes = [req.barcode, req.requestBarcode, req.orderBarcode, String(req.id)].filter(Boolean).map(x => String(x).toLowerCase().trim());
+          const matchedInvoices = (this.state.invoices || []).filter(inv => {
+            const rel = String(inv.relatedBarcode || inv.requestBarcode || '').toLowerCase().trim();
+            return rel && reqBarcodes.some(b => rel === b || rel.includes(b) || b.includes(rel));
+          });
+
+          if (matchedInvoices.length === 0) return '';
+
+          return `
+            <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 1rem; margin-top: 1.25rem;">
+              <div style="font-size: 0.8rem; color: #059669; font-weight: 700; margin-bottom: 0.65rem; display: flex; align-items: center; justify-content: space-between;">
+                <span>🧾 İLGİLİ FATURALAR VE MUHASEBE KAYITLARI</span>
+                <span class="badge" style="background: #10b981; color: white; font-size: 0.7rem; font-weight:700;">${matchedInvoices.length} Fatura Bağlı</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                ${matchedInvoices.map(inv => {
+                  const delivered = inv.accountingDeliveryDate && inv.accountingDeliveryDate !== 'null' && String(inv.accountingDeliveryDate).trim() !== '';
+                  let statusText = '📥 Satınalmada (Bekliyor)';
+                  let statusBg = '#fef3c7';
+                  let statusColor = '#92400e';
+                  if (inv.paymentStatus === 'Ödendi') {
+                    statusText = '🟢 Ödendi';
+                    statusBg = '#dcfce7';
+                    statusColor = '#166534';
+                  } else if (delivered) {
+                    statusText = `📤 Muhasebeye Teslim Edildi (${inv.accountingDeliveryDate})`;
+                    statusBg = '#e0e7ff';
+                    statusColor = '#4338ca';
+                  }
+                  return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.5rem;">
+                      <div>
+                        <div style="font-weight: 700; color: var(--accent-primary); font-family: var(--font-mono); font-size: 0.95rem;">🧾 Fatura #${inv.invoiceNo}</div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">🏢 ${inv.supplier || '-'} • 📅 Fatura Tarihi: ${inv.invoiceDate || '-'}</div>
+                      </div>
+                      <div style="text-align: right; display: flex; align-items: center; gap: 0.75rem;">
+                        <div>
+                          <div style="font-weight: 800; font-family: var(--font-mono); color: var(--status-completed); font-size: 0.95rem;">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</div>
+                          <span class="badge" style="background: ${statusBg}; color: ${statusColor}; font-size: 0.7rem; margin-top: 2px;">${statusText}</span>
+                        </div>
+                        <button class="btn-icon" onclick="App.closeModal('modal-view-details'); App.openDocumentManager('invoice', '${inv.id}', 'Fatura #${inv.invoiceNo}')" title="Fatura Evrakları & Dijital Arşiv" style="font-size:1.1rem;">📁</button>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        })()}
+
         <!-- Action Quick Buttons (Revize İste & Muayene Kabul) -->
         <div style="margin-top: 1.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end;">
           <button type="button" class="btn-secondary" style="color: #ea580c; border-color: #ea580c; font-size: 0.82rem; padding: 0.45rem 0.85rem;" onclick="App.closeModal('modal-view-details'); App.openRevisionModal('${req.id}')">
@@ -5539,11 +5622,10 @@ const App = {
   // 6. INVOICES & HANDOVER PROTOCOL & WEEKLY PAYMENT SCHEDULE RENDERER
   renderInvoices() {
     const isExec = this.state.currentUser?.role === 'EXECUTIVE';
-    let invoices = this.state.invoices || [];
+    const isUnit = this.state.currentUser?.role === 'UNIT';
+    const isReadOnly = isExec || isUnit;
 
-    if (this.state.selectedYear !== 'ALL') {
-      invoices = invoices.filter(i => i.academicYear === this.state.selectedYear || !i.academicYear);
-    }
+    let invoices = this.getFilteredInvoices();
 
     const searchText = document.getElementById('filter-invoice-search')?.value.toLowerCase().trim() || '';
     const statusVal = document.getElementById('filter-invoice-status')?.value || 'ALL';
@@ -5572,13 +5654,13 @@ const App = {
     const isDelivered = (inv) => Boolean(inv.accountingDeliveryDate && inv.accountingDeliveryDate !== 'null' && String(inv.accountingDeliveryDate).trim() !== '');
 
     // Compute Overall KPI Totals before tab filtering
-    const totalAmountAll = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const totalAmountAll = invoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
     const paidInvoices = invoices.filter(inv => inv.paymentStatus === 'Ödendi');
-    const paidAmount = paidInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const paidAmount = paidInvoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
     const pendingDeliveryInvoices = invoices.filter(inv => !isDelivered(inv));
-    const pendingDeliveryTotal = pendingDeliveryInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const pendingDeliveryTotal = pendingDeliveryInvoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
     const deliveredInvoices = invoices.filter(inv => isDelivered(inv));
-    const deliveredTotal = deliveredInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const deliveredTotal = deliveredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0);
 
     const elTotal = document.getElementById('invoice-kpi-total');
     const elPending = document.getElementById('invoice-kpi-pending');
@@ -5589,6 +5671,17 @@ const App = {
     if (elPending) elPending.innerText = `${this.formatMoney(pendingDeliveryTotal, 'TRY', 2)} (${pendingDeliveryInvoices.length} Adet)`;
     if (elDelivered) elDelivered.innerText = `${this.formatMoney(deliveredTotal, 'TRY', 2)} (${deliveredInvoices.length} Adet)`;
     if (elPaid) elPaid.innerText = `${this.formatMoney(paidAmount, 'TRY', 2)} (${paidInvoices.length} Adet)`;
+
+    // Update KPI Card Subtitles for Unit Users
+    const cardTotalSub = document.querySelector('#card-inv-kpi-total .kpi-sub');
+    const cardPendingSub = document.querySelector('#card-inv-kpi-pending .kpi-sub');
+    const cardDeliveredSub = document.querySelector('#card-inv-kpi-delivered .kpi-sub');
+    const cardPaidSub = document.querySelector('#card-inv-kpi-paid .kpi-sub');
+
+    if (cardTotalSub) cardTotalSub.innerText = isUnit ? 'Birimimizin Faturaları' : 'Tüm Kurum Faturaları';
+    if (cardPendingSub) cardPendingSub.innerText = isUnit ? '⚡ Satınalmada İşlemde' : '⚡ Muhasebeye Teslim Edilecekler';
+    if (cardDeliveredSub) cardDeliveredSub.innerText = isUnit ? 'Muhasebeye Sevk Edildi' : 'Ödeme / Onay Sürecinde';
+    if (cardPaidSub) cardPaidSub.innerText = isUnit ? 'Ödemesi Tamamlandı' : 'Kasadan Çıkan / Biten';
 
     // Apply Delivery Tab Filters
     invoices = invoices.filter(inv => {
@@ -5633,7 +5726,7 @@ const App = {
 
     tbody.innerHTML = invoices.map(inv => {
       const due = inv.dueDate ? new Date(inv.dueDate) : null;
-      if (due) due.setHours(0,0,0,0);
+      due && due.setHours(0,0,0,0);
       const diffDays = due ? Math.ceil((due - today) / (1000 * 60 * 60 * 24)) : null;
 
       let dueBadge = '';
@@ -5688,11 +5781,11 @@ const App = {
             <div class="action-btns" style="justify-content:center;">
               <a href="#invoice/${inv.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'invoice', ${inv.id})" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('invoice', '${inv.id}', 'Fatura #${inv.invoiceNo} — ${inv.supplier?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
-              ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>` : ''}
-              ${!isExec && !delivered ? `<button class="btn-icon btn-invoice-handover-action" style="color:#4f46e5;" onclick="App.openInvoiceHandoverModal([${inv.id}])" title="Muhasebeye Teslim Et & Tutanak Yazdır">📤</button>` : ''}
-              ${!isExec && delivered ? `<button class="btn-icon" style="color:#f59e0b;" onclick="App.revertInvoiceHandover(${inv.id})" title="Teslimatı Geri Al (Satınalmaya Döndür)">↩️</button>` : ''}
-              ${!isExec && inv.paymentStatus !== 'Ödendi' ? `<button class="btn-icon" onclick="App.markInvoiceAsPaid(${inv.id})" title="Ödendi İşaretle">✅</button>` : ''}
-              ${!isExec ? `<button class="btn-icon btn-delete-action" onclick="App.deleteInvoice(${inv.id})" title="Faturayı Sil">🗑️</button>` : ''}
+              ${!isReadOnly ? `<button class="btn-icon btn-edit-action" onclick="App.openInvoiceModal(${inv.id})" title="Düzenle">✏️</button>` : ''}
+              ${!isReadOnly && !delivered ? `<button class="btn-icon btn-invoice-handover-action" style="color:#4f46e5;" onclick="App.openInvoiceHandoverModal([${inv.id}])" title="Muhasebeye Teslim Et & Tutanak Yazdır">📤</button>` : ''}
+              ${!isReadOnly && delivered ? `<button class="btn-icon" style="color:#f59e0b;" onclick="App.revertInvoiceHandover(${inv.id})" title="Teslimatı Geri Al (Satınalmaya Döndür)">↩️</button>` : ''}
+              ${!isReadOnly && inv.paymentStatus !== 'Ödendi' ? `<button class="btn-icon" onclick="App.markInvoiceAsPaid(${inv.id})" title="Ödendi İşaretle">✅</button>` : ''}
+              ${!isReadOnly ? `<button class="btn-icon btn-delete-action" onclick="App.deleteInvoice(${inv.id})" title="Faturayı Sil">🗑️</button>` : ''}
             </div>
           </td>
         </tr>
@@ -10897,23 +10990,25 @@ const App = {
   },
 
   exportInvoicesToExcel() {
-    const invoices = this.state.invoices || [];
+    const invoices = this.getFilteredInvoices();
     const search = (document.getElementById('filter-invoice-search')?.value || '').toLowerCase().trim();
     const status = document.getElementById('filter-invoice-status')?.value || 'ALL';
 
     const filtered = invoices.filter(inv => {
-      if (status !== 'ALL' && inv.status !== status) return false;
+      const pStatus = inv.paymentStatus || inv.status || 'Ödeme Bekliyor';
+      if (status !== 'ALL' && pStatus !== status) return false;
       if (search) {
         const no = (inv.invoiceNo || '').toLowerCase();
         const sup = (inv.supplier || '').toLowerCase();
-        if (!no.includes(search) && !sup.includes(search)) return false;
+        const rel = (inv.relatedBarcode || '').toLowerCase();
+        if (!no.includes(search) && !sup.includes(search) && !rel.includes(search)) return false;
       }
       return true;
     });
 
     const headers = [
       'Fatura No', 'Tedarikçi Firma', 'Fatura Tarihi', 'Vade Tarihi', 
-      'Fatura Tutarı', 'Para Birimi', 'Ödeme Durumu', 'Ödeme Tarihi', 'İlişkili Talep/Sözleşme', 'Açıklama'
+      'Fatura Tutarı', 'Para Birimi', 'Ödeme Durumu', 'Ödeme Tarihi', 'İlişkili Talep/Barkod', 'Açıklama'
     ];
 
     let grandTotal = 0;
@@ -10927,10 +11022,10 @@ const App = {
         inv.dueDate || '',
         amt,
         inv.currency || 'TRY',
-        inv.status || 'Ödeme Bekliyor',
+        inv.paymentStatus || inv.status || 'Ödeme Bekliyor',
         inv.paymentDate || '',
-        inv.relatedRequestBarcode || '',
-        inv.notes || ''
+        inv.relatedBarcode || inv.requestBarcode || '',
+        inv.notes || inv.description || ''
       ];
     });
 
@@ -10939,8 +11034,10 @@ const App = {
       grandTotal, 'TRY', '', '', '', ''
     ]);
 
+    const unitSuffix = this.state.currentUser?.role === 'UNIT' && this.state.currentUser?.unit ? `_${this.state.currentUser.unit.replace(/\s+/g, '_')}` : '';
+
     this.exportToExcelXLSX({
-      filename: `Fatura_Listesi_${this.state.selectedYear}`,
+      filename: `Fatura_Listesi_${this.state.selectedYear}${unitSuffix}`,
       sheetName: 'Faturalar',
       title: 'FATURA VE ÖDEME TAKİP LİSTESİ',
       headers: headers,
