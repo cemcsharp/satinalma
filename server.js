@@ -11,6 +11,12 @@ const crypto = require('crypto');
 const pg = require('pg');
 const archiver = require('archiver');
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Force IPv4 first to prevent ENETUNREACH on IPv6-disabled Linux VPS servers
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 // Load .env configuration file if present
 const envFilePath = path.join(__dirname, '.env');
@@ -586,7 +592,12 @@ function createSmtpTransporter(config) {
     },
     tls: {
       rejectUnauthorized: false
-    }
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
+    // Force IPv4 socket to avoid Linux VPS ENETUNREACH on IPv6
+    family: 4
   });
 }
 
