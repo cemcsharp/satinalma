@@ -172,7 +172,7 @@
 
       <!-- User Profile Card & Actions -->
       <div class="user-profile-card">
-        <div class="user-info-row">
+        <div class="user-info-row" onclick="App.openUserProfileModal()" style="cursor: pointer;" title="Profil ve İletişim Bilgilerinizi Düzenleyin">
           <div class="user-avatar" id="user-avatar">CT</div>
           <div class="user-details">
             <h4 id="user-name">Cem TUR</h4>
@@ -180,8 +180,8 @@
           </div>
         </div>
         <div style="display: flex; gap: 0.35rem; margin-top: 0.4rem;">
-          <button type="button" class="btn-secondary" id="btn-open-change-password" onclick="App.openChangePasswordModal()" style="flex: 1; justify-content: center; padding: 0.38rem 0.3rem; font-size: 0.74rem; border-color: var(--border-color);" title="Kendi Giriş Şifrenizi Değiştirin">
-            <span>🔑</span> Şifre Değiştir
+          <button type="button" class="btn-secondary" id="btn-open-user-profile" onclick="App.openUserProfileModal()" style="flex: 1.2; justify-content: center; padding: 0.38rem 0.3rem; font-size: 0.74rem; border-color: var(--border-color);" title="Kendi Profil ve İletişim Bilgilerinizi Düzenleyin">
+            <span>👤</span> Profilim
           </button>
           <button type="button" class="btn-secondary" id="btn-logout" style="flex: 1; justify-content: center; padding: 0.38rem 0.3rem; font-size: 0.74rem;" title="Oturumu Güvenli Kapat">
             <span>🚪</span> Çıkış
@@ -4400,47 +4400,91 @@
     </div>
   </div>
 
-  <!-- Modal: Self Change Password (Kullanıcı Kendi Şifresini Değiştirme) -->
-  <div class="modal-overlay" id="modal-change-password">
-    <div class="modal-content" style="max-width: 440px;">
+  <!-- Modal: User Profile & Contact Directory Form (Kullanıcı Profil ve İletişim Bilgileri) -->
+  <div class="modal-overlay" id="modal-user-profile">
+    <div class="modal-content" style="max-width: 500px;">
       <div class="modal-header">
-        <h3>🔑 Şifremi Değiştir</h3>
+        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+          <span>👤</span> Profilim & İletişim Bilgilerim
+        </h3>
         <button type="button" class="btn-close-modal close-modal">&times;</button>
       </div>
-      <form id="form-self-change-password" onsubmit="App.handleSelfChangePasswordSubmit(event)">
-        <div class="form-grid" style="grid-template-columns: 1fr; gap: 1rem;">
+      <form id="form-user-profile" onsubmit="App.handleProfileUpdateSubmit(event)">
+        <!-- User Badge Header Card -->
+        <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.08)); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+          <div class="user-avatar" id="prof-avatar" style="width: 48px; height: 48px; font-size: 1.2rem; background: var(--accent-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">CT</div>
+          <div style="flex: 1; min-width: 0;">
+            <h4 id="prof-name" style="margin: 0; font-size: 1.05rem; color: var(--text-main); font-weight: 700;">Cem TUR</h4>
+            <div id="prof-role-badge" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Satınalma Mdr. Yrd. (ADMIN)</div>
+            <div id="prof-unit-badge" style="font-size: 0.75rem; color: var(--accent-primary); font-weight: 600; margin-top: 2px;">🏢 Birim: Genel Satınalma</div>
+          </div>
+        </div>
+
+        <div class="form-grid" style="grid-template-columns: 1fr; gap: 0.9rem;">
           <div class="form-group">
-            <label>Mevcut Şifreniz <span class="required">*</span></label>
-            <div style="position: relative; display: flex; align-items: center;">
-              <input type="password" id="cp-current" required placeholder="••••••••" style="width: 100%; padding-right: 2.5rem;">
-              <button type="button" onclick="App.togglePasswordVisibility('cp-current', this)" style="position: absolute; right: 8px; background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 4px; color: var(--text-muted);" title="Göster / Gizle">👁️</button>
+            <label style="font-weight: 700;">Kurumsal E-Posta Adresi</label>
+            <input type="email" id="prof-email" placeholder="ör: cem.tur@pirireis.edu.tr" style="width: 100%;">
+            <small style="font-size: 0.73rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Talep durumu güncellemeleri ve resmi sistem bildirimleri bu adrese gönderilir.</small>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+            <div class="form-group">
+              <label style="font-weight: 700;">GSM / Cep Telefonu</label>
+              <input type="tel" id="prof-phone" placeholder="ör: 0532 123 45 67" style="width: 100%;">
+            </div>
+
+            <div class="form-group">
+              <label style="font-weight: 700;">Dahili No</label>
+              <input type="text" id="prof-extension" placeholder="ör: 1450" style="width: 100%;">
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Yeni Şifre <span class="required">*</span></label>
-            <div style="position: relative; display: flex; align-items: center;">
-              <input type="password" id="cp-new" required minlength="4" placeholder="Yeni şifrenizi girin (en az 4 karakter)" style="width: 100%; padding-right: 2.5rem;">
-              <button type="button" onclick="App.togglePasswordVisibility('cp-new', this)" style="position: absolute; right: 8px; background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 4px; color: var(--text-muted);" title="Göster / Gizle">👁️</button>
+          <!-- Password Accordion Toggle -->
+          <div style="margin-top: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; background: var(--bg-card);">
+            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="App.toggleProfilePasswordSection()">
+              <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+                <span>🔑</span> Giriş Şifremi Değiştir (İsteğe Bağlı)
+              </span>
+              <span id="prof-pass-arrow" style="font-size: 0.8rem; color: var(--text-muted);">▼</span>
             </div>
-          </div>
 
-          <div class="form-group">
-            <label>Yeni Şifre (Tekrar) <span class="required">*</span></label>
-            <div style="position: relative; display: flex; align-items: center;">
-              <input type="password" id="cp-confirm" required minlength="4" placeholder="Yeni şifrenizi tekrar girin" style="width: 100%; padding-right: 2.5rem;">
-              <button type="button" onclick="App.togglePasswordVisibility('cp-confirm', this)" style="position: absolute; right: 8px; background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 4px; color: var(--text-muted);" title="Göster / Gizle">👁️</button>
+            <div id="prof-pass-section" style="display: none; margin-top: 0.85rem; flex-direction: column; gap: 0.75rem;">
+              <div class="form-group">
+                <label style="font-size: 0.8rem;">Mevcut Şifreniz</label>
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="password" id="prof-current-pass" placeholder="Mevcut şifreniz" style="width: 100%; padding-right: 2.5rem;">
+                  <button type="button" onclick="App.togglePasswordVisibility('prof-current-pass', this)" style="position: absolute; right: 8px; background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 4px; color: var(--text-muted);" title="Göster / Gizle">👁️</button>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div class="form-group">
+                  <label style="font-size: 0.8rem;">Yeni Şifre</label>
+                  <div style="position: relative; display: flex; align-items: center;">
+                    <input type="password" id="prof-new-pass" minlength="4" placeholder="Yeni şifre (min 4)" style="width: 100%; padding-right: 2.2rem;">
+                    <button type="button" onclick="App.togglePasswordVisibility('prof-new-pass', this)" style="position: absolute; right: 6px; background: none; border: none; cursor: pointer; font-size: 0.85rem; padding: 4px; color: var(--text-muted);" title="Göster / Gizle">👁️</button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label style="font-size: 0.8rem;">Yeni Şifre (Tekrar)</label>
+                  <div style="position: relative; display: flex; align-items: center;">
+                    <input type="password" id="prof-confirm-pass" minlength="4" placeholder="Tekrar girin" style="width: 100%; padding-right: 2.2rem;">
+                    <button type="button" onclick="App.togglePasswordVisibility('prof-confirm-pass', this)" style="position: absolute; right: 6px; background: none; border: none; cursor: pointer; font-size: 0.85rem; padding: 4px; color: var(--text-muted);" title="Göster / Gizle">👁️</button>
+                  </div>
+                </div>
+              </div>
+              <small id="prof-pass-error" style="color: #ef4444; font-size: 0.76rem; display: none; font-weight: 600;">
+                ⚠️ Yeni şifreler birbiriyle eşleşmiyor!
+              </small>
             </div>
-            <small id="cp-match-error" style="color: #ef4444; font-size: 0.76rem; display: none; margin-top: 0.35rem; font-weight: 600;">
-              ⚠️ Yeni şifreler birbiriyle eşleşmiyor!
-            </small>
           </div>
         </div>
 
         <div class="form-actions" style="margin-top: 1.5rem; justify-content: space-between;">
           <button type="button" class="btn-secondary close-modal">İptal</button>
-          <button type="submit" class="btn-primary" id="btn-submit-change-pass">
-            <span>💾</span> Şifremi Güncelle
+          <button type="submit" class="btn-primary" id="btn-submit-profile">
+            <span>💾</span> Bilgilerimi Kaydet
           </button>
         </div>
       </form>

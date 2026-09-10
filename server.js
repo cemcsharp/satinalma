@@ -287,7 +287,7 @@ function readBody(req, maxBytes = 100 * 1024 * 1024) {
 async function getTableData(tableName) {
   if (tableName === 'users') {
     // Şifre alanını ASLA API ile açık olarak döndürme
-    const res = await pool.query('SELECT id, name, title, role, "isActive", email FROM users ORDER BY id ASC');
+    const res = await pool.query('SELECT id, name, title, role, unit, "isActive", email, phone, mobile, extension FROM users ORDER BY id ASC');
     return res.rows;
   }
   if (tableName === 'vendor_ratings') {
@@ -1406,7 +1406,7 @@ const server = http.createServer(async (req, res) => {
     return user && (user.role === 'EXECUTIVE' || user.role === 'UNIT');
   }
 
-  if (currentUser && isReadOnlyUser(currentUser) && method !== 'GET' && urlPath !== '/api/auth/logout' && urlPath !== '/api/auth/change-password') {
+  if (currentUser && isReadOnlyUser(currentUser) && method !== 'GET' && urlPath !== '/api/auth/logout' && urlPath !== '/api/auth/change-password' && urlPath !== '/api/auth/update-profile') {
     const isPublicVendorRating = urlPath === '/api/vendor_ratings' && method === 'POST';
     if (!isPublicVendorRating) {
       return sendForbidden('Bu hesap güvenli salt-okunur (izleme) modundadır. Veri değiştirme yetkisi bulunmamaktadır.');
@@ -1462,7 +1462,7 @@ const server = http.createServer(async (req, res) => {
       const parsedId = parseInt(cleanInput, 10);
 
       let userQuery = `
-        SELECT id, name, title, role, unit, "isActive", password, email 
+        SELECT id, name, title, role, unit, "isActive", password, email, phone, mobile, extension 
         FROM users 
         WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) 
            OR LOWER(TRIM(COALESCE(username, ''))) = LOWER(TRIM($1)) 
@@ -1476,7 +1476,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (['exec', 'executive', 'yonetim', 'yönetim'].includes(cleanInput.toLowerCase())) {
-        userQuery = 'SELECT id, name, title, role, unit, "isActive", password, email FROM users WHERE role = \'EXECUTIVE\' LIMIT 1';
+        userQuery = 'SELECT id, name, title, role, unit, "isActive", password, email, phone, mobile, extension FROM users WHERE role = \'EXECUTIVE\' LIMIT 1';
         queryParams = [];
       } else {
         userQuery += ' LIMIT 1';
@@ -1510,7 +1510,10 @@ const server = http.createServer(async (req, res) => {
         title: user.title,
         role: user.role,
         unit: user.unit || '',
-        email: user.email
+        email: user.email || '',
+        phone: user.phone || '',
+        mobile: user.mobile || '',
+        extension: user.extension || ''
       };
 
       // Giriş logu
@@ -1533,8 +1536,87 @@ const server = http.createServer(async (req, res) => {
         sendUnauthorized();
         return;
       }
+      const uRes = await pool.query('SELECT id, name, title, role, unit, email, phone, mobile, extension FROM users WHERE id = $1', [currentUser.id]).catch(() => null);
+      const safeMe = uRes && uRes.rowCount > 0 ? uRes.rows[0] : currentUser;
       res.writeHead(200);
-      res.end(JSON.stringify({ success: true, user: currentUser }));
+      res.end(JSON.stringify({ success: true, user: safeMe }));
+      return;
+    }
+
+    if (urlPath === '/api/auth/update-profile' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      if (!currentUser) {
+        sendUnauthorized();
+        return;
+      }
+
+      const body = await readBody(req, 1024 * 1024);
+      const { email, phone, extension, currentPassword, newPassword } = JSON.parse(body || '{}');
+
+      const userRes = await pool.query('SELECT id, name, title, role, unit, password FROM users WHERE id = $1', [currentUser.id]);
+      if (userRes.rowCount === 0) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Kullanıcı hesabı bulunamadı.' }));
+        return;
+      }
+
+      const dbUser = userRes.rows[0];
+
+      let updateQuery = 'UPDATE users SET email = $1, phone = $2, extension = $3';
+      let updateParams = [email ? String(email).trim() : null, phone ? String(phone).trim() : null, extension ? String(extension).trim() : null];
+
+      // If user wants to change password too:
+      if (newPassword && String(newPassword).trim() !== '') {
+        if (!currentPassword) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Şifrenizi değiştirmek için mevcut şifrenizi girmelisiniz.' }));
+          return;
+        }
+
+        const isMatch = verifyPassword(currentPassword, dbUser.password);
+        if (!isMatch) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Mevcut şifrenizi hatalı girdiniz.' }));
+          return;
+        }
+
+        if (String(newPassword).length < 4) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Yeni şifre en az 4 karakter olmalıdır.' }));
+          return;
+        }
+
+        const hashedPassword = hashPassword(newPassword);
+        updateQuery += ', password = $4 WHERE id = $5';
+        updateParams.push(hashedPassword, currentUser.id);
+      } else {
+        updateQuery += ' WHERE id = $4';
+        updateParams.push(currentUser.id);
+      }
+
+      await pool.query(updateQuery, updateParams);
+
+      const pad = (n) => String(n).padStart(2, '0');
+      const now = new Date();
+      const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      await pool.query(
+        'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+        [dateStr, dbUser.name, 'Profil Güncellendi', 'Kullanıcı iletişim bilgilerini / şifresini başarıyla güncelledi.']
+      ).catch(() => {});
+
+      const updatedUser = {
+        id: dbUser.id,
+        name: dbUser.name,
+        title: dbUser.title,
+        role: dbUser.role,
+        unit: dbUser.unit || '',
+        email: email ? String(email).trim() : '',
+        phone: phone ? String(phone).trim() : '',
+        extension: extension ? String(extension).trim() : ''
+      };
+
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, message: 'Profil ve iletişim bilgileriniz başarıyla güncellendi.', user: updatedUser }));
       return;
     }
 
@@ -2936,6 +3018,7 @@ async function initDatabaseSchema() {
 
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS extension VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS unit VARCHAR(255);

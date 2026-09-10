@@ -573,12 +573,71 @@ const App = {
     this.populateLoginDropdown();
   },
 
-  openChangePasswordModal() {
-    const form = document.getElementById('form-self-change-password');
-    if (form) form.reset();
-    const errEl = document.getElementById('cp-match-error');
+  openUserProfileModal() {
+    const user = this.state.currentUser;
+    if (!user) return;
+
+    const isExec = user.role === 'EXECUTIVE';
+    const isUnit = user.role === 'UNIT';
+    const isAdmin = user.role === 'ADMIN';
+
+    let avatarText = user.name.split(' ').map(n => n[0]).join('');
+    if (isExec) avatarText = '🏛️';
+    else if (isUnit) avatarText = '🏢';
+
+    const avatarEl = document.getElementById('prof-avatar');
+    if (avatarEl) avatarEl.innerText = avatarText;
+
+    const nameEl = document.getElementById('prof-name');
+    if (nameEl) nameEl.innerText = user.name || 'Kullanıcı';
+
+    const roleEl = document.getElementById('prof-role-badge');
+    if (roleEl) {
+      if (isExec) roleEl.innerText = `${user.title || 'Üst Yönetici'} (İzleme Modu)`;
+      else if (isUnit) roleEl.innerText = `${user.title || 'Birim Personeli'} (Birim Yetkilisi)`;
+      else if (isAdmin) roleEl.innerText = `${user.title || 'Yönetici'} (Satınalma Yöneticisi)`;
+      else roleEl.innerText = `${user.title || 'Uzman'} (Satınalma Uzmanı)`;
+    }
+
+    const unitEl = document.getElementById('prof-unit-badge');
+    if (unitEl) {
+      unitEl.innerText = user.unit ? `🏢 Birim: ${user.unit}` : '🏢 Birim: Satınalma ve Tedarik Müdürlüğü';
+    }
+
+    const emailEl = document.getElementById('prof-email');
+    if (emailEl) emailEl.value = user.email || '';
+
+    const phoneEl = document.getElementById('prof-phone');
+    if (phoneEl) phoneEl.value = user.phone || user.mobile || '';
+
+    const extEl = document.getElementById('prof-extension');
+    if (extEl) extEl.value = user.extension || '';
+
+    // Reset password section
+    const currentPassEl = document.getElementById('prof-current-pass');
+    if (currentPassEl) currentPassEl.value = '';
+    const newPassEl = document.getElementById('prof-new-pass');
+    if (newPassEl) newPassEl.value = '';
+    const confirmPassEl = document.getElementById('prof-confirm-pass');
+    if (confirmPassEl) confirmPassEl.value = '';
+
+    const passSec = document.getElementById('prof-pass-section');
+    if (passSec) passSec.style.display = 'none';
+    const arrow = document.getElementById('prof-pass-arrow');
+    if (arrow) arrow.innerText = '▼';
+    const errEl = document.getElementById('prof-pass-error');
     if (errEl) errEl.style.display = 'none';
-    this.openModal('modal-change-password');
+
+    this.openModal('modal-user-profile');
+  },
+
+  toggleProfilePasswordSection() {
+    const passSec = document.getElementById('prof-pass-section');
+    const arrow = document.getElementById('prof-pass-arrow');
+    if (!passSec) return;
+    const isHidden = passSec.style.display === 'none' || !passSec.style.display;
+    passSec.style.display = isHidden ? 'flex' : 'none';
+    if (arrow) arrow.innerText = isHidden ? '▲' : '▼';
   },
 
   togglePasswordVisibility(inputId, btn) {
@@ -593,51 +652,73 @@ const App = {
     }
   },
 
-  async handleSelfChangePasswordSubmit(e) {
+  async handleProfileUpdateSubmit(e) {
     e.preventDefault();
-    const currentPassword = document.getElementById('cp-current')?.value || '';
-    const newPassword = document.getElementById('cp-new')?.value || '';
-    const confirmPassword = document.getElementById('cp-confirm')?.value || '';
-    const errEl = document.getElementById('cp-match-error');
-    const submitBtn = document.getElementById('btn-submit-change-pass');
+    const email = document.getElementById('prof-email')?.value.trim() || '';
+    const phone = document.getElementById('prof-phone')?.value.trim() || '';
+    const extension = document.getElementById('prof-extension')?.value.trim() || '';
+    const currentPassword = document.getElementById('prof-current-pass')?.value || '';
+    const newPassword = document.getElementById('prof-new-pass')?.value || '';
+    const confirmPassword = document.getElementById('prof-confirm-pass')?.value || '';
+    const errEl = document.getElementById('prof-pass-error');
+    const submitBtn = document.getElementById('btn-submit-profile');
 
-    if (newPassword !== confirmPassword) {
-      if (errEl) errEl.style.display = 'block';
-      this.showToast('Yeni şifreler birbiriyle eşleşmiyor!', 'warning', '⚠️');
-      return;
-    }
-    if (errEl) errEl.style.display = 'none';
+    if (newPassword || confirmPassword) {
+      if (newPassword !== confirmPassword) {
+        if (errEl) errEl.style.display = 'block';
+        this.showToast('Yeni şifreler birbiriyle eşleşmiyor!', 'warning', '⚠️');
+        return;
+      }
+      if (errEl) errEl.style.display = 'none';
 
-    if (newPassword.length < 4) {
-      this.showToast('Yeni şifre en az 4 karakter olmalıdır.', 'warning', '⚠️');
-      return;
+      if (newPassword.length < 4) {
+        this.showToast('Yeni şifre en az 4 karakter olmalıdır.', 'warning', '⚠️');
+        return;
+      }
+      if (!currentPassword) {
+        this.showToast('Şifrenizi değiştirmek için mevcut şifrenizi girmelisiniz.', 'warning', '⚠️');
+        return;
+      }
     }
 
     try {
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span>⏳</span> Güncelleniyor...';
+        submitBtn.innerHTML = '<span>⏳</span> Kaydediliyor...';
       }
 
-      const res = await this.authFetch('/api/auth/change-password', {
+      const res = await this.authFetch('/api/auth/update-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newPassword })
+        body: JSON.stringify({ email, phone, extension, currentPassword, newPassword })
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Şifre değiştirilemedi.');
+        throw new Error(data.error || 'Profil güncellenemedi.');
       }
 
-      this.showToast('Şifreniz başarıyla değiştirildi!', 'success', '🔑');
-      this.closeModal('modal-change-password');
+      // Update state
+      if (data.user) {
+        this.state.currentUser = { ...this.state.currentUser, ...data.user };
+        localStorage.setItem('currentUser', JSON.stringify(this.state.currentUser));
+
+        // Update in-memory user list
+        const idx = (this.state.users || []).findIndex(u => String(u.id) === String(data.user.id));
+        if (idx !== -1) {
+          this.state.users[idx] = { ...this.state.users[idx], ...data.user };
+        }
+      }
+
+      this.updateUserProfileCard();
+      this.showToast('Profil ve iletişim bilgileriniz başarıyla kaydedildi!', 'success', '👤');
+      this.closeModal('modal-user-profile');
     } catch (err) {
       this.showToast(err.message, 'error', '❌');
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<span>💾</span> Şifremi Güncelle';
+        submitBtn.innerHTML = '<span>💾</span> Bilgilerimi Kaydet';
       }
     }
   },
@@ -4507,6 +4588,36 @@ const App = {
       `;
     }
 
+    // Lookup contact info for assigned staff and unit
+    const assignedUser = (this.state.users || []).find(u => (u.name || '').trim().toLowerCase() === (req.assignedTo || '').trim().toLowerCase());
+    let staffContactHtml = '';
+    if (assignedUser && (assignedUser.phone || assignedUser.mobile || assignedUser.email || assignedUser.extension)) {
+      const p = assignedUser.phone || assignedUser.mobile || '';
+      staffContactHtml = `
+        <div style="display:flex; align-items:center; gap:0.35rem; margin-top:0.35rem; flex-wrap:wrap;">
+          ${p ? `<a href="tel:${p}" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:rgba(16,185,129,0.12); color:#059669; padding:2px 7px; border-radius:4px; font-size:0.75rem; font-weight:700;" title="Telefon: ${p}">📞 ${p}</a>` : ''}
+          ${assignedUser.extension ? `<span style="background:rgba(59,130,246,0.1); color:#2563eb; padding:2px 7px; border-radius:4px; font-size:0.75rem; font-weight:700;" title="Dahili No">☎️ Dahili: ${assignedUser.extension}</span>` : ''}
+          ${assignedUser.email ? `<a href="mailto:${assignedUser.email}?subject=Talep %23${req.requestBarcode || req.id}: ${encodeURIComponent(req.subject)}" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:rgba(99,102,241,0.12); color:#4f46e5; padding:2px 7px; border-radius:4px; font-size:0.75rem; font-weight:700;" title="E-Posta: ${assignedUser.email}">✉️ E-Posta</a>` : ''}
+        </div>
+      `;
+    }
+
+    const unitUsers = (this.state.users || []).filter(u => (u.unit || '').trim().toLowerCase() === (req.unit || '').trim().toLowerCase());
+    let unitContactHtml = '';
+    if (unitUsers.length > 0) {
+      const uPrimary = unitUsers[0];
+      const p = uPrimary.phone || uPrimary.mobile || '';
+      if (p || uPrimary.email || uPrimary.extension) {
+        unitContactHtml = `
+          <div style="display:flex; align-items:center; gap:0.35rem; margin-top:0.35rem; flex-wrap:wrap;">
+            ${p ? `<a href="tel:${p}" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:rgba(16,185,129,0.12); color:#059669; padding:2px 7px; border-radius:4px; font-size:0.75rem; font-weight:700;" title="Birim İletişim: ${uPrimary.name} - ${p}">📞 ${p}</a>` : ''}
+            ${uPrimary.extension ? `<span style="background:rgba(59,130,246,0.1); color:#2563eb; padding:2px 7px; border-radius:4px; font-size:0.75rem; font-weight:700;" title="Dahili No">☎️ Dahili: ${uPrimary.extension}</span>` : ''}
+            ${uPrimary.email ? `<a href="mailto:${uPrimary.email}?subject=Talep %23${req.requestBarcode || req.id}: ${encodeURIComponent(req.subject)}" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:rgba(99,102,241,0.12); color:#4f46e5; padding:2px 7px; border-radius:4px; font-size:0.75rem; font-weight:700;" title="Birim E-Posta: ${uPrimary.email}">✉️ E-Posta</a>` : ''}
+          </div>
+        `;
+      }
+    }
+
     const body = document.getElementById('view-details-body');
     if (body) {
       body.innerHTML = `
@@ -4530,10 +4641,12 @@ const App = {
           <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">İLGİLİ BİRİM</div>
             <div style="font-weight: 600; color: var(--text-main);">${req.unit}</div>
+            ${unitContactHtml}
           </div>
           <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">ATANAN PERSONEL</div>
             <div style="font-weight: 600; color: var(--text-main);">${req.assignedTo}</div>
+            ${staffContactHtml}
           </div>
           <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">GELİŞ TARİHİ</div>
