@@ -3391,21 +3391,109 @@ const App = {
       }
     });
 
-    // Update Request Management KPI Totals
-    const reqTotal = allFilteredRequests.length;
-    const reqOpen = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal').length;
-    const reqCompleted = allFilteredRequests.filter(r => r.status === 'Tamamlandı').length;
-    const reqOverdue = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal' && r._diffDays >= 14).length;
+    // Update Request Management / Unit Spending KPI Totals
+    const isUnitUser = this.state.currentUser?.role === 'UNIT';
 
-    const elReqTotal = document.getElementById('req-kpi-total');
-    const elReqOpen = document.getElementById('req-kpi-open');
-    const elReqOverdue = document.getElementById('req-kpi-overdue');
-    const elReqCompleted = document.getElementById('req-kpi-completed');
+    if (isUnitUser) {
+      // 1. Completed Spending (Tamamlanan / Faturası kesilmiş harcamalar)
+      const completedRequests = allFilteredRequests.filter(r => r.status === 'Tamamlandı');
+      const completedSpendTRY = completedRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
 
-    if (elReqTotal) elReqTotal.innerText = reqTotal;
-    if (elReqOpen) elReqOpen.innerText = reqOpen;
-    if (elReqOverdue) elReqOverdue.innerText = reqOverdue;
-    if (elReqCompleted) elReqCompleted.innerText = reqCompleted;
+      // 2. Ordered Spending (Siparişteki / Yoldaki harcamalar)
+      const orderedRequests = allFilteredRequests.filter(r => r.status === 'Sipariş Verildi' || (r.orderBarcode && r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal'));
+      const orderedSpendTRY = orderedRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0), 0);
+
+      // 3. Pending In-Process Budget (Onay / Teklif aşamasında bekleyen yaklaşık maliyet)
+      const pendingRequests = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Sipariş Verildi' && !r.orderBarcode && r.status !== 'Reddedildi' && r.status !== 'İptal');
+      const pendingSpendTRY = pendingRequests.reduce((sum, r) => sum + (parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0), 0);
+
+      // 4. Total Demands
+      const reqTotal = allFilteredRequests.length;
+      const reqCompletedCount = completedRequests.length;
+      const reqOpenCount = reqTotal - reqCompletedCount;
+
+      // Update Card 1: Tamamlanan Harcama
+      const elIcon1 = document.getElementById('req-kpi-icon-1');
+      const elVal1 = document.getElementById('req-kpi-total');
+      const elLbl1 = document.getElementById('req-kpi-label-1');
+      const elSub1 = document.getElementById('req-kpi-sub-1');
+      if (elIcon1) { elIcon1.className = 'kpi-icon green'; elIcon1.innerText = '💰'; }
+      if (elVal1) { elVal1.innerText = this.formatMoney(completedSpendTRY, 'TRY', 0); elVal1.style.color = '#10b981'; }
+      if (elLbl1) elLbl1.innerText = 'Tamamlanan Harcamamız';
+      if (elSub1) elSub1.innerText = `✅ ${reqCompletedCount} Alım Tamamlandı`;
+
+      // Update Card 2: Siparişteki Tutar
+      const elIcon2 = document.getElementById('req-kpi-icon-2');
+      const elVal2 = document.getElementById('req-kpi-open');
+      const elLbl2 = document.getElementById('req-kpi-label-2');
+      const elSub2 = document.getElementById('req-kpi-sub-2');
+      if (elIcon2) { elIcon2.className = 'kpi-icon purple'; elIcon2.innerText = '📦'; }
+      if (elVal2) { elVal2.innerText = this.formatMoney(orderedSpendTRY, 'TRY', 0); elVal2.style.color = '#8b5cf6'; }
+      if (elLbl2) elLbl2.innerText = 'Siparişteki / Yoldaki Tutar';
+      if (elSub2) elSub2.innerText = `🚚 ${orderedRequests.length} Sipariş Teslim Bekliyor`;
+
+      // Update Card 3: Süreçteki Tutar
+      const elIcon3 = document.getElementById('req-kpi-icon-3');
+      const elVal3 = document.getElementById('req-kpi-overdue');
+      const elLbl3 = document.getElementById('req-kpi-label-3');
+      const elSub3 = document.getElementById('req-kpi-sub-3');
+      if (elIcon3) { elIcon3.className = 'kpi-icon yellow'; elIcon3.innerText = '⏳'; }
+      if (elVal3) { elVal3.innerText = this.formatMoney(pendingSpendTRY, 'TRY', 0); elVal3.style.color = '#f59e0b'; }
+      if (elLbl3) { elLbl3.innerText = 'Süreçteki / Bekleyen Tutar'; elLbl3.style.color = 'var(--text-muted)'; elLbl3.style.fontWeight = '500'; }
+      if (elSub3) { elSub3.innerText = `📋 Onay & Teklif Aşamasında`; elSub3.style.color = 'var(--text-muted)'; }
+
+      // Update Card 4: Toplam Talep Sayısı
+      const elIcon4 = document.getElementById('req-kpi-icon-4');
+      const elVal4 = document.getElementById('req-kpi-completed');
+      const elLbl4 = document.getElementById('req-kpi-label-4');
+      const elSub4 = document.getElementById('req-kpi-sub-4');
+      if (elIcon4) { elIcon4.className = 'kpi-icon blue'; elIcon4.innerText = '📋'; }
+      if (elVal4) { elVal4.innerText = reqTotal; elVal4.style.color = 'var(--text-main)'; }
+      if (elLbl4) elLbl4.innerText = 'Birim Toplam Talebi';
+      if (elSub4) elSub4.innerText = `⚡ ${reqOpenCount} Açık • ${reqCompletedCount} Kapalı`;
+    } else {
+      // Standard Admin/Staff Request Management KPI Totals
+      const reqTotal = allFilteredRequests.length;
+      const reqOpen = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal').length;
+      const reqCompleted = allFilteredRequests.filter(r => r.status === 'Tamamlandı').length;
+      const reqOverdue = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal' && r._diffDays >= 14).length;
+
+      const elIcon1 = document.getElementById('req-kpi-icon-1');
+      const elVal1 = document.getElementById('req-kpi-total');
+      const elLbl1 = document.getElementById('req-kpi-label-1');
+      const elSub1 = document.getElementById('req-kpi-sub-1');
+      if (elIcon1) { elIcon1.className = 'kpi-icon blue'; elIcon1.innerText = '📋'; }
+      if (elVal1) { elVal1.innerText = reqTotal; elVal1.style.color = 'var(--text-main)'; }
+      if (elLbl1) elLbl1.innerText = 'Toplam Talep';
+      if (elSub1) elSub1.innerText = '⚡ Tüm Talepleri Listele';
+
+      const elIcon2 = document.getElementById('req-kpi-icon-2');
+      const elVal2 = document.getElementById('req-kpi-open');
+      const elLbl2 = document.getElementById('req-kpi-label-2');
+      const elSub2 = document.getElementById('req-kpi-sub-2');
+      if (elIcon2) { elIcon2.className = 'kpi-icon yellow'; elIcon2.innerText = '⏳'; }
+      if (elVal2) { elVal2.innerText = reqOpen; elVal2.style.color = 'var(--text-main)'; }
+      if (elLbl2) elLbl2.innerText = 'Açık / Devam Eden';
+      if (elSub2) elSub2.innerText = '⚡ İşlem Bekleyenler';
+
+      const elIcon3 = document.getElementById('req-kpi-icon-3');
+      const elVal3 = document.getElementById('req-kpi-overdue');
+      const elLbl3 = document.getElementById('req-kpi-label-3');
+      const elSub3 = document.getElementById('req-kpi-sub-3');
+      if (elIcon3) { elIcon3.className = 'kpi-icon red'; elIcon3.innerText = '🚨'; }
+      if (elVal3) { elVal3.innerText = reqOverdue; elVal3.style.color = 'var(--status-rejected)'; }
+      if (elLbl3) { elLbl3.innerText = '14+ Gün Bekleyen (SLA)'; elLbl3.style.color = 'var(--status-rejected)'; elLbl3.style.fontWeight = '700'; }
+      if (elSub3) { elSub3.innerText = '⚡ Acil Talepleri Filtrele'; elSub3.style.color = 'var(--status-rejected)'; elSub3.style.fontWeight = '600'; }
+
+      const elIcon4 = document.getElementById('req-kpi-icon-4');
+      const elVal4 = document.getElementById('req-kpi-completed');
+      const elLbl4 = document.getElementById('req-kpi-label-4');
+      const elSub4 = document.getElementById('req-kpi-sub-4');
+      if (elIcon4) { elIcon4.className = 'kpi-icon green'; elIcon4.innerText = '✅'; }
+      if (elVal4) { elVal4.innerText = reqCompleted; elVal4.style.color = 'var(--text-main)'; }
+      if (elLbl4) elLbl4.innerText = 'Tamamlanan Talep';
+      if (elSub4) elSub4.innerText = '⚡ Kapatılan İşleri Filtrele';
+    }
 
     let requests = [...allFilteredRequests];
 
