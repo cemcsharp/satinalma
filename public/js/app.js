@@ -1878,20 +1878,42 @@ const App = {
     if (targetUnit) {
       const userUnit = targetUnit.trim().toLowerCase();
       const unitRequests = (this.state.requests || []).filter(r => (r.unit || '').trim().toLowerCase() === userUnit);
+      
       const unitBarcodes = new Set();
       unitRequests.forEach(r => {
-        if (r.barcode) unitBarcodes.add(String(r.barcode).toLowerCase().trim());
-        if (r.requestBarcode) unitBarcodes.add(String(r.requestBarcode).toLowerCase().trim());
-        if (r.orderBarcode) unitBarcodes.add(String(r.orderBarcode).toLowerCase().trim());
-        if (r.id) unitBarcodes.add(String(r.id));
+        if (r.barcode) {
+          const b = String(r.barcode).trim().toLowerCase();
+          unitBarcodes.add(b);
+          unitBarcodes.add(b.replace(/^[#\s]+/, ''));
+        }
+        if (r.requestBarcode) {
+          const rb = String(r.requestBarcode).trim().toLowerCase();
+          unitBarcodes.add(rb);
+          unitBarcodes.add(rb.replace(/^[#\s]+/, ''));
+        }
+        if (r.orderBarcode) {
+          const ob = String(r.orderBarcode).trim().toLowerCase();
+          unitBarcodes.add(ob);
+          unitBarcodes.add(ob.replace(/^[#\s]+/, ''));
+        }
+        if (r.id) {
+          unitBarcodes.add(String(r.id).trim().toLowerCase());
+        }
       });
 
       invoices = invoices.filter(inv => {
+        // 1. Direct unit match on invoice
         if (inv.unit && inv.unit.trim().toLowerCase() === userUnit) return true;
-        const rel = String(inv.relatedBarcode || inv.requestBarcode || '').toLowerCase().trim();
-        if (rel && (unitBarcodes.has(rel) || [...unitBarcodes].some(bc => bc && (rel.includes(bc) || bc.includes(rel))))) {
+
+        // 2. Exact match with this unit's request barcodes / IDs
+        const rawRel = String(inv.relatedBarcode || inv.requestBarcode || '').trim().toLowerCase();
+        if (!rawRel) return false;
+
+        const cleanRel = rawRel.replace(/^[#\s]+/, '');
+        if (unitBarcodes.has(rawRel) || unitBarcodes.has(cleanRel)) {
           return true;
         }
+
         return false;
       });
     }
@@ -4479,10 +4501,19 @@ const App = {
         </div>
 
         ${(() => {
-          const reqBarcodes = [req.barcode, req.requestBarcode, req.orderBarcode, String(req.id)].filter(Boolean).map(x => String(x).toLowerCase().trim());
+          const rawBarcodes = [req.barcode, req.requestBarcode, req.orderBarcode].filter(Boolean).map(x => String(x).toLowerCase().trim());
+          const cleanBarcodes = rawBarcodes.map(x => x.replace(/^[#\s]+/, ''));
+          const reqIdStr = String(req.id).trim();
+
           const matchedInvoices = (this.state.invoices || []).filter(inv => {
-            const rel = String(inv.relatedBarcode || inv.requestBarcode || '').toLowerCase().trim();
-            return rel && reqBarcodes.some(b => rel === b || rel.includes(b) || b.includes(rel));
+            const rawRel = String(inv.relatedBarcode || inv.requestBarcode || '').toLowerCase().trim();
+            if (!rawRel) return false;
+            const cleanRel = rawRel.replace(/^[#\s]+/, '');
+            
+            return rawBarcodes.includes(rawRel) || 
+                   cleanBarcodes.includes(cleanRel) || 
+                   rawRel === reqIdStr || 
+                   cleanRel === reqIdStr;
           });
 
           if (matchedInvoices.length === 0) return '';
