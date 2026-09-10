@@ -1268,15 +1268,28 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      let userQuery = 'SELECT id, name, title, role, unit, "isActive", password, email FROM users WHERE id = $1';
-      let queryParams = [parseInt(userId, 10) || 0];
+      const cleanInput = String(userId).trim();
+      const parsedId = parseInt(cleanInput, 10);
 
-      if (['exec', 'executive', 'yonetim', 'yönetim'].includes(String(userId).toLowerCase())) {
+      let userQuery = `
+        SELECT id, name, title, role, unit, "isActive", password, email 
+        FROM users 
+        WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) 
+           OR LOWER(TRIM(COALESCE(username, ''))) = LOWER(TRIM($1)) 
+           OR LOWER(TRIM(name)) = LOWER(TRIM($1))
+      `;
+      let queryParams = [cleanInput];
+
+      if (!isNaN(parsedId) && parsedId > 0 && !cleanInput.includes('@')) {
+        userQuery += ' OR id = $2';
+        queryParams.push(parsedId);
+      }
+
+      if (['exec', 'executive', 'yonetim', 'yönetim'].includes(cleanInput.toLowerCase())) {
         userQuery = 'SELECT id, name, title, role, unit, "isActive", password, email FROM users WHERE role = \'EXECUTIVE\' LIMIT 1';
         queryParams = [];
-      } else if (isNaN(parseInt(userId, 10))) {
-        userQuery = 'SELECT id, name, title, role, unit, "isActive", password, email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1';
-        queryParams = [String(userId).trim()];
+      } else {
+        userQuery += ' LIMIT 1';
       }
 
       const userRes = await pool.query(userQuery, queryParams);

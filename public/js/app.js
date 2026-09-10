@@ -487,15 +487,14 @@ const App = {
       if (typeof e.preventDefault === 'function') e.preventDefault();
       if (typeof e.stopPropagation === 'function') e.stopPropagation();
     }
-    const selectEl = document.getElementById('login-screen-user-select');
-    const selectedVal = selectEl?.value;
+    const usernameInput = (document.getElementById('login-screen-username')?.value || document.getElementById('login-screen-user-select')?.value || '').trim();
     const passInput = document.getElementById('login-screen-password')?.value || '';
     const errMsg = document.getElementById('login-error-msg');
     const submitBtn = document.querySelector('#form-login-screen button[type="submit"]');
 
-    if (!selectedVal) {
+    if (!usernameInput) {
       if (errMsg) {
-        errMsg.innerText = '⚠️ Lütfen listeden bir personel seçin!';
+        errMsg.innerText = '⚠️ Lütfen e-posta adresinizi veya kullanıcı adınızı girin!';
         errMsg.style.display = 'block';
       }
       return;
@@ -507,17 +506,16 @@ const App = {
     }
 
     try {
-      const parsedId = parseInt(selectedVal, 10);
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: isNaN(parsedId) ? selectedVal : parsedId, password: passInput })
+        body: JSON.stringify({ userId: usernameInput, password: passInput })
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
         if (errMsg) {
-          errMsg.innerText = `⚠️ ${data.error || 'Şifre hatalı! Lütfen tekrar deneyin.'}`;
+          errMsg.innerText = `⚠️ ${data.error || 'Giriş bilgileri veya şifre hatalı!'}`;
           errMsg.style.display = 'block';
         }
         return;
@@ -538,8 +536,9 @@ const App = {
       this.updateUserProfileCard();
       await this.fetchInitialData();
       
-      const savedView = localStorage.getItem('activeView') || 'dashboard';
-      this.switchView(savedView);
+      const isUnit = data.user.role === 'UNIT';
+      const defaultView = isUnit ? 'requests' : (localStorage.getItem('activeView') || 'dashboard');
+      this.switchView(defaultView);
       this.showToast(`Hoş geldiniz, Sayın ${data.user.name}`, 'success', '👋');
     } catch (err) {
       console.error('Login error:', err);

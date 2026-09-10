@@ -57,29 +57,33 @@
         </div>
       </div>
 
-      <!-- Right Panel: Satınalma Ekibi Güvenli Girişi -->
+      <!-- Right Panel: Kurumsal Sistem Girişi -->
       <div class="login-panel-right">
         <div class="login-header" style="text-align: left; margin-bottom: 1.25rem;">
           <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.4rem;">
             <img src="/img/logo.png" alt="Piri Reis Üniversitesi Logo" style="width:40px; height:40px; object-fit:contain; border-radius:50%; background:#fff; padding:2px; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
             <div>
-              <h3 style="font-size: 1.15rem; margin:0; font-weight:800;">Satınalma Ekibi Girişi</h3>
-              <p style="font-size: 0.78rem; color: var(--text-muted); margin:0;">Piri Reis Üniversitesi Kurumsal Yönetim</p>
+              <h3 style="font-size: 1.15rem; margin:0; font-weight:800;">Kurumsal Sistem Girişi</h3>
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin:0;">Satınalma & Birim Takip Portalı</p>
             </div>
           </div>
         </div>
 
         <form id="form-login-screen" action="javascript:void(0);" method="POST" onsubmit="event.preventDefault(); return false;" autocomplete="off">
           <div class="form-group" style="margin-bottom: 1.1rem;">
-            <label style="font-size:0.8rem; font-weight:700;">Personel Seçin</label>
-            <select id="login-screen-user-select" name="userSelect" autocomplete="off" required>
-              <option value="">-- Lütfen Personel / Yönetici Seçin --</option>
-            </select>
+            <label style="font-size:0.8rem; font-weight:700;">E-Posta Adresi veya Kullanıcı Adı</label>
+            <div style="position:relative;">
+              <input type="text" id="login-screen-username" name="username" placeholder="ornek@pirireis.edu.tr veya kullanıcı adı" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required style="padding-left: 2.3rem;">
+              <span style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); font-size:1rem;">👤</span>
+            </div>
           </div>
 
           <div class="form-group" style="margin-bottom: 1.25rem;">
             <label style="font-size:0.8rem; font-weight:700;">Şifre</label>
-            <input type="password" id="login-screen-password" name="userPassword" placeholder="Şifrenizi girin" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+            <div style="position:relative;">
+              <input type="password" id="login-screen-password" name="userPassword" placeholder="••••••••" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required style="padding-left: 2.3rem;">
+              <span style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); font-size:1rem;">🔒</span>
+            </div>
           </div>
 
           <div id="login-error-msg" style="color: var(--status-rejected); font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; display: none;">
