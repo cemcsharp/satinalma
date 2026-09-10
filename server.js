@@ -978,6 +978,119 @@ async function notifyStaffOnAssignment(demand, eventType, oldAssignedTo = null) 
   }
 }
 
+// ----------------------------------------------------
+// 📧 YENİ KULLANICI / PERSONEL HESAP AÇILIŞ BİLDİRİM FONKSİYONU
+// ----------------------------------------------------
+async function notifyNewUserCreated(user, rawPassword) {
+  if (!user || !user.email || !user.email.includes('@')) return;
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  try {
+    const cfg = await getSmtpConfig();
+    if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) {
+      console.log(`ℹ️ SMTP pasif olduğu için yeni kullanıcı "${user.name}" hoş geldiniz e-postası gönderilmedi.`);
+      return;
+    }
+
+    const baseUrl = getAppBaseUrl(cfg);
+
+    let roleName = 'Satınalma Uzmanı';
+    let roleDesc = 'Tüm satınalma talepleri, sipariş, fatura ve sözleşme süreçlerini takip edebilirsiniz.';
+    if (user.role === 'ADMIN') {
+      roleName = 'Satınalma Yöneticisi (ADMIN)';
+      roleDesc = 'Sistem üzerinde tam yetkili yönetici olarak tanımlandınız.';
+    } else if (user.role === 'EXECUTIVE') {
+      roleName = 'Üst Yönetim (EXECUTIVE)';
+      roleDesc = 'Tüm kurum ve birim harcamalarını, raporları ve analizleri izleme yetkisine sahipsiniz.';
+    } else if (user.role === 'UNIT') {
+      roleName = `Birim Kullanıcısı (${user.unit || 'Birim'})`;
+      roleDesc = `Yalnızca "${user.unit || 'Biriminiz'}" adına açılan satınalma taleplerini ve sözleşmeleri izleyebilirsiniz.`;
+    }
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 26px 24px; color: #ffffff; text-align: left; border-bottom: 3px solid #f59e0b;">
+          <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; margin-bottom: 4px;">PİRİ REİS ÜNİVERSİTESİ</div>
+          <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em;">Satınalma Takip Sistemi — Kullanıcı Hesabınız Oluşturuldu</div>
+        </div>
+        
+        <div style="padding: 24px; color: #1e293b;">
+          <h2 style="margin-top: 0; font-size: 1.15rem; color: #0f172a; font-weight: 700;">Hoş Geldiniz, Sayın ${user.name} 👋</h2>
+          
+          <p style="font-size: 0.92rem; line-height: 1.6; color: #334155; margin-top: 8px;">
+            Piri Reis Üniversitesi Satınalma Takip Sistemi üzerinde kurumsal kullanıcı hesabınız başarıyla tanımlanmıştır. Sisteme aşağıdaki bilgilerinizle giriş yapabilirsiniz:
+          </p>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+              <tbody>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 9px 0; font-weight: 600; color: #64748b; width: 38%;">Giriş E-Postası:</td>
+                  <td style="padding: 9px 0; font-weight: 700; color: #1e3a8a; font-family: monospace;">${user.email}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 9px 0; font-weight: 600; color: #64748b;">Geçici Şifre:</td>
+                  <td style="padding: 9px 0; font-weight: 700; color: #0f172a; font-family: monospace; background: rgba(99,102,241,0.08); padding-left: 6px; border-radius: 4px;">${rawPassword}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 9px 0; font-weight: 600; color: #64748b;">Tanımlı Unvan:</td>
+                  <td style="padding: 9px 0; color: #0f172a;">${user.title || '-'}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 9px 0; font-weight: 600; color: #64748b;">Sistem Yetki Rolü:</td>
+                  <td style="padding: 9px 0; font-weight: 700; color: #2563eb;">${roleName}</td>
+                </tr>
+                ${user.unit ? `
+                <tr>
+                  <td style="padding: 9px 0; font-weight: 600; color: #64748b;">Bağlı Olduğu Birim:</td>
+                  <td style="padding: 9px 0; color: #0f172a; font-weight: 600;">${user.unit}</td>
+                </tr>` : ''}
+              </tbody>
+            </table>
+          </div>
+
+          <p style="font-size: 0.83rem; color: #64748b; line-height: 1.5;">
+            ℹ️ <strong>Yetki Kapsamı:</strong> ${roleDesc}
+          </p>
+
+          <div style="margin: 26px 0 16px 0; text-align: center;">
+            <a href="${baseUrl}" target="_blank" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
+              🚀 Satınalma Takip Sistemine Giriş Yap
+            </a>
+          </div>
+
+          <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 0.78rem; color: #64748b; line-height: 1.5;">
+            🔒 <em>Güvenliğiniz için ilk giriş yaptıktan sonra şifrenizi değiştirmeniz tavsiye edilir. Bu e-posta otomatik oluşturulmuştur.</em>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const transporter = await createSmtpTransporter(cfg);
+    await transporter.sendMail({
+      from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
+      to: user.email,
+      subject: `🎉 Hesabınız Oluşturuldu — Piri Reis Üniversitesi Satınalma Takip Sistemi`,
+      html: html
+    });
+
+    await pool.query(
+      'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+      [dateStr, 'Sistem (E-Posta Servisi)', 'Kullanıcı Hesap Bildirimi', `"${user.name}" kullanıcısına (${user.email}) hoş geldiniz ve giriş bilgileri e-postası gönderildi.`]
+    ).catch(() => {});
+
+    console.log(`✉️ Yeni Kullanıcı Hoş Geldiniz E-Postası Gönderildi -> ${user.name} (${user.email})`);
+  } catch (err) {
+    console.error('Kullanıcı hoş geldiniz e-posta hatası:', err.message);
+    await pool.query(
+      'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+      [dateStr, 'Sistem (E-Posta Servisi)', 'Kullanıcı E-Posta Hatası', `"${user.name}" kullanıcısına hesap bilgileri e-postası gönderilemedi: ${err.message}`]
+    ).catch(() => {});
+  }
+}
+
 async function sendRatingReminderEmail(demand) {
   const cfg = await getSmtpConfig();
   if (!cfg || !cfg.isEnabled || !cfg.host) {
@@ -2366,10 +2479,11 @@ const server = http.createServer(async (req, res) => {
           
           delete data.id;
 
+          let rawPasswordForNotification = null;
           // Şifre güvenliği: Kullanıcı eklenirken şifreyi PBKDF2 ile hashle
           if (table === 'users') {
-            const rawPass = data.password || '123456';
-            data.password = hashPassword(rawPass);
+            rawPasswordForNotification = data.password || '123456';
+            data.password = hashPassword(rawPasswordForNotification);
           }
 
           if (table === 'vendor_ratings') {
@@ -2436,6 +2550,11 @@ const server = http.createServer(async (req, res) => {
               if (result.rows[0].assignedTo && result.rows[0].assignedTo !== 'Henüz Atanmadı') {
                 notifyStaffOnAssignment(result.rows[0], 'ASSIGNED').catch(e => console.error('Personel e-posta tetikleme hatası:', e.message));
               }
+            }
+
+            // Trigger automated welcome email with login credentials on user creation
+            if (table === 'users' && result.rows[0]) {
+              notifyNewUserCreated(result.rows[0], rawPasswordForNotification).catch(e => console.error('Yeni kullanıcı e-posta hatası:', e.message));
             }
           } catch (err) {
             console.error(`INSERT hatası (${table}):`, err.message);
