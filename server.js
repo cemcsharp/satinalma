@@ -95,7 +95,7 @@ pool.on('error', (err) => {
 
 // Bilinen ve İzin Verilen Veritabanı Tablo Sütunları (Güvenli Filtreleme)
 const TABLE_COLUMNS = {
-  users: ['name', 'title', 'role', 'isActive', 'password', 'phone', 'email', 'username'],
+  users: ['name', 'title', 'role', 'unit', 'isActive', 'password', 'phone', 'email', 'username'],
   requests: [
     'sequenceNo', 'requestBarcode', 'subject', 'unit', 'arrivalDate', 'requestDate',
     'assignedTo', 'priority', 'status', 'estimatedAmount', 'budgetAmount', 'actualAmount',
@@ -201,6 +201,7 @@ function generateToken(user) {
     id: user.id,
     name: user.name,
     role: user.role || 'STAFF',
+    unit: user.unit || '',
     title: user.title || '',
     email: user.email || '',
     exp
@@ -1212,11 +1213,14 @@ const server = http.createServer(async (req, res) => {
   }
 
   function isReadOnlyUser(user) {
-    return user && user.role === 'EXECUTIVE';
+    return user && (user.role === 'EXECUTIVE' || user.role === 'UNIT');
   }
 
   if (currentUser && isReadOnlyUser(currentUser) && method !== 'GET' && urlPath !== '/api/auth/logout') {
-    return sendForbidden('Yönetici (EXECUTIVE) hesabı güvenli salt-okunur (izleme) modundadır. Veri değiştirme yetkisi bulunmamaktadır.');
+    const isPublicVendorRating = urlPath === '/api/vendor_ratings' && method === 'POST';
+    if (!isPublicVendorRating) {
+      return sendForbidden('Bu hesap güvenli salt-okunur (izleme) modundadır. Veri değiştirme yetkisi bulunmamaktadır.');
+    }
   }
 
   try {
@@ -1226,7 +1230,7 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/auth/users' && method === 'GET') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       try {
-        const userRes = await pool.query('SELECT id, name, title, role, "isActive" FROM users WHERE "isActive" = true ORDER BY id ASC');
+        const userRes = await pool.query('SELECT id, name, title, role, unit, "isActive" FROM users WHERE "isActive" = true ORDER BY id ASC');
         res.writeHead(200);
         res.end(JSON.stringify(userRes.rows));
       } catch (e) {
@@ -1239,7 +1243,7 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/auth/users-list' && method === 'GET') {
       // Login dropdown için güvenli personel listesi (Şifresiz)
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      const result = await pool.query('SELECT id, name, title, role, "isActive" FROM users ORDER BY "isActive" DESC, id ASC');
+      const result = await pool.query('SELECT id, name, title, role, unit, "isActive" FROM users ORDER BY "isActive" DESC, id ASC');
       res.writeHead(200);
       res.end(JSON.stringify(result.rows));
       return;
@@ -1264,14 +1268,14 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      let userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE id = $1';
+      let userQuery = 'SELECT id, name, title, role, unit, "isActive", password, email FROM users WHERE id = $1';
       let queryParams = [parseInt(userId, 10) || 0];
 
       if (['exec', 'executive', 'yonetim', 'yönetim'].includes(String(userId).toLowerCase())) {
-        userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE role = \'EXECUTIVE\' LIMIT 1';
+        userQuery = 'SELECT id, name, title, role, unit, "isActive", password, email FROM users WHERE role = \'EXECUTIVE\' LIMIT 1';
         queryParams = [];
       } else if (isNaN(parseInt(userId, 10))) {
-        userQuery = 'SELECT id, name, title, role, "isActive", password, email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1';
+        userQuery = 'SELECT id, name, title, role, unit, "isActive", password, email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1';
         queryParams = [String(userId).trim()];
       }
 
@@ -1302,6 +1306,7 @@ const server = http.createServer(async (req, res) => {
         name: user.name,
         title: user.title,
         role: user.role,
+        unit: user.unit || '',
         email: user.email
       };
 
@@ -2661,6 +2666,7 @@ async function initDatabaseSchema() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS unit VARCHAR(255);
 
       ALTER TABLE units ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 

@@ -247,7 +247,9 @@ const App = {
       let roleIcon = '👤';
       if (u.role === 'EXECUTIVE') roleIcon = '🏛️';
       else if (u.role === 'ADMIN') roleIcon = '🛡️';
-      html += `<option value="${u.id}" ${String(u.id) === String(currentVal) ? 'selected' : ''}>${roleIcon} ${u.name} - ${u.title}${statusLabel}</option>`;
+      else if (u.role === 'UNIT') roleIcon = '🏢';
+      const unitTag = (u.role === 'UNIT' && u.unit) ? ` [${u.unit}]` : '';
+      html += `<option value="${u.id}" ${String(u.id) === String(currentVal) ? 'selected' : ''}>${roleIcon} ${u.name} - ${u.title}${unitTag}${statusLabel}</option>`;
     });
     loginSelect.innerHTML = html;
   },
@@ -578,11 +580,18 @@ const App = {
 
     const isExec = user.role === 'EXECUTIVE';
     const isAdmin = user.role === 'ADMIN';
+    const isUnit = user.role === 'UNIT';
 
     if (isExec) {
       document.body.classList.add('role-executive');
     } else {
       document.body.classList.remove('role-executive');
+    }
+
+    if (isUnit) {
+      document.body.classList.add('role-unit');
+    } else {
+      document.body.classList.remove('role-unit');
     }
 
     if (!isAdmin) {
@@ -591,10 +600,28 @@ const App = {
       document.body.classList.remove('role-non-admin');
     }
 
-    // Toggle Settings menu item visibility (ADMIN only)
-    const settingsNavItem = document.querySelector('li[data-view="settings"]');
-    if (settingsNavItem) {
-      settingsNavItem.style.display = isAdmin ? '' : 'none';
+    // Sidebar navigation items filtering for UNIT role
+    const allNavItems = document.querySelectorAll('.sidebar-nav li[data-view]');
+    allNavItems.forEach(item => {
+      const view = item.getAttribute('data-view');
+      if (isUnit) {
+        if (['requests', 'contracts', 'notifications'].includes(view)) {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      } else {
+        if (view === 'settings') {
+          item.style.display = isAdmin ? '' : 'none';
+        } else {
+          item.style.display = '';
+        }
+      }
+    });
+
+    // If unit user is currently on an unauthorized view, redirect to requests
+    if (isUnit && (!['requests', 'contracts', 'notifications'].includes(this.state.currentView))) {
+      this.switchView('requests');
     }
 
     // Topbar live rates button (only opens settings if ADMIN)
@@ -608,7 +635,10 @@ const App = {
     const execBadge = document.getElementById('badge-executive-banner');
     if (execBadge) execBadge.style.display = isExec ? 'inline-flex' : 'none';
 
-    const avatarText = isExec ? '🏛️' : user.name.split(' ').map(n => n[0]).join('');
+    let avatarText = user.name.split(' ').map(n => n[0]).join('');
+    if (isExec) avatarText = '🏛️';
+    else if (isUnit) avatarText = '🏢';
+
     const avatarEl = document.getElementById('user-avatar');
     if (avatarEl) avatarEl.innerText = avatarText;
 
@@ -618,6 +648,7 @@ const App = {
     const roleEl = document.getElementById('user-role-label');
     if (roleEl) {
       if (isExec) roleEl.innerText = 'Üst Yönetim (İzleme Modu)';
+      else if (isUnit) roleEl.innerText = `${user.title || 'Birim Yetkilisi'} (${user.unit || 'Birim'})`;
       else if (user.role === 'ADMIN') roleEl.innerText = `${user.title} (Yönetici)`;
       else roleEl.innerText = `${user.title} (Uzman)`;
     }
@@ -1782,6 +1813,9 @@ const App = {
 
   getFilteredRequests() {
     return this.state.requests.filter(r => {
+      if (this.state.currentUser?.role === 'UNIT' && this.state.currentUser?.unit) {
+        if (r.unit !== this.state.currentUser.unit) return false;
+      }
       const acadYear = r.academicYear || this.getAcademicYear(r.arrivalDate || r.requestDate);
       if (this.state.selectedYear !== 'ALL' && acadYear !== this.state.selectedYear) {
         return false;
@@ -2102,6 +2136,16 @@ const App = {
       if (wA !== wB) return wA - wB;
       return a.diffDays - b.diffDays;
     });
+
+    if (this.state.currentUser?.role === 'UNIT') {
+      const myUnit = this.state.currentUser?.unit;
+      return allNotifs.filter(n => {
+        if (n.category === 'GUARANTEE' || n.category === 'INVOICE') return false;
+        if (n.category === 'CONTRACT' && n.data?.unit && myUnit && n.data.unit !== myUnit) return false;
+        if (n.category === 'REQUEST' && n.data?.unit && myUnit && n.data.unit !== myUnit) return false;
+        return true;
+      });
+    }
 
     return allNotifs;
   },
@@ -3399,6 +3443,12 @@ const App = {
 
     const isAdmin = this.state.currentUser?.role === 'ADMIN';
     const isExec = this.state.currentUser?.role === 'EXECUTIVE';
+    const isUnit = this.state.currentUser?.role === 'UNIT';
+    const isReadOnly = isExec || isUnit;
+
+    // Hide add request buttons for read-only unit users
+    const btnAddReq = document.getElementById('btn-open-add-request');
+    if (btnAddReq) btnAddReq.style.display = isReadOnly ? 'none' : '';
 
     tbody.innerHTML = pageRequests.map((r, i) => `
       <tr>
@@ -3419,10 +3469,10 @@ const App = {
           <div class="action-btns">
             <a href="#request/${r.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'request', '${r.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
             <button class="btn-icon" onclick="App.openDocumentManager('request', '${r.id}', '#${r.requestBarcode || r.id} — ${r.subject?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
-            ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>` : ''}
-            ${!isExec ? `<button class="btn-icon" style="color:#ea580c;" onclick="App.openRevisionModal('${r.id}')" title="Birimden Revize / Eksik Şartname İste">⚠️</button>` : ''}
+            ${!isReadOnly ? `<button class="btn-icon btn-edit-action" onclick="App.openEditModal('${r.id}')" title="Düzenle / Sipariş Gir">✏️</button>` : ''}
+            ${!isReadOnly ? `<button class="btn-icon" style="color:#ea580c;" onclick="App.openRevisionModal('${r.id}')" title="Birimden Revize / Eksik Şartname İste">⚠️</button>` : ''}
             <button class="btn-icon" style="color:#10b981;" onclick="App.openInspectionReport('${r.id}')" title="Muayene ve Kabul Tutanağı (PDF / Yazdır)">📄</button>
-            ${isAdmin && !isExec ? `<button class="btn-icon btn-delete-action" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil (Sadece Yönetici)">🗑️</button>` : ''}
+            ${isAdmin && !isReadOnly ? `<button class="btn-icon btn-delete-action" onclick="App.deleteRequest('${r.id}')" title="Talebi Sil (Sadece Yönetici)">🗑️</button>` : ''}
           </div>
         </td>
       </tr>
@@ -3763,6 +3813,12 @@ const App = {
   // 5. CONTRACT MANAGEMENT RENDERER (SÖZLEŞME TAKİP)
   renderContracts() {
     const isExec = this.state.currentUser?.role === 'EXECUTIVE';
+    const isUnit = this.state.currentUser?.role === 'UNIT';
+    const isReadOnly = isExec || isUnit;
+
+    const btnAddContract = document.getElementById('btn-open-add-contract');
+    if (btnAddContract) btnAddContract.style.display = isReadOnly ? 'none' : '';
+
     let contracts = this.state.contracts || [];
 
     // Filter by academic year overlap (or show all if ALL)
@@ -3788,6 +3844,11 @@ const App = {
     now.setHours(0,0,0,0);
 
     contracts = contracts.filter(c => {
+      // Unit restriction for UNIT role
+      if (this.state.currentUser?.role === 'UNIT' && this.state.currentUser?.unit) {
+        if (c.unit !== this.state.currentUser.unit) return false;
+      }
+
       // Unit filter
       if (unitVal !== 'ALL' && c.unit !== unitVal) return false;
 
@@ -3869,8 +3930,8 @@ const App = {
             <div class="action-btns">
               <a href="#contract/${c.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'contract', '${c.id}')" title="Detayları Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('contract', '${c.id}', 'Sözleşme #${c.contractNo} — ${c.title?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
-              ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openContractModal('${c.id}')" title="Düzenle">✏️</button>` : ''}
-              ${!isExec ? `<button class="btn-icon btn-delete-action" onclick="App.deleteContract('${c.id}')" title="Sözleşmeyi Sil">🗑️</button>` : ''}
+              ${!isReadOnly ? `<button class="btn-icon btn-edit-action" onclick="App.openContractModal('${c.id}')" title="Düzenle">✏️</button>` : ''}
+              ${!isReadOnly ? `<button class="btn-icon btn-delete-action" onclick="App.deleteContract('${c.id}')" title="Sözleşmeyi Sil">🗑️</button>` : ''}
             </div>
           </td>
         </tr>
@@ -8015,6 +8076,8 @@ const App = {
           roleBadge = '<span class="badge priority-kritik">🛡️ Satınalma Yöneticisi (ADMIN)</span>';
         } else if (u.role === 'EXECUTIVE') {
           roleBadge = '<span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:700; border:1px solid rgba(245,158,11,0.35);">🏛️ Yönetim</span>';
+        } else if (u.role === 'UNIT') {
+          roleBadge = `<span class="badge" style="background:rgba(59,130,246,0.15); color:#2563eb; font-weight:700; border:1px solid rgba(59,130,246,0.35);" title="Bağlı Birim: ${u.unit || '-'}">🏢 ${u.unit || 'Birim Kullanıcısı'}</span>`;
         }
         return `
           <tr>
@@ -9458,6 +9521,28 @@ const App = {
   },
 
   openUserModal(userId = null) {
+    const unitSelect = document.getElementById('um-unit');
+    if (unitSelect) {
+      const unitsList = (this.state.units || []).map(u => u.name).filter(Boolean);
+      unitSelect.innerHTML = '<option value="">-- Birim Seçiniz --</option>' + 
+        unitsList.map(un => `<option value="${un}">${un}</option>`).join('');
+    }
+
+    const roleSelect = document.getElementById('um-role');
+    const unitGroup = document.getElementById('um-unit-group');
+
+    const updateUnitGroupVisibility = () => {
+      if (unitGroup && roleSelect) {
+        const isUnit = roleSelect.value === 'UNIT';
+        unitGroup.style.display = isUnit ? 'block' : 'none';
+        if (unitSelect) unitSelect.required = isUnit;
+      }
+    };
+
+    if (roleSelect) {
+      roleSelect.onchange = updateUnitGroupVisibility;
+    }
+
     if (userId) {
       const u = this.state.users.find(usr => String(usr.id) === String(userId));
       if (!u) return;
@@ -9465,6 +9550,7 @@ const App = {
       document.getElementById('um-name').value = u.name;
       document.getElementById('um-title').value = u.title;
       document.getElementById('um-role').value = u.role || 'STAFF';
+      if (unitSelect) unitSelect.value = u.unit || '';
       document.getElementById('um-password').value = '';
       document.getElementById('um-password').placeholder = 'Mevcut şifreyi korumak için boş bırakın';
       if (document.getElementById('um-phone')) document.getElementById('um-phone').value = u.phone || '';
@@ -9475,10 +9561,12 @@ const App = {
       document.getElementById('um-id').value = '';
       document.getElementById('form-user-manage').reset();
       document.getElementById('um-role').value = 'STAFF';
+      if (unitSelect) unitSelect.value = '';
       document.getElementById('um-password').value = '';
       document.getElementById('um-password').placeholder = 'Şifre belirleyin (Boşsa: 123456)';
       document.getElementById('user-modal-title').innerText = '➕ Yeni Kullanıcı / Personel Ekle';
     }
+    updateUnitGroupVisibility();
     this.openModal('modal-user-form');
   },
 
@@ -9488,10 +9576,16 @@ const App = {
     const name = document.getElementById('um-name').value.trim();
     const title = document.getElementById('um-title').value.trim();
     const role = document.getElementById('um-role').value;
+    const unit = document.getElementById('um-unit')?.value.trim() || '';
     const passwordInput = document.getElementById('um-password').value.trim();
     const phone = document.getElementById('um-phone')?.value.trim() || '';
     const email = document.getElementById('um-email')?.value.trim() || '';
     const isActive = document.getElementById('um-is-active').value === 'true';
+
+    if (role === 'UNIT' && !unit) {
+      this.showToast("Lütfen birim kullanıcısı için bağlı olduğu birimi seçiniz.", "error");
+      return;
+    }
 
     if (id) {
       const u = this.state.users.find(usr => String(usr.id) === String(id));
@@ -9499,6 +9593,7 @@ const App = {
         u.name = name;
         u.title = title;
         u.role = role;
+        u.unit = unit;
         u.phone = phone;
         u.email = email;
         u.isActive = isActive;
@@ -9516,6 +9611,7 @@ const App = {
         name: name,
         title: title,
         role: role,
+        unit: unit,
         password: passwordInput || '123456',
         phone: phone,
         email: email,
