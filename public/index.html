@@ -162,9 +162,6 @@
         </li>
 
         <li class="nav-section-title">⚙️ Sistem</li>
-        <li class="nav-item" data-view="activity-logs">
-          <a href="#/activity-logs"><span class="nav-icon">📜</span><span>Aktivite Logu</span></a>
-        </li>
         <li class="nav-item" data-view="settings">
           <a href="#/settings"><span class="nav-icon">⚙️</span><span>Ayarlar</span></a>
         </li>
@@ -2439,6 +2436,9 @@
           <button class="btn-secondary" data-tab="system" onclick="App.setSettingsTab('system')" style="padding: 0.5rem 1rem; font-weight: 700;">
             🗄️ Veritabanı & Sistem
           </button>
+          <button class="btn-secondary" data-tab="logs" onclick="App.setSettingsTab('logs')" style="padding: 0.5rem 1rem; font-weight: 700;">
+            📜 Aktivite Logları
+          </button>
         </div>
 
         <!-- TAB 1: KULLANICI VE YETKİ YÖNETİMİ (DETAYLI PANEL) -->
@@ -2827,46 +2827,44 @@
               </button>
             </div>
           </div>
-        </div>
-
-      </section>
-
-      <!-- 9. ACTIVITY LOGS VIEW (İŞLEM GEÇMİŞİ) -->
-      <section id="view-activity-logs" class="view-section" style="display: none;">
-        <div class="glass-card">
-          <div class="card-header" style="margin-bottom: 1.5rem;">
-            <div>
-              <h3>📜 Sistem İşlem ve Aktivite Geçmişi (Audit Logs)</h3>
-              <p style="font-size: 0.85rem; color: var(--text-muted);">Sistemde gerçekleştirilen tüm ekleme, silme, devir ve onay işlemlerinin kronolojik dökümü</p>
-            </div>
-            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-              <div class="search-input-box" style="width: 240px;">
-                <span class="search-icon">🔍</span>
-                <input type="text" id="filter-log-search" placeholder="İşlem veya personel ara...">
+        <!-- TAB 7: AKTİVİTE LOGLARI (AUDIT TRAILS) -->
+        <div class="settings-tab-content" data-tab="logs" id="tab-content-logs" style="display: none;">
+          <div class="glass-card">
+            <div class="card-header" style="margin-bottom: 1.25rem;">
+              <div>
+                <h3>📜 Sistem İşlem ve Aktivite Geçmişi (Audit Logs)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Sistemde gerçekleştirilen tüm ekleme, silme, devir, onay ve güncelleme işlemlerinin kronolojik dökümü</p>
               </div>
-              <button class="btn-secondary" id="btn-export-logs-excel">
-                <span>📥</span> Excel İndir
-              </button>
-              <button class="btn-export-pdf" id="btn-export-logs-pdf">
-                <span>🖨️</span> PDF / Yazdır
-              </button>
+              <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                <div class="search-input-box" style="width: 260px;">
+                  <span class="search-icon">🔍</span>
+                  <input type="text" id="filter-log-search" placeholder="İşlem veya personel ara...">
+                </div>
+                <button class="btn-secondary" id="btn-export-logs-excel" onclick="App.exportLogsToExcel()">
+                  <span>📥</span> Excel İndir
+                </button>
+                <button class="btn-export-pdf" id="btn-export-logs-pdf" onclick="window.print()">
+                  <span>🖨️</span> PDF / Yazdır
+                </button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table" id="table-activity-logs">
+                <thead>
+                  <tr>
+                    <th style="width: 170px;">Tarih / Saat</th>
+                    <th style="width: 180px;">İşlemi Yapan</th>
+                    <th style="width: 220px;">İşlem Türü</th>
+                    <th>Detay ve Açıklama</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
             </div>
           </div>
-
-          <div class="table-container">
-            <table class="custom-table" id="table-activity-logs">
-              <thead>
-                <tr>
-                  <th>Tarih / Saat</th>
-                  <th>İşlemi Yapan</th>
-                  <th>İşlem Türü</th>
-                  <th>Detay ve Açıklama</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
         </div>
+
       </section>
     </main>
   </div>

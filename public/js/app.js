@@ -1909,6 +1909,12 @@ const App = {
   },
 
   switchView(viewName, fromHistory = false) {
+    if (viewName === 'activity-logs') {
+      this.switchView('settings', fromHistory);
+      this.setSettingsTab('logs');
+      return;
+    }
+
     const isUnit = this.state.currentUser?.role === 'UNIT';
 
     // Restrict views for UNIT role
@@ -8687,6 +8693,61 @@ const App = {
     document.querySelectorAll('.settings-tab-content').forEach(sec => {
       sec.style.display = (sec.getAttribute('data-tab') === tabName) ? 'block' : 'none';
     });
+    if (tabName === 'logs') {
+      this.renderActivityLogs();
+    } else if (tabName === 'users') {
+      this.renderUsersSettings();
+    } else if (tabName === 'units') {
+      this.renderUnitsSettings();
+    } else if (tabName === 'smtp') {
+      this.fetchSmtpSettings();
+    } else if (tabName === 'workload') {
+      this.renderWorkloadSettingsUI();
+    } else if (tabName === 'system') {
+      this.renderBackupsTableSettings();
+    }
+  },
+
+  renderActivityLogs() {
+    const tbody = document.querySelector('#table-activity-logs tbody');
+    if (!tbody) return;
+    const searchVal = (document.getElementById('filter-log-search')?.value || '').toLowerCase().trim();
+    const logs = this.state.logs || [];
+    const filtered = logs.filter(l => {
+      if (!searchVal) return true;
+      const txt = `${l.timestamp || ''} ${l.user || ''} ${l.action || ''} ${l.details || ''}`.toLowerCase();
+      return txt.includes(searchVal);
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:2rem;">Kayıtlı aktivite logu bulunamadı.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.slice(0, 250).map(l => {
+      let actionBadgeClass = 'badge status-completed';
+      const act = (l.action || '').toLowerCase();
+      if (act.includes('silindi') || act.includes('iptal')) actionBadgeClass = 'badge priority-kritik';
+      else if (act.includes('güncellendi') || act.includes('düzenle') || act.includes('revize')) actionBadgeClass = 'badge priority-yuksek';
+      else if (act.includes('devredildi') || act.includes('sevk') || act.includes('teslim')) actionBadgeClass = 'badge status-open';
+
+      return `
+        <tr>
+          <td style="font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">
+            🕒 ${l.timestamp || '-'}
+          </td>
+          <td style="font-weight:600; white-space:nowrap;">
+            👤 ${l.user || 'Sistem'}
+          </td>
+          <td style="white-space:nowrap;">
+            <span class="${actionBadgeClass}">${l.action || 'İşlem'}</span>
+          </td>
+          <td style="font-size:0.85rem; line-height:1.4; color:var(--text-main); word-break:break-word;">
+            ${l.details || '-'}
+          </td>
+        </tr>
+      `;
+    }).join('');
   },
 
   renderUsersSettings() {
@@ -8802,6 +8863,7 @@ const App = {
     this.renderRegulationsSettings();
     this.renderBackupsTableSettings();
     this.fetchSmtpSettings();
+    this.renderActivityLogs();
   },
 
   syncRatesInputUI() {
