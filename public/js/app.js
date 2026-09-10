@@ -754,12 +754,24 @@ const App = {
     allNavItems.forEach(item => {
       const view = item.getAttribute('data-view');
       if (isUnit) {
-        if (['requests', 'contracts', 'invoices', 'notifications'].includes(view)) {
+        if (['requests', 'contracts', 'invoices', 'notifications', 'supplier-analysis'].includes(view)) {
           item.style.display = '';
+          if (view === 'supplier-analysis') {
+            const btnSpan = item.querySelector('button span:last-child');
+            if (btnSpan) btnSpan.innerText = 'Çalışılan Firmalar';
+            const iconSpan = item.querySelector('.nav-icon');
+            if (iconSpan) iconSpan.innerText = '🏢';
+          }
         } else {
           item.style.display = 'none';
         }
       } else {
+        if (view === 'supplier-analysis') {
+          const btnSpan = item.querySelector('button span:last-child');
+          if (btnSpan) btnSpan.innerText = 'Tedarikçi Analizi';
+          const iconSpan = item.querySelector('.nav-icon');
+          if (iconSpan) iconSpan.innerText = '🏭';
+        }
         if (view === 'settings') {
           item.style.display = isAdmin ? '' : 'none';
         } else {
@@ -775,7 +787,7 @@ const App = {
     });
 
     // If unit user is currently on an unauthorized view, redirect to requests
-    if (isUnit && (!['requests', 'contracts', 'invoices', 'notifications'].includes(this.state.currentView))) {
+    if (isUnit && (!['requests', 'contracts', 'invoices', 'notifications', 'supplier-analysis', 'vendor-profile'].includes(this.state.currentView))) {
       this.switchView('requests');
     }
 
@@ -1925,7 +1937,10 @@ const App = {
       invoices: { title: 'Fatura & Muhasebe', sub: 'Vadesi gelen faturalar ve haftalık nakit akış ödeme listesi' },
       tenders: { title: 'İhale Planlayıcısı & Süreç Yönetimi', sub: 'İhale tarihleri, aşamaları, birim talepleri ve kazanan yüklenici takibi' },
       'unit-analysis': { title: 'Birim Analizi', sub: 'Üniversite birimlerinin talep ve harcama detayları' },
-      'supplier-analysis': { title: 'Tedarikçi Analizi', sub: 'En yüksek harcama yapılan tedarikçilerin sıralaması' },
+      'supplier-analysis': { 
+        title: this.state.currentUser?.role === 'UNIT' ? '🏢 Çalışılan Firmalar' : 'Tedarikçi Analizi', 
+        sub: this.state.currentUser?.role === 'UNIT' ? `\"${this.state.currentUser?.unit || 'Biriminiz'}\" biriminin mal/hizmet aldığı tedarikçi firmalar, sipariş sayıları ve performans puanları` : 'En yüksek harcama yapılan tedarikçilerin sıralaması' 
+      },
       'yearly-report': { title: 'Yıllık Rapor', sub: 'Yıllık satınalma faaliyet raporu, YoY metrikleri ve SLA hız analizleri' },
       'personnel-savings-detail': { title: 'Personel Pazarlık Tasarrufu & KPI Raporu', sub: 'Satınalma uzmanının yıllık pazarlık tasarrufları, ay ve birim kırılımlı grafik ve veri analizleri' },
       'activity-logs': { title: 'Aktivite Logları', sub: 'Sistemdeki ekleme, silme, onay ve devir işlemlerinin audit geçmişi' },
@@ -3486,23 +3501,36 @@ const App = {
           v.requestId && (String(v.requestId) === String(r.id) || (r.requestBarcode && String(v.requestId) === String(r.requestBarcode)))
         );
 
+        const isUnitUser = this.state.currentUser && this.state.currentUser.role === 'UNIT';
+
         if (rating) {
           ratingBadge = `
             <div style="margin-top:0.25rem;">
-              <span class="score-badge-gold" style="font-size:0.68rem; padding:0.1rem 0.4rem; cursor:pointer;" onclick="App.openVendorProfile('${r.supplier.replace(/'/g, "\\'")}')" title="${rating.ratedBy} tarafından bu talep için puanlandı (${rating.ratedAt})">
+              <span class="score-badge-gold" style="font-size:0.68rem; padding:0.1rem 0.4rem; cursor:pointer;" onclick="event.stopPropagation(); App.openVendorProfile('${r.supplier.replace(/'/g, "\\'")}')" title="${rating.ratedBy} tarafından bu talep için puanlandı (${rating.ratedAt})">
                 ⭐ ${rating.overallScore} (Puanlandı)
               </span>
             </div>
           `;
         } else {
-          ratingBadge = `
-            <div style="margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem;">
-              <span class="badge" style="background:rgba(245,158,11,0.12); color:#d97706; border:1px solid rgba(245,158,11,0.35); font-size:0.68rem; padding:0.1rem 0.35rem;" title="Bu sipariş için birimden henüz puanlama yapılmadı">
-                ⏳ Puan Bekliyor
-              </span>
-              <button class="btn-icon" style="font-size:0.75rem; padding:0.1rem 0.3rem; border:1px solid rgba(245,158,11,0.4); background:rgba(245,158,11,0.08);" onclick="App.sendRatingReminder('${r.id}')" title="Birime Hatırlatma E-Postası Gönder">🔔</button>
-            </div>
-          `;
+          if (isUnitUser) {
+            ratingBadge = `
+              <div style="margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem;">
+                <button class="btn btn-xs" style="background:#f59e0b; color:#fff; font-size:0.68rem; padding:0.15rem 0.45rem; border:none; border-radius:4px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:0.2rem; box-shadow:0 1px 3px rgba(245,158,11,0.3);" onclick="event.stopPropagation(); App.openRateVendorFromRequest('${r.id}')" title="Bu siparişi ve tedarikçiyi değerlendirin">
+                  ⭐ Puanla
+                </button>
+              </div>
+            `;
+          } else {
+            ratingBadge = `
+              <div style="margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem;">
+                <span class="badge" style="background:rgba(245,158,11,0.12); color:#d97706; border:1px solid rgba(245,158,11,0.35); font-size:0.68rem; padding:0.1rem 0.35rem;" title="Bu sipariş için birimden henüz puanlama yapılmadı">
+                  ⏳ Puan Bekliyor
+                </span>
+                <button class="btn-icon" style="font-size:0.75rem; padding:0.1rem 0.3rem; border:1px solid rgba(245,158,11,0.4); background:rgba(245,158,11,0.08);" onclick="event.stopPropagation(); App.sendRatingReminder('${r.id}')" title="Birime Hatırlatma E-Postası Gönder">🔔</button>
+                <button class="btn-icon" style="font-size:0.72rem; padding:0.1rem 0.3rem; border:1px solid rgba(245,158,11,0.4); background:rgba(245,158,11,0.08);" onclick="event.stopPropagation(); App.openRateVendorFromRequest('${r.id}')" title="Satınalma Adına Puanla">⭐</button>
+              </div>
+            `;
+          }
         }
       }
       return `<div><span class="badge status-completed">✅ Tamamlandı</span>${ratingBadge}</div>`;
@@ -3525,6 +3553,22 @@ const App = {
         return `<span class="badge status-open">🔵 Açık / İşlemde</span>`;
       }
     }
+  },
+
+  openRateVendorFromRequest(reqId) {
+    const req = (this.state.requests || []).find(r => String(r.id) === String(reqId) || (r.requestBarcode && String(r.requestBarcode) === String(reqId)));
+    if (!req) {
+      this.showToast('Talep kaydı bulunamadı.', 'error');
+      return;
+    }
+    const supplierName = (req.supplier || '').trim();
+    if (!supplierName) {
+      this.showToast('Bu talebe ait tedarikçi firma tanımlı değil.', 'warning');
+      return;
+    }
+
+    const pType = (req.purchaseType || 'MAL').toUpperCase();
+    this.openVendorRateModal(supplierName, req.id, pType, req);
   },
 
   async sendRatingReminder(reqId) {
@@ -4740,6 +4784,79 @@ const App = {
               </div>
             </div>
           `;
+        })()}
+
+        ${(() => {
+          if (req.status !== 'Tamamlandı' || !req.supplier) return '';
+          
+          const rating = (this.state.vendorRatings || []).find(v => 
+            v.requestId && (String(v.requestId) === String(req.id) || (req.requestBarcode && String(v.requestId) === String(req.requestBarcode)))
+          );
+          const isUnitUser = this.state.currentUser && this.state.currentUser.role === 'UNIT';
+
+          if (rating) {
+            return `
+              <div style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-md); padding: 1rem; margin-top: 1.25rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                  <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <span style="font-size: 1.2rem;">⭐</span>
+                    <strong style="font-size: 0.95rem; color: #d97706;">Tedarikçi Değerlendirmesi: ${rating.overallScore} / 5.0</strong>
+                    <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #d97706; font-size: 0.7rem; font-weight:700;">Tamamlandı</span>
+                  </div>
+                  <button type="button" class="btn-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.55rem; color: #d97706; border-color: #d97706; font-weight: 700;" onclick="App.openVendorProfile('${(req.supplier || '').replace(/'/g, "\\'")}')">
+                    🏢 360° Firma Profilini Aç
+                  </button>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; text-align: center; margin-bottom: 0.65rem; font-size: 0.78rem;">
+                  <div style="background: var(--bg-card); padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--text-muted);">Kalite</div>
+                    <div style="font-weight: 700; color: #f59e0b;">${rating.qualityScore || 5} ★</div>
+                  </div>
+                  <div style="background: var(--bg-card); padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--text-muted);">Hız</div>
+                    <div style="font-weight: 700; color: #f59e0b;">${rating.speedScore || 5} ★</div>
+                  </div>
+                  <div style="background: var(--bg-card); padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--text-muted);">${(rating.purchaseType || 'MAL') === 'MAL' ? 'Montaj' : 'Yetkinlik'}</div>
+                    <div style="font-weight: 700; color: #f59e0b;">${rating.communicationScore || 5} ★</div>
+                  </div>
+                  <div style="background: var(--bg-card); padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--text-muted);">Evrak/Uyum</div>
+                    <div style="font-weight: 700; color: #f59e0b;">${rating.complianceScore || 5} ★</div>
+                  </div>
+                </div>
+                ${rating.reviewNotes ? `<div style="font-size: 0.82rem; color: var(--text-main); background: var(--bg-card); padding: 0.5rem 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); margin-bottom: 0.4rem;"><strong>Değerlendirme Notu:</strong> "${rating.reviewNotes}"</div>` : ''}
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-align: right;">Değerlendiren: ${rating.ratedBy} ${rating.ratedAt ? '• ' + rating.ratedAt : ''}</div>
+              </div>
+            `;
+          } else {
+            return `
+              <div style="background: rgba(245, 158, 11, 0.06); border: 1px dashed rgba(245, 158, 11, 0.45); border-radius: var(--radius-md); padding: 1rem; margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                <div>
+                  <div style="font-weight: 700; font-size: 0.92rem; color: #d97706; display: flex; align-items: center; gap: 0.35rem;">
+                    <span>⏳</span> Tedarikçi Performans Değerlendirmesi Bekleniyor
+                  </div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">
+                    ${isUnitUser ? 'Bu sipariş tamamlanmıştır. Tedarikçinin hizmet ve teslimat kalitesini puanlayarak kurumsal kaliteye katkıda bulunun.' : 'Bu sipariş için birimden henüz puanlama girişi yapılmamıştır.'}
+                  </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  ${isUnitUser ? `
+                    <button type="button" class="btn-primary" style="background: #f59e0b; border-color: #f59e0b; font-size: 0.82rem; padding: 0.45rem 0.95rem; font-weight: 700;" onclick="App.openRateVendorFromRequest('${req.id}')">
+                      ⭐ Bu Siparişi Puanla
+                    </button>
+                  ` : `
+                    <button type="button" class="btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.75rem; border-color: #d97706; color: #d97706;" onclick="App.sendRatingReminder('${req.id}')">
+                      🔔 Birime Hatırlatma Gönder
+                    </button>
+                    <button type="button" class="btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.75rem; border-color: #f59e0b; color: #f59e0b;" onclick="App.openRateVendorFromRequest('${req.id}')">
+                      ⭐ Satınalma Olarak Puanla
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+          }
         })()}
 
         <!-- Action Quick Buttons (Revize İste & Muayene Kabul) -->
@@ -7006,9 +7123,11 @@ const App = {
                   <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--accent-primary); color:var(--accent-primary); font-weight:700;" onclick="App.openVendorProfile('${safeName}')" title="360° Firma Profili & Radar Karnesi">
                     <span>🔍</span> Profil
                   </button>
-                  <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--status-completed); color:var(--status-completed); font-weight:700;" onclick="App.openEditSupplierByName('${safeName}')" title="Cari Kartı Düzenle / Tanımla">
-                    <span>✏️</span> Düzenle
-                  </button>
+                  ${this.state.currentUser?.role !== 'UNIT' ? `
+                    <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--status-completed); color:var(--status-completed); font-weight:700;" onclick="App.openEditSupplierByName('${safeName}')" title="Cari Kartı Düzenle / Tanımla">
+                      <span>✏️</span> Düzenle
+                    </button>
+                  ` : ''}
                   <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:#f59e0b; color:#d97706; font-weight:700;" onclick="App.openVendorRateModal('${safeName}')" title="Puan Ver">
                     <span>⭐</span> Puanla
                   </button>
@@ -9278,11 +9397,13 @@ const App = {
     const vendorName = this.state.currentVendorProfile;
     if (!vendorName) return;
 
+    const isUnit = this.state.currentUser?.role === 'UNIT';
+    const baseRequests = isUnit ? this.getFilteredRequests() : (this.state.requests || []);
     const safeClean = vendorName.trim().toLocaleLowerCase('tr-TR');
     const safeCleanStd = vendorName.trim().toLowerCase();
-    const vendorRequests = (this.state.requests || []).filter(r => r.supplier && (r.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || r.supplier.trim().toLowerCase() === safeCleanStd));
-    const vendorContracts = (this.state.contracts || []).filter(c => c.supplier && (c.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || c.supplier.trim().toLowerCase() === safeCleanStd));
-    const vendorGuarantees = (this.state.guarantees || []).filter(g => g.supplier && (g.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || g.supplier.trim().toLowerCase() === safeCleanStd));
+    const vendorRequests = baseRequests.filter(r => r.supplier && (r.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || r.supplier.trim().toLowerCase() === safeCleanStd));
+    const vendorContracts = (this.state.contracts || []).filter(c => (!isUnit || c.unit === this.state.currentUser?.unit) && c.supplier && (c.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || c.supplier.trim().toLowerCase() === safeCleanStd));
+    const vendorGuarantees = (this.state.guarantees || []).filter(g => (!isUnit || g.unit === this.state.currentUser?.unit) && g.supplier && (g.supplier.trim().toLocaleLowerCase('tr-TR') === safeClean || g.supplier.trim().toLowerCase() === safeCleanStd));
 
     const totalSpend = vendorRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
     const totalRequestsCount = vendorRequests.length;
@@ -9308,7 +9429,7 @@ const App = {
     const avgDays = daysCount > 0 ? Math.round(totalWaitDays / daysCount) : 0;
 
     // Total Spend across all suppliers for budget share
-    const allSpend = (this.state.requests || []).reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
+    const allSpend = baseRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
     const budgetSharePct = allSpend > 0 ? ((totalSpend / allSpend) * 100).toFixed(1) : 0;
 
     // Score & Tier
@@ -9500,16 +9621,33 @@ const App = {
     window.print();
   },
 
-  openVendorRateModal(supplierName) {
+  openVendorRateModal(supplierName, requestId = null, purchaseType = 'MAL', reqObj = null) {
     if (!supplierName) return;
-    document.getElementById('vr-supplier-name').value = supplierName;
-    document.getElementById('vr-supplier-title').innerText = `🏢 ${supplierName}`;
+    const cleanSupplier = supplierName.trim();
+    document.getElementById('vr-supplier-name').value = cleanSupplier;
+    document.getElementById('vr-request-id').value = requestId || '';
+    document.getElementById('vr-supplier-title').innerText = `🏢 ${cleanSupplier}`;
     document.getElementById('vr-review-notes').value = '';
 
-    // Default to MAL
-    this.setRatingPurchaseType('MAL');
+    // Request banner
+    const bannerEl = document.getElementById('vr-request-banner');
+    if (bannerEl) {
+      if (reqObj || requestId) {
+        const rBarcode = reqObj?.requestBarcode || requestId;
+        const rSubj = reqObj?.subject || '';
+        const rUnit = reqObj?.unit || '';
+        bannerEl.innerHTML = `📋 <strong>Talep #${rBarcode}:</strong> ${rSubj} ${rUnit ? `<span class="badge" style="margin-left:0.4rem; background:rgba(59,130,246,0.15); color:var(--accent-primary); font-size:0.75rem;">🏢 ${rUnit}</span>` : ''}`;
+        bannerEl.style.display = 'block';
+      } else {
+        bannerEl.style.display = 'none';
+      }
+    }
 
-    const scoreData = this.getVendorScore(supplierName);
+    // Purchase type
+    const finalType = (purchaseType || (reqObj?.purchaseType) || 'MAL').toUpperCase();
+    this.setRatingPurchaseType(finalType === 'HIZMET' ? 'HIZMET' : 'MAL');
+
+    const scoreData = this.getVendorScore(cleanSupplier);
     const statsEl = document.getElementById('vr-supplier-stats');
     const overallEl = document.getElementById('vr-overall-display');
     const historySection = document.getElementById('vr-history-section');
@@ -9743,6 +9881,7 @@ const App = {
     const supplierName = document.getElementById('vr-supplier-name')?.value;
     if (!supplierName) return;
 
+    const requestId = document.getElementById('vr-request-id')?.value || null;
     const purchaseType = document.getElementById('vr-purchase-type')?.value || 'MAL';
     const qualityScore = parseInt(document.querySelector('[data-criterion="quality"]')?.getAttribute('data-score') || '5', 10);
     const speedScore = parseInt(document.querySelector('[data-criterion="speed"]')?.getAttribute('data-score') || '5', 10);
@@ -9751,16 +9890,25 @@ const App = {
     const overallScore = parseFloat(((qualityScore + speedScore + assemblyScore + complianceScore) / 4).toFixed(1));
     const reviewNotes = document.getElementById('vr-review-notes')?.value.trim() || '';
 
+    const isUnitUser = this.state.currentUser && this.state.currentUser.role === 'UNIT';
+    let raterName = 'Satınalma Yetkilisi';
+    if (this.state.currentUser) {
+      raterName = isUnitUser 
+        ? `${this.state.currentUser.name} [Birim Değerlendirmesi] (${this.state.currentUser.unit || 'Birim'})`
+        : `${this.state.currentUser.name} (${this.state.currentUser.title || 'Satınalma'})`;
+    }
+
     const newRating = {
       supplierName,
       purchaseType,
+      requestId: requestId ? parseInt(requestId, 10) : null,
       qualityScore,
       speedScore,
       complianceScore,
       communicationScore: assemblyScore,
       overallScore,
       reviewNotes,
-      ratedBy: this.state.currentUser ? this.state.currentUser.name : 'Satınalma Yetkilisi',
+      ratedBy: raterName,
       ratedAt: new Date().toLocaleDateString('tr-TR') + ' ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
     };
 
@@ -9773,13 +9921,24 @@ const App = {
       if (res.ok) {
         const saved = await res.json();
         if (!this.state.vendorRatings) this.state.vendorRatings = [];
-        this.state.vendorRatings.push(saved);
-        this.showToast(`"${supplierName}" firması için [${purchaseType === 'MAL' ? 'Mal' : 'Hizmet'}] puanlaması (${overallScore} ⭐) kaydedildi!`, 'success', '⭐');
-        this.logAction('Tedarikçi Puanlandı', `Firma: ${supplierName} (${purchaseType}): ${overallScore} ⭐`);
+        this.state.vendorRatings.push(this.normalizeRating(saved));
+        this.showToast(`"${supplierName}" firması için [${purchaseType === 'MAL' ? 'Mal' : 'Hizmet'}] değerlendirmeniz (${overallScore} ⭐) başarıyla kaydedildi!`, 'success', '⭐');
+        this.logAction('Tedarikçi Puanlandı', `Firma: ${supplierName} (${purchaseType}): ${overallScore} ⭐ ${requestId ? '[Talep #' + requestId + ']' : ''}`);
         this.closeModal('modal-vendor-rate');
-        this.renderSupplierAnalysis();
+        
+        // Refresh views
+        if (this.state.currentView === 'requests') this.renderRequests();
+        if (this.state.currentView === 'my-requests') this.renderMyRequests();
+        if (this.state.currentView === 'supplier-analysis') this.renderSupplierAnalysis();
+        if (this.state.currentView === 'vendor-profile') this.renderVendorProfile();
+        
+        // If view details modal was open, refresh it
+        if (this.state.currentActiveDetail && this.state.currentActiveDetail.type === 'request') {
+          this.openViewDetailsModal(this.state.currentActiveDetail.data.id);
+        }
       } else {
-        this.showToast("Puanlama kaydedilemedi.", "error");
+        const errData = await res.json().catch(() => ({}));
+        this.showToast(errData.error || "Puanlama kaydedilemedi.", "error");
       }
     } catch (err) {
       console.error(err);
