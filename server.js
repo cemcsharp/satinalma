@@ -581,9 +581,23 @@ async function getSmtpConfig() {
   return null;
 }
 
-function createSmtpTransporter(config) {
+async function createSmtpTransporter(config) {
+  let targetHost = config.host;
+  try {
+    // If it's a domain name (not an IP address), strictly resolve IPv4 'A' record to bypass IPv6 ENETUNREACH
+    if (config.host && !/^\d+\.\d+\.\d+\.\d+$/.test(config.host)) {
+      const ips = await dns.promises.resolve4(config.host);
+      if (ips && ips.length > 0) {
+        targetHost = ips[0];
+        console.log(`🌐 SMTP Host "${config.host}" IPv4 olarak çözümlendi: ${targetHost}`);
+      }
+    }
+  } catch (dnsErr) {
+    console.warn(`DNS IPv4 resolve4 warning for ${config.host}:`, dnsErr.message);
+  }
+
   return nodemailer.createTransport({
-    host: config.host,
+    host: targetHost,
     port: parseInt(config.port, 10) || 587,
     secure: config.secure === true || config.port == 465,
     auth: {
@@ -591,18 +605,12 @@ function createSmtpTransporter(config) {
       pass: config.pass
     },
     tls: {
-      rejectUnauthorized: false
+      rejectUnauthorized: false,
+      servername: config.host // Crucial for TLS SNI hostname validation against the real domain!
     },
     connectionTimeout: 15000,
     greetingTimeout: 15000,
-    socketTimeout: 20000,
-    // Strictly resolve and connect over IPv4 only
-    family: 4,
-    lookup: (hostname, options, callback) => {
-      dns.lookup(hostname, { family: 4 }, (err, address, family) => {
-        callback(err, address, family);
-      });
-    }
+    socketTimeout: 20000
   });
 }
 
@@ -810,7 +818,7 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
       </div>
     `;
 
-    const transporter = createSmtpTransporter(cfg);
+    const transporter = await createSmtpTransporter(cfg);
     const recipientList = Array.from(recipients);
 
     await transporter.sendMail({
@@ -951,7 +959,7 @@ async function notifyStaffOnAssignment(demand, eventType, oldAssignedTo = null) 
       </div>
     `;
 
-    const transporter = createSmtpTransporter(cfg);
+    const transporter = await createSmtpTransporter(cfg);
     await transporter.sendMail({
       from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
       to: staff.email,
@@ -1048,7 +1056,7 @@ async function sendRatingReminderEmail(demand) {
     </div>
   `;
 
-  const transporter = createSmtpTransporter(cfg);
+  const transporter = await createSmtpTransporter(cfg);
   await transporter.sendMail({
     from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
     to: unitEmail,
@@ -1748,7 +1756,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        const transporter = createSmtpTransporter(cfg);
+        const transporter = await createSmtpTransporter(cfg);
         const target = payload.testEmail || cfg.user;
         const info = await transporter.sendMail({
           from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
@@ -1804,7 +1812,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        const transporter = createSmtpTransporter(cfg);
+        const transporter = await createSmtpTransporter(cfg);
         await transporter.sendMail({
           from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
           to,
