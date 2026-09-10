@@ -4222,6 +4222,8 @@ const App = {
 
     const btnAddContract = document.getElementById('btn-open-add-contract');
     if (btnAddContract) btnAddContract.style.display = isReadOnly ? 'none' : '';
+    const btnCheckExp = document.getElementById('btn-check-contract-expirations');
+    if (btnCheckExp) btnCheckExp.style.display = isReadOnly ? 'none' : '';
 
     let contracts = this.state.contracts || [];
 
@@ -4506,6 +4508,8 @@ const App = {
   },
 
   async checkContractExpirations() {
+    const isReadOnly = this.state.currentUser?.role === 'EXECUTIVE' || this.state.currentUser?.role === 'UNIT';
+    if (isReadOnly) return;
     this.showToast("Sözleşme vadeleri taranıyor ve bildirimler kontrol ediliyor...", "info", "⏳");
     try {
       const res = await this.authFetch('/api/contracts/check-expirations', { method: 'POST' });
