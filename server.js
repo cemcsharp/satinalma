@@ -596,18 +596,23 @@ async function createSmtpTransporter(config) {
     console.warn(`DNS IPv4 resolve4 warning for ${config.host}:`, dnsErr.message);
   }
 
+  const port = parseInt(config.port, 10) || 587;
+  // Port 465 is direct SSL/TLS. Port 587 and 25 use STARTTLS (secure: false is required to avoid wrong version number)
+  const isSecure = (port === 465);
+
   return nodemailer.createTransport({
     host: targetHost,
-    port: parseInt(config.port, 10) || 587,
-    secure: config.secure === true || config.port == 465,
+    port: port,
+    secure: isSecure,
     auth: {
       user: config.user,
       pass: config.pass
     },
     tls: {
       rejectUnauthorized: false,
-      servername: config.host // Crucial for TLS SNI hostname validation against the real domain!
+      servername: config.host
     },
+    requireTLS: (port === 587),
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 20000
