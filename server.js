@@ -2916,6 +2916,7 @@ async function initDatabaseSchema() {
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS "paymentDate" VARCHAR(100);
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS notes TEXT;
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS "academicYear" VARCHAR(50);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS unit VARCHAR(255);
 
       ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS "bankName" VARCHAR(255);
       ALTER TABLE guarantees ADD COLUMN IF NOT EXISTS type VARCHAR(100);

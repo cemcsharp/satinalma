@@ -387,13 +387,13 @@ const App = {
 
   populateDropdowns() {
     // Populate unit dropdowns
-    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'er-unit', 'cm-unit', 'gm-unit', 'tm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit', 'filter-tender-unit'];
+    const unitSelects = ['filter-unit', 'select-unit-analysis', 'nr-unit', 'er-unit', 'cm-unit', 'gm-unit', 'tm-unit', 'filter-contract-unit', 'filter-my-unit', 'filter-supplier-unit', 'filter-delegation-unit', 'filter-tender-unit', 'filter-invoice-unit', 'im-unit'];
     unitSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       const prevVal = el.value;
       const isFilter = id.startsWith('filter') || id.startsWith('select');
-      el.innerHTML = isFilter ? '<option value="ALL">Tüm Birimler</option>' : '<option value="">Birim Seçin</option>';
+      el.innerHTML = isFilter ? '<option value="ALL">🏢 Tüm Birimler</option>' : '<option value="">🏢 Birim Seçiniz / Otomatik</option>';
       this.state.units.forEach(u => {
         const uName = typeof u === 'object' ? u.name : u;
         el.innerHTML += `<option value="${uName}">${uName}</option>`;
@@ -630,6 +630,11 @@ const App = {
     }
 
     // Topbar live rates button (only opens settings if ADMIN)
+    const invoiceUnitFilter = document.getElementById('filter-invoice-unit');
+    if (invoiceUnitFilter) {
+      invoiceUnitFilter.style.display = isUnit ? 'none' : '';
+    }
+
     const ratesPill = document.getElementById('topbar-rates-pill');
     if (ratesPill) {
       ratesPill.style.cursor = isAdmin ? 'pointer' : 'default';
@@ -1032,7 +1037,7 @@ const App = {
     });
 
     // Filters for Invoices & Date Period Tabs
-    ['filter-invoice-search', 'filter-invoice-status', 'filter-invoice-due-period'].forEach(id => {
+    ['filter-invoice-search', 'filter-invoice-status', 'filter-invoice-due-period', 'filter-invoice-unit'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener('input', () => this.renderInvoices());
@@ -1853,9 +1858,19 @@ const App = {
       invoices = invoices.filter(i => i.academicYear === this.state.selectedYear || !i.academicYear);
     }
 
-    // Birim Kullanıcısı (UNIT) için sadece kendi birimine ait taleplerle ilişkili faturaları filtrele
+    // Determine target unit filter (either from UNIT user's assigned unit or from filter dropdown)
+    let targetUnit = null;
     if (this.state.currentUser?.role === 'UNIT' && this.state.currentUser?.unit) {
-      const userUnit = (this.state.currentUser.unit || '').trim().toLowerCase();
+      targetUnit = this.state.currentUser.unit;
+    } else {
+      const unitVal = document.getElementById('filter-invoice-unit')?.value;
+      if (unitVal && unitVal !== 'ALL') {
+        targetUnit = unitVal;
+      }
+    }
+
+    if (targetUnit) {
+      const userUnit = targetUnit.trim().toLowerCase();
       const unitRequests = (this.state.requests || []).filter(r => (r.unit || '').trim().toLowerCase() === userUnit);
       const unitBarcodes = new Set();
       unitRequests.forEach(r => {
@@ -5973,6 +5988,29 @@ const App = {
     this.setInvoiceDeliveryTab('DELIVERED');
   },
 
+  onInvoiceBarcodeChange(barcode) {
+    if (!barcode || !barcode.trim()) return;
+    const cleanBc = barcode.trim().toLowerCase();
+    const matchedReq = (this.state.requests || []).find(r => {
+      const bc = String(r.barcode || '').toLowerCase().trim();
+      const rbc = String(r.requestBarcode || '').toLowerCase().trim();
+      const obc = String(r.orderBarcode || '').toLowerCase().trim();
+      const rid = String(r.id);
+      return bc === cleanBc || rbc === cleanBc || obc === cleanBc || rid === cleanBc;
+    });
+
+    if (matchedReq && matchedReq.unit) {
+      const unitSelect = document.getElementById('im-unit');
+      if (unitSelect) {
+        unitSelect.value = matchedReq.unit;
+      }
+      const supInput = document.getElementById('im-supplier');
+      if (supInput && !supInput.value && matchedReq.supplier) {
+        supInput.value = matchedReq.supplier.split(',')[0].trim();
+      }
+    }
+  },
+
   openInvoiceModal(invoiceId = null) {
     if (invoiceId) {
       const inv = this.state.invoices.find(item => String(item.id) === String(invoiceId));
@@ -5993,6 +6031,7 @@ const App = {
       document.getElementById('im-status').value = inv.paymentStatus || 'Ödeme Bekliyor';
       document.getElementById('im-delivery-date').value = inv.accountingDeliveryDate || '';
       document.getElementById('im-related-barcode').value = inv.relatedBarcode || '';
+      document.getElementById('im-unit').value = inv.unit || '';
       document.getElementById('im-payment-date').value = inv.paymentDate || '';
       document.getElementById('im-notes').value = inv.notes || '';
       document.getElementById('invoice-modal-title').innerText = `✏️ Fatura #${inv.invoiceNo} Düzenle`;
@@ -6017,6 +6056,7 @@ const App = {
     const paymentStatus = document.getElementById('im-status').value;
     const accountingDeliveryDate = document.getElementById('im-delivery-date').value;
     const relatedBarcode = document.getElementById('im-related-barcode').value.trim();
+    const unit = document.getElementById('im-unit')?.value.trim() || '';
     const paymentDate = document.getElementById('im-payment-date').value;
     const notes = document.getElementById('im-notes').value.trim();
 
@@ -6032,6 +6072,7 @@ const App = {
         inv.paymentStatus = paymentStatus;
         inv.accountingDeliveryDate = accountingDeliveryDate;
         inv.relatedBarcode = relatedBarcode;
+        inv.unit = unit;
         inv.paymentDate = paymentDate;
         inv.notes = notes;
         await this.apiSync('invoices', 'PUT', inv);
@@ -6047,6 +6088,7 @@ const App = {
         paymentStatus,
         accountingDeliveryDate,
         relatedBarcode,
+        unit,
         paymentDate,
         notes,
         academicYear: this.getAcademicYearFromDate(invoiceDate || dueDate)
@@ -11034,7 +11076,15 @@ const App = {
       grandTotal, 'TRY', '', '', '', ''
     ]);
 
-    const unitSuffix = this.state.currentUser?.role === 'UNIT' && this.state.currentUser?.unit ? `_${this.state.currentUser.unit.replace(/\s+/g, '_')}` : '';
+    let unitSuffix = '';
+    if (this.state.currentUser?.role === 'UNIT' && this.state.currentUser?.unit) {
+      unitSuffix = `_${this.state.currentUser.unit.replace(/\s+/g, '_')}`;
+    } else {
+      const uVal = document.getElementById('filter-invoice-unit')?.value;
+      if (uVal && uVal !== 'ALL') {
+        unitSuffix = `_${uVal.replace(/\s+/g, '_')}`;
+      }
+    }
 
     this.exportToExcelXLSX({
       filename: `Fatura_Listesi_${this.state.selectedYear}${unitSuffix}`,

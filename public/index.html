@@ -1178,6 +1178,10 @@
               <input type="text" id="filter-invoice-search" placeholder="Fatura no, firma, açıklama, barkod...">
             </div>
 
+            <select class="filter-select" id="filter-invoice-unit" title="Birim Filtresi" style="border-color: var(--accent-primary); font-weight: 600;">
+              <option value="ALL">🏢 Tüm Birimler</option>
+            </select>
+
             <select class="filter-select" id="filter-invoice-due-period" title="Ödeme Vadesi Filtresi" style="border-color: var(--accent-primary); font-weight: 600;">
               <option value="ALL">🗓️ Tüm Ödeme Vadeleri</option>
               <option value="THIS_WEEK">⚡ Bu Hafta Vadesi Gelenler</option>
@@ -3395,7 +3399,14 @@
 
           <div class="form-group">
             <label>Bağlı Talep / Sözleşme No</label>
-            <input type="text" id="im-related-barcode" placeholder="ör: 249001 veya SOZ-2025-001">
+            <input type="text" id="im-related-barcode" placeholder="ör: 249001 veya SOZ-2025-001" oninput="App.onInvoiceBarcodeChange(this.value)">
+          </div>
+
+          <div class="form-group">
+            <label>İlgili Birim / Fakülte</label>
+            <select id="im-unit">
+              <option value="">🏢 Birim Seçiniz / Otomatik</option>
+            </select>
           </div>
 
           <div class="form-group">
