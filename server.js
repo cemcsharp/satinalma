@@ -95,7 +95,7 @@ pool.on('error', (err) => {
 
 // Bilinen ve İzin Verilen Veritabanı Tablo Sütunları (Güvenli Filtreleme)
 const TABLE_COLUMNS = {
-  users: ['name', 'title', 'role', 'unit', 'isActive', 'password', 'phone', 'email', 'username'],
+  users: ['name', 'title', 'role', 'unit', 'isActive', 'password', 'phone', 'mobile', 'email', 'username', 'emailNotify'],
   requests: [
     'sequenceNo', 'requestBarcode', 'subject', 'unit', 'arrivalDate', 'requestDate',
     'assignedTo', 'priority', 'status', 'estimatedAmount', 'budgetAmount', 'actualAmount',
@@ -2677,9 +2677,11 @@ async function initDatabaseSchema() {
       );
 
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS unit VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "emailNotify" BOOLEAN DEFAULT true;
 
       ALTER TABLE units ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 

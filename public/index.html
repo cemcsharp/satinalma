@@ -2866,76 +2866,109 @@
 
   <!-- Modal 1: User Add / Edit Modal -->
   <div class="modal-overlay" id="modal-user-form">
-    <div class="modal-content" style="max-width: 480px;">
+    <div class="modal-content" style="max-width: 660px; max-height: 90vh; overflow-y: auto;">
       <div class="modal-header">
         <h3 id="user-modal-title">👤 Personel Düzenle</h3>
         <button class="btn-close-modal close-modal">&times;</button>
       </div>
 
-      <form id="form-user-manage">
+      <form id="form-user-manage" novalidate>
         <input type="hidden" id="um-id">
 
-        <div class="form-group" style="margin-bottom: 1rem;">
-          <label>Ad Soyad <span class="required">*</span></label>
-          <input type="text" id="um-name" required placeholder="ör: Ahmet YILMAZ">
+        <!-- Role Guidance Alert -->
+        <div id="um-role-info-banner" style="background: rgba(99,102,241,0.08); border-left: 4px solid var(--accent-primary); padding: 0.75rem 1rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; font-size: 0.8rem; color: var(--text-main); line-height: 1.45;">
+          <strong>🛡️ Yetki Kılavuzu:</strong> <span id="um-role-info-text">Seçilen role göre personelin görebileceği ve işlem yapabileceği modüller otomatik belirlenir.</span>
         </div>
 
-        <div class="form-group" style="margin-bottom: 1rem;">
-          <label>Unvan <span class="required">*</span></label>
-          <input type="text" id="um-title" required placeholder="ör: Satınalma Uzmanı">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group">
+            <label>Adı Soyadı <span class="required" style="color:#ef4444;">*</span></label>
+            <input type="text" id="um-name" required placeholder="ör: Ahmet YILMAZ" style="width: 100%;">
+            <small class="form-error" id="um-name-error" style="display:none; color:#ef4444; font-size:0.75rem; margin-top:0.2rem;">Ad Soyad alanı zorunludur.</small>
+          </div>
+
+          <div class="form-group">
+            <label>Kurumsal E-Posta <span class="required" style="color:#ef4444;">*</span></label>
+            <input type="email" id="um-email" required placeholder="ör: ayilmaz@pirireis.edu.tr" style="width: 100%;">
+            <small class="form-error" id="um-email-error" style="display:none; color:#ef4444; font-size:0.75rem; margin-top:0.2rem;">Geçerli ve benzersiz bir e-posta giriniz.</small>
+          </div>
         </div>
 
-        <div class="form-group" style="margin-bottom: 1rem;">
-          <label>Sistem Rolü & Yetki Düzeyi <span class="required">*</span></label>
-          <select id="um-role">
-            <option value="STAFF">👤 Satınalma Uzmanı (Standart Operasyon Yetkisi)</option>
-            <option value="ADMIN">🛡️ Satınalma Yöneticisi (Tam Yetki, Silme & Ayarlar)</option>
-            <option value="EXECUTIVE">🏛️ Yönetim (İzleme & Raporlama Modu)</option>
-            <option value="UNIT">🏢 Birim Kullanıcısı (Yalnızca Kendi Biriminin Talepleri & Sözleşmeleri)</option>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group">
+            <label>Unvan / Pozisyon <span class="required" style="color:#ef4444;">*</span></label>
+            <input type="text" id="um-title" required placeholder="ör: Satınalma Uzmanı, Daire Başkanı..." style="width: 100%;">
+            <small class="form-error" id="um-title-error" style="display:none; color:#ef4444; font-size:0.75rem; margin-top:0.2rem;">Unvan alanı zorunludur.</small>
+          </div>
+
+          <div class="form-group">
+            <label>Sistem Rolü & Yetki <span class="required" style="color:#ef4444;">*</span></label>
+            <select id="um-role" style="width: 100%; font-weight: 600;">
+              <option value="STAFF">👤 Satınalma Uzmanı (STAFF)</option>
+              <option value="ADMIN">🛡️ Satınalma Yöneticisi (ADMIN)</option>
+              <option value="EXECUTIVE">🏛️ Üst Yönetim (EXECUTIVE)</option>
+              <option value="UNIT">🏢 Birim Kullanıcısı (UNIT)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" id="um-unit-group" style="margin-bottom: 1rem; display: none; background: rgba(59,130,246,0.06); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px dashed rgba(59,130,246,0.35);">
+          <label style="color: #2563eb; font-weight: 700;">Bağlı Olduğu Birim / Fakülte <span class="required" style="color:#ef4444;">*</span></label>
+          <select id="um-unit" style="width: 100%; border-color: #3b82f6; font-weight: 600; margin-top: 0.35rem;">
+            <option value="">-- Birim Seçiniz --</option>
           </select>
-          <small style="display:block; margin-top:0.35rem; font-size:0.75rem; color:var(--text-muted); line-height: 1.4;">
-            • <strong>Satınalma Uzmanı:</strong> Talep, sipariş, fatura, sözleşme ve teminat işlemlerini yürütür.<br>
-            • <strong>Satınalma Yöneticisi:</strong> Personel yönetimi, silme, ayarlar ve tüm operasyona tam yetkilidir.<br>
-            • <strong>Yönetim:</strong> Tüm üniversite verilerini ve analizleri inceler, Excel/PDF indirebilir; veri değiştiremez/silemez.<br>
-            • <strong>Birim Kullanıcısı:</strong> Yalnızca bağlı olduğu birimin taleplerini, sözleşmelerini ve evraklarını izler.
+          <small style="font-size:0.75rem; color:var(--text-muted); display:block; margin-top:0.25rem;">Bu kullanıcı sadece seçilen birimin taleplerini, siparişlerini ve sözleşmelerini izleyebilir.</small>
+          <small class="form-error" id="um-unit-error" style="display:none; color:#ef4444; font-size:0.75rem; margin-top:0.2rem;">Birim kullanıcısı için bağlı birim seçilmesi zorunludur.</small>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group">
+            <label>Dahili Telefon No</label>
+            <input type="text" id="um-phone" placeholder="ör: 1104" style="width: 100%;">
+          </div>
+
+          <div class="form-group">
+            <label>GSM / Cep Telefonu</label>
+            <input type="tel" id="um-mobile" placeholder="ör: 0532 123 45 67" style="width: 100%;">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group">
+            <label>Giriş Şifresi <span id="um-password-required-star" class="required" style="color:#ef4444; display:none;">*</span></label>
+            <div style="position: relative;">
+              <input type="password" id="um-password" placeholder="Şifre belirleyin (Boşsa: 123456)" style="width: 100%; padding-right: 2.2rem;">
+              <button type="button" id="btn-toggle-um-password" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 0.9rem;" title="Şifreyi Göster / Gizle">👁️</button>
+            </div>
+            <small id="um-password-help" style="font-size:0.73rem; color:var(--text-muted); display:block; margin-top:0.25rem;">Yeni kullanıcı için boş bırakılırsa varsayılan: <strong>123456</strong></small>
+            <small class="form-error" id="um-password-error" style="display:none; color:#ef4444; font-size:0.75rem; margin-top:0.2rem;">Şifre en az 4 karakter olmalıdır.</small>
+          </div>
+
+          <div class="form-group">
+            <label>Hesap Durumu <span class="required" style="color:#ef4444;">*</span></label>
+            <select id="um-is-active" style="width: 100%; font-weight: 600;">
+              <option value="true">🟢 Aktif (Sisteme Giriş Yapabilir)</option>
+              <option value="false">🔴 Pasif (Giriş Engellendi / Ayrıldı)</option>
+            </select>
+            <small style="font-size:0.73rem; color:var(--text-muted); display:block; margin-top:0.25rem;">Pasif hesaplar oturum açamaz ve atama listelerinde görünmez.</small>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem; padding: 0.75rem 1rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; font-weight: 600; font-size: 0.85rem;">
+            <input type="checkbox" id="um-email-notify" checked style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
+            <span>📧 Süreç ve Talep Güncelleme E-Posta Bildirimlerini Al</span>
+          </label>
+          <small style="display: block; color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; margin-left: 1.5rem;">
+            Personel atandığı veya biriminin oluşturduğu talep onaylandığında/tamamlandığında bilgilendirilir.
           </small>
         </div>
 
-        <div class="form-group" id="um-unit-group" style="margin-bottom: 1rem; display: none;">
-          <label>Bağlı Olduğu Birim <span class="required">*</span></label>
-          <select id="um-unit" style="border-color: var(--accent-primary); font-weight: 600;">
-            <option value="">-- Birim Seçiniz --</option>
-          </select>
-          <small style="font-size:0.73rem; color:var(--text-muted); display:block; margin-top:0.2rem;">Kullanıcı yalnızca bu birime ait satınalma taleplerini ve sözleşmeleri görebilecektir.</small>
-        </div>
-
-        <div class="form-group" style="margin-bottom: 1rem;">
-          <label>Giriş Şifresi</label>
-          <input type="text" id="um-password" placeholder="Şifre belirleyin (Boş bırakılırsa: 123456)">
-          <small id="um-password-help" style="font-size:0.73rem; color:var(--text-muted); display:block; margin-top:0.2rem;">Mevcut personeli düzenlerken şifreyi korumak için boş bırakabilirsiniz.</small>
-        </div>
-
-        <div class="form-group" style="margin-bottom: 1rem;">
-          <label>Dahili Telefon No</label>
-          <input type="text" id="um-phone" placeholder="ör: 1104">
-        </div>
-
-        <div class="form-group" style="margin-bottom: 1rem;">
-          <label>E-Posta Adresi</label>
-          <input type="email" id="um-email" placeholder="ör: smeric@pirireis.edu.tr">
-        </div>
-
-        <div class="form-group" style="margin-bottom: 1.5rem;">
-          <label>Durum</label>
-          <select id="um-is-active">
-            <option value="true">🟢 Aktif Çalışan</option>
-            <option value="false">🔴 Pasif (Aramızdan Ayrıldı)</option>
-          </select>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn-secondary close-modal">İptal</button>
-          <button type="submit" class="btn-primary">Kaydet</button>
+        <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+          <button type="button" class="btn-secondary close-modal" style="padding: 0.55rem 1.25rem;">Vazgeç</button>
+          <button type="submit" class="btn-primary" id="btn-save-user-submit" style="padding: 0.55rem 1.5rem;">
+            <span>💾</span> Bilgileri Kaydet
+          </button>
         </div>
       </form>
     </div>

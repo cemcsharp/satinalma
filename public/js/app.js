@@ -1123,6 +1123,12 @@ const App = {
     document.getElementById('btn-open-new-request')?.addEventListener('click', () => this.openNewRequestModal());
     document.getElementById('btn-open-excel-import')?.addEventListener('click', () => this.openExcelImportModal());
     document.getElementById('btn-open-add-user')?.addEventListener('click', () => this.openUserModal());
+    document.getElementById('btn-toggle-um-password')?.addEventListener('click', () => {
+      const pwdInput = document.getElementById('um-password');
+      if (pwdInput) {
+        pwdInput.type = pwdInput.type === 'password' ? 'text' : 'password';
+      }
+    });
     document.getElementById('filter-users-search')?.addEventListener('input', () => this.renderUsersSettings());
     document.getElementById('filter-users-role')?.addEventListener('change', () => this.renderUsersSettings());
     document.getElementById('filter-users-status')?.addEventListener('change', () => this.renderUsersSettings());
@@ -9622,39 +9628,63 @@ const App = {
   openUserModal(userId = null) {
     const unitSelect = document.getElementById('um-unit');
     if (unitSelect) {
-      const unitsList = (this.state.units || []).map(u => u.name).filter(Boolean);
+      const unitsList = (this.state.units || []).map(u => (typeof u === 'object' ? u.name : u)).filter(Boolean);
       unitSelect.innerHTML = '<option value="">-- Birim Seçiniz --</option>' + 
         unitsList.map(un => `<option value="${un}">${un}</option>`).join('');
     }
 
     const roleSelect = document.getElementById('um-role');
     const unitGroup = document.getElementById('um-unit-group');
+    const roleInfoText = document.getElementById('um-role-info-text');
 
-    const updateUnitGroupVisibility = () => {
-      if (unitGroup && roleSelect) {
-        const isUnit = roleSelect.value === 'UNIT';
+    const roleDescriptions = {
+      ADMIN: '🛡️ Satınalma Yöneticisi: Uzman yetkilerine ek olarak personel ve kullanıcı hesaplarını yönetebilir, veri silebilir, ayarları değiştirebilir ve sistem güncellemelerini yönetir.',
+      STAFF: '👤 Satınalma Uzmanı: Tüm satınalma talepleri, sipariş, fatura, sözleşme, teminat ve tedarikçi işlemlerini tam yetkiyle yönetir.',
+      EXECUTIVE: '🏛️ Üst Yönetim: Tüm kurum ve birim harcamalarını, raporları, grafikleri ve analizleri izleyebilir; Excel/PDF indirebilir. Veri değiştirme/silme yapamaz.',
+      UNIT: '🏢 Birim Kullanıcısı: Yalnızca bağlı olduğu birimin taleplerini, sözleşmelerini ve faturalarını izler. Diğer birimlerin verilerine erişemez.'
+    };
+
+    const updateRoleUI = () => {
+      if (!roleSelect) return;
+      const role = roleSelect.value;
+      const isUnit = role === 'UNIT';
+      if (unitGroup) {
         unitGroup.style.display = isUnit ? 'block' : 'none';
         if (unitSelect) unitSelect.required = isUnit;
+      }
+      if (roleInfoText) {
+        roleInfoText.innerText = roleDescriptions[role] || 'Seçilen role göre yetkiler belirlenir.';
       }
     };
 
     if (roleSelect) {
-      roleSelect.onchange = updateUnitGroupVisibility;
+      roleSelect.onchange = updateRoleUI;
     }
+
+    // Reset validation errors
+    document.querySelectorAll('.form-error').forEach(el => el.style.display = 'none');
+
+    const pwdHelp = document.getElementById('um-password-help');
+    const pwdRequiredStar = document.getElementById('um-password-required-star');
+    const emailNotifyCheckbox = document.getElementById('um-email-notify');
 
     if (userId) {
       const u = this.state.users.find(usr => String(usr.id) === String(userId));
       if (!u) return;
       document.getElementById('um-id').value = u.id;
-      document.getElementById('um-name').value = u.name;
-      document.getElementById('um-title').value = u.title;
+      document.getElementById('um-name').value = u.name || '';
+      document.getElementById('um-title').value = u.title || '';
       document.getElementById('um-role').value = u.role || 'STAFF';
       if (unitSelect) unitSelect.value = u.unit || '';
       document.getElementById('um-password').value = '';
       document.getElementById('um-password').placeholder = 'Mevcut şifreyi korumak için boş bırakın';
+      if (pwdHelp) pwdHelp.innerHTML = 'Mevcut şifreyi korumak için bu alanı <strong>boş bırakabilirsiniz</strong>.';
+      if (pwdRequiredStar) pwdRequiredStar.style.display = 'none';
       if (document.getElementById('um-phone')) document.getElementById('um-phone').value = u.phone || '';
+      if (document.getElementById('um-mobile')) document.getElementById('um-mobile').value = u.mobile || '';
       if (document.getElementById('um-email')) document.getElementById('um-email').value = u.email || '';
-      document.getElementById('um-is-active').value = (u.isActive !== false).toString();
+      if (document.getElementById('um-is-active')) document.getElementById('um-is-active').value = (u.isActive !== false).toString();
+      if (emailNotifyCheckbox) emailNotifyCheckbox.checked = u.emailNotify !== false;
       document.getElementById('user-modal-title').innerText = `✏️ Kullanıcı / Personel Düzenle (${u.name})`;
     } else {
       document.getElementById('um-id').value = '';
@@ -9663,69 +9693,149 @@ const App = {
       if (unitSelect) unitSelect.value = '';
       document.getElementById('um-password').value = '';
       document.getElementById('um-password').placeholder = 'Şifre belirleyin (Boşsa: 123456)';
+      if (pwdHelp) pwdHelp.innerHTML = 'Yeni kullanıcı için boş bırakılırsa varsayılan: <strong>123456</strong>';
+      if (pwdRequiredStar) pwdRequiredStar.style.display = 'none';
+      if (emailNotifyCheckbox) emailNotifyCheckbox.checked = true;
       document.getElementById('user-modal-title').innerText = '➕ Yeni Kullanıcı / Personel Ekle';
     }
-    updateUnitGroupVisibility();
+    updateRoleUI();
     this.openModal('modal-user-form');
   },
 
   async handleSaveUser(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    
+    // Hide previous error notices
+    document.querySelectorAll('.form-error').forEach(el => el.style.display = 'none');
+
     const id = document.getElementById('um-id').value;
     const name = document.getElementById('um-name').value.trim();
     const title = document.getElementById('um-title').value.trim();
     const role = document.getElementById('um-role').value;
     const unit = document.getElementById('um-unit')?.value.trim() || '';
-    const passwordInput = document.getElementById('um-password').value.trim();
+    const email = document.getElementById('um-email')?.value.trim().toLowerCase() || '';
     const phone = document.getElementById('um-phone')?.value.trim() || '';
-    const email = document.getElementById('um-email')?.value.trim() || '';
+    const mobile = document.getElementById('um-mobile')?.value.trim() || '';
+    const passwordInput = document.getElementById('um-password').value.trim();
     const isActive = document.getElementById('um-is-active').value === 'true';
+    const emailNotify = document.getElementById('um-email-notify')?.checked !== false;
 
+    let hasError = false;
+
+    // 1. Name validation
+    if (!name || name.length < 2) {
+      const errEl = document.getElementById('um-name-error');
+      if (errEl) errEl.style.display = 'block';
+      document.getElementById('um-name')?.focus();
+      hasError = true;
+    }
+
+    // 2. Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      const errEl = document.getElementById('um-email-error');
+      if (errEl) {
+        errEl.innerText = 'Lütfen geçerli bir kurumsal e-posta adresi giriniz.';
+        errEl.style.display = 'block';
+      }
+      if (!hasError) document.getElementById('um-email')?.focus();
+      hasError = true;
+    } else {
+      // Uniqueness check
+      const duplicateUser = this.state.users.find(usr => 
+        (usr.email || '').toLowerCase() === email && String(usr.id) !== String(id)
+      );
+      if (duplicateUser) {
+        const errEl = document.getElementById('um-email-error');
+        if (errEl) {
+          errEl.innerText = `Bu e-posta adresi (${email}) "${duplicateUser.name}" adlı kullanıcıda zaten kayıtlıdır!`;
+          errEl.style.display = 'block';
+        }
+        if (!hasError) document.getElementById('um-email')?.focus();
+        hasError = true;
+      }
+    }
+
+    // 3. Title validation
+    if (!title) {
+      const errEl = document.getElementById('um-title-error');
+      if (errEl) errEl.style.display = 'block';
+      if (!hasError) document.getElementById('um-title')?.focus();
+      hasError = true;
+    }
+
+    // 4. Role & Unit validation
     if (role === 'UNIT' && !unit) {
-      this.showToast("Lütfen birim kullanıcısı için bağlı olduğu birimi seçiniz.", "error");
+      const errEl = document.getElementById('um-unit-error');
+      if (errEl) errEl.style.display = 'block';
+      if (!hasError) document.getElementById('um-unit')?.focus();
+      hasError = true;
+    }
+
+    // 5. Password validation
+    if (passwordInput && passwordInput.length < 4) {
+      const errEl = document.getElementById('um-password-error');
+      if (errEl) errEl.style.display = 'block';
+      if (!hasError) document.getElementById('um-password')?.focus();
+      hasError = true;
+    }
+
+    if (hasError) {
+      this.showToast("Lütfen formdaki eksik veya hatalı alanları kontrol ediniz.", "error", "⚠️");
       return;
     }
 
-    if (id) {
-      const u = this.state.users.find(usr => String(usr.id) === String(id));
-      if (u) {
-        u.name = name;
-        u.title = title;
-        u.role = role;
-        u.unit = unit;
-        u.phone = phone;
-        u.email = email;
-        u.isActive = isActive;
-        if (passwordInput !== '') {
-          u.password = passwordInput;
-        } else {
-          delete u.password; // boşsa mevcut şifreyi koru
+    try {
+      if (id) {
+        const u = this.state.users.find(usr => String(usr.id) === String(id));
+        if (u) {
+          u.name = name;
+          u.title = title;
+          u.role = role;
+          u.unit = role === 'UNIT' ? unit : '';
+          u.phone = phone;
+          u.mobile = mobile;
+          u.email = email;
+          u.isActive = isActive;
+          u.emailNotify = emailNotify;
+          if (passwordInput !== '') {
+            u.password = passwordInput;
+          } else {
+            delete u.password; // keep existing password
+          }
+          await this.apiSync('users', 'PUT', u);
         }
-        await this.apiSync('users', 'PUT', u);
+      } else {
+        const username = email.split('@')[0] || name.split(' ')[0].toLowerCase();
+        const newUser = {
+          username: username,
+          name: name,
+          title: title,
+          role: role,
+          unit: role === 'UNIT' ? unit : '',
+          password: passwordInput || '123456',
+          phone: phone,
+          mobile: mobile,
+          email: email,
+          isActive: isActive,
+          emailNotify: emailNotify
+        };
+        const savedU = await this.apiSync('users', 'POST', newUser);
+        if (savedU && savedU.id) newUser.id = savedU.id;
+        this.state.users.push(newUser);
       }
-    } else {
-      const username = name.split(' ')[0].toLowerCase();
-      const newUser = {
-        username: username,
-        name: name,
-        title: title,
-        role: role,
-        unit: unit,
-        password: passwordInput || '123456',
-        phone: phone,
-        email: email,
-        isActive: isActive
-      };
-      const savedU = await this.apiSync('users', 'POST', newUser);
-      if (savedU) newUser.id = savedU.id;
-      this.state.users.push(newUser);
-    }
 
-    this.showToast("Kullanıcı bilgileri başarıyla kaydedildi!", "success");
-    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-    this.populateLoginDropdown();
-    this.populateDropdowns();
-    this.render();
+      this.showToast("Kullanıcı bilgileri eksiksiz ve başarıyla kaydedildi!", "success", "✅");
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+      this.populateLoginDropdown();
+      this.populateDropdowns();
+      this.render();
+      this.renderUsersSettings();
+      this.logAction('Kullanıcı Kaydedildi', `${name} (${title} - ${role})`);
+    } catch (err) {
+      console.error('Kullanıcı kaydetme hatası:', err);
+      this.showToast(`Kullanıcı kaydedilemedi: ${err.message}`, "error");
+    }
   },
 
   async toggleUserStatus(userId) {
