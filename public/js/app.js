@@ -600,8 +600,8 @@ const App = {
       document.body.classList.remove('role-non-admin');
     }
 
-    // Sidebar navigation items filtering for UNIT role
-    const allNavItems = document.querySelectorAll('.sidebar-nav li[data-view]');
+    // Sidebar navigation items and section titles filtering for UNIT role
+    const allNavItems = document.querySelectorAll('.nav-menu li.nav-item, li[data-view]');
     allNavItems.forEach(item => {
       const view = item.getAttribute('data-view');
       if (isUnit) {
@@ -617,6 +617,12 @@ const App = {
           item.style.display = '';
         }
       }
+    });
+
+    // Hide sidebar section titles for UNIT role
+    const allSectionTitles = document.querySelectorAll('.nav-menu li.nav-section-title');
+    allSectionTitles.forEach(title => {
+      title.style.display = isUnit ? 'none' : '';
     });
 
     // If unit user is currently on an unauthorized view, redirect to requests
@@ -1697,10 +1703,18 @@ const App = {
   },
 
   switchView(viewName, fromHistory = false) {
+    const isUnit = this.state.currentUser?.role === 'UNIT';
+
+    // Restrict views for UNIT role
+    if (isUnit && !['requests', 'contracts', 'notifications'].includes(viewName)) {
+      this.showToast('Birim kullanıcıları yalnızca Talepler ve Sözleşmeler sayfalarına erişebilir.', 'info', '🏢');
+      viewName = 'requests';
+    }
+
     // Restrict Settings view to ADMIN only
     if (viewName === 'settings' && this.state.currentUser?.role !== 'ADMIN') {
       this.showToast('Ayarlar sayfasına erişim sadece Satınalma Yöneticisi (ADMIN) yetkisine açıktır.', 'warning', '🔒');
-      this.switchView('dashboard');
+      this.switchView(isUnit ? 'requests' : 'dashboard');
       return;
     }
 
