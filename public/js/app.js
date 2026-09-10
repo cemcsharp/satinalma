@@ -1714,8 +1714,8 @@ const App = {
     const isUnit = this.state.currentUser?.role === 'UNIT';
 
     // Restrict views for UNIT role
-    if (isUnit && !['requests', 'contracts', 'notifications'].includes(viewName)) {
-      this.showToast('Birim kullanıcıları yalnızca Talepler ve Sözleşmeler sayfalarına erişebilir.', 'info', '🏢');
+    if (isUnit && !['requests', 'contracts', 'invoices', 'notifications'].includes(viewName)) {
+      this.showToast('Birim kullanıcıları yalnızca Talepler, Faturalar ve Sözleşmeler sayfalarına erişebilir.', 'info', '🏢');
       viewName = 'requests';
     }
 
