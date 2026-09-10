@@ -573,6 +573,75 @@ const App = {
     this.populateLoginDropdown();
   },
 
+  openChangePasswordModal() {
+    const form = document.getElementById('form-self-change-password');
+    if (form) form.reset();
+    const errEl = document.getElementById('cp-match-error');
+    if (errEl) errEl.style.display = 'none';
+    this.openModal('modal-change-password');
+  },
+
+  togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      if (btn) btn.innerText = '🙈';
+    } else {
+      input.type = 'password';
+      if (btn) btn.innerText = '👁️';
+    }
+  },
+
+  async handleSelfChangePasswordSubmit(e) {
+    e.preventDefault();
+    const currentPassword = document.getElementById('cp-current')?.value || '';
+    const newPassword = document.getElementById('cp-new')?.value || '';
+    const confirmPassword = document.getElementById('cp-confirm')?.value || '';
+    const errEl = document.getElementById('cp-match-error');
+    const submitBtn = document.getElementById('btn-submit-change-pass');
+
+    if (newPassword !== confirmPassword) {
+      if (errEl) errEl.style.display = 'block';
+      this.showToast('Yeni şifreler birbiriyle eşleşmiyor!', 'warning', '⚠️');
+      return;
+    }
+    if (errEl) errEl.style.display = 'none';
+
+    if (newPassword.length < 4) {
+      this.showToast('Yeni şifre en az 4 karakter olmalıdır.', 'warning', '⚠️');
+      return;
+    }
+
+    try {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>⏳</span> Güncelleniyor...';
+      }
+
+      const res = await this.authFetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Şifre değiştirilemedi.');
+      }
+
+      this.showToast('Şifreniz başarıyla değiştirildi!', 'success', '🔑');
+      this.closeModal('modal-change-password');
+    } catch (err) {
+      this.showToast(err.message, 'error', '❌');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>💾</span> Şifremi Güncelle';
+      }
+    }
+  },
+
   updateUserProfileCard() {
     const user = this.state.currentUser;
     if (!user) return;

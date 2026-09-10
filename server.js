@@ -1406,7 +1406,7 @@ const server = http.createServer(async (req, res) => {
     return user && (user.role === 'EXECUTIVE' || user.role === 'UNIT');
   }
 
-  if (currentUser && isReadOnlyUser(currentUser) && method !== 'GET' && urlPath !== '/api/auth/logout') {
+  if (currentUser && isReadOnlyUser(currentUser) && method !== 'GET' && urlPath !== '/api/auth/logout' && urlPath !== '/api/auth/change-password') {
     const isPublicVendorRating = urlPath === '/api/vendor_ratings' && method === 'POST';
     if (!isPublicVendorRating) {
       return sendForbidden('Bu hesap güvenli salt-okunur (izleme) modundadır. Veri değiştirme yetkisi bulunmamaktadır.');
@@ -1542,6 +1542,59 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.writeHead(200);
       res.end(JSON.stringify({ success: true, message: 'Çıkış yapıldı.' }));
+      return;
+    }
+
+    if (urlPath === '/api/auth/change-password' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      if (!currentUser) {
+        sendUnauthorized();
+        return;
+      }
+
+      const body = await readBody(req, 1024 * 1024);
+      const { currentPassword, newPassword } = JSON.parse(body || '{}');
+
+      if (!currentPassword || !newPassword) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Lütfen mevcut şifrenizi ve yeni şifrenizi giriniz.' }));
+        return;
+      }
+
+      if (String(newPassword).length < 4) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Yeni şifre en az 4 karakter olmalıdır.' }));
+        return;
+      }
+
+      const userRes = await pool.query('SELECT id, name, password FROM users WHERE id = $1', [currentUser.id]);
+      if (userRes.rowCount === 0) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Kullanıcı hesabı bulunamadı.' }));
+        return;
+      }
+
+      const dbUser = userRes.rows[0];
+      const isMatch = verifyPassword(currentPassword, dbUser.password);
+      if (!isMatch) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Mevcut şifrenizi hatalı girdiniz.' }));
+        return;
+      }
+
+      const hashedPassword = hashPassword(newPassword);
+      await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, currentUser.id]);
+
+      const pad = (n) => String(n).padStart(2, '0');
+      const now = new Date();
+      const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      await pool.query(
+        'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+        [dateStr, dbUser.name, 'Şifre Değiştirildi', 'Kullanıcı kendi oturumundan şifresini başarıyla güncelledi.']
+      ).catch(() => {});
+
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, message: 'Şifreniz başarıyla değiştirildi.' }));
       return;
     }
 
