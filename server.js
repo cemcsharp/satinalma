@@ -596,8 +596,13 @@ function createSmtpTransporter(config) {
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 20000,
-    // Force IPv4 socket to avoid Linux VPS ENETUNREACH on IPv6
-    family: 4
+    // Strictly resolve and connect over IPv4 only
+    family: 4,
+    lookup: (hostname, options, callback) => {
+      dns.lookup(hostname, { family: 4 }, (err, address, family) => {
+        callback(err, address, family);
+      });
+    }
   });
 }
 
