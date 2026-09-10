@@ -629,6 +629,12 @@ const App = {
       this.switchView('requests');
     }
 
+    // Topbar new request button
+    const btnNewReq = document.getElementById('btn-open-new-request');
+    if (btnNewReq) {
+      btnNewReq.style.display = (isExec || isUnit) ? 'none' : '';
+    }
+
     // Topbar live rates button (only opens settings if ADMIN)
     const invoiceUnitFilter = document.getElementById('filter-invoice-unit');
     if (invoiceUnitFilter) {

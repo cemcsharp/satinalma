@@ -3529,7 +3529,7 @@ body.role-executive #btn-restore-backup,
   }
 }
 
-/* 👑 Kurumsal Yönetici (EXECUTIVE - Read-Only) Role Rules */
+/* 👑 Kurumsal Yönetici (EXECUTIVE) & Birim (UNIT) Read-Only Role Rules */
 body.role-executive #btn-open-new-request,
 body.role-executive #btn-open-add-contract,
 body.role-executive #btn-open-add-guarantee,
@@ -3550,6 +3550,10 @@ body.role-executive .btn-edit-action,
 body.role-executive .chk-invoice-item,
 body.role-executive #chk-select-all-invoices,
 body.role-executive .btn-invoice-handover-action,
+body.role-unit #btn-open-new-request,
+body.role-unit #btn-open-add-contract,
+body.role-unit #btn-open-add-guarantee,
+body.role-unit #btn-open-add-tender,
 body.role-unit #btn-open-bulk-modal,
 body.role-unit #btn-import-excel,
 body.role-unit #btn-backup-now,
