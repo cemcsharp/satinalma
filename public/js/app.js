@@ -8344,12 +8344,16 @@ const App = {
       const data = await res.json();
       if (data.success) {
         this.showToast(`🎉 Test e-postası başarıyla ulaştı: ${testTarget}`, 'success', '✅');
+        this.showConfirm('SMTP Testi Başarılı', `"${testTarget}" adresine deneme e-postası başarıyla ulaştırıldı. Bildirim servisiniz hazır!`, null, '✅');
       } else {
-        this.showToast(`SMTP Hatası: ${data.error}`, 'error', '❌');
+        const errMsg = data.error || 'SMTP sunucusuna bağlanılamadı.';
+        this.showToast('SMTP Test Hatası: ' + errMsg, 'error', '❌');
+        this.showConfirm('SMTP Bağlantı Hatası', errMsg + (data.rawError ? `\n\nSunucu Yanıtı: ${data.rawError}` : ''), null, '❌');
       }
     } catch (err) {
       console.error(err);
       this.showToast('E-posta test isteği başarısız oldu: ' + err.message, 'error');
+      this.showConfirm('Bağlantı Hatası', `Sunucu ile iletişim kurulamadı: ${err.message}`, null, '❌');
     }
   },
 

@@ -1757,9 +1757,18 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200);
         res.end(JSON.stringify({ success: true, message: `Test e-postası başarıyla gönderildi: ${target}`, messageId: info.messageId }));
       } catch (err) {
-        console.error('SMTP test hatası:', err);
+        console.error('SMTP test hatası:', err.message);
+        let errorHint = err.message;
+        const msg = (err.message || '').toLowerCase();
+        if (msg.includes('535') || msg.includes('authentication') || msg.includes('eauth') || msg.includes('invalid credentials')) {
+          errorHint = 'Kimlik Doğrulama Başarısız (535): E-posta kullanıcı adı veya şifre hatalı. Microsoft 365 kullanıyorsanız ve MFA (2FA) açıksa hesap şifresi yerine "Uygulama Parolası (App Password)" kullanmalı ve M365 Admin panelinde "Authenticated SMTP" yetkisinin açık olduğundan emin olmalısınız.';
+        } else if (msg.includes('554') || msg.includes('sendasdenied')) {
+          errorHint = 'Gönderici İzni Hatası (554 SendAsDenied): "Gönderici E-Postası (From)" alanı giriş yapılan e-posta ile aynı olmalıdır.';
+        } else if (msg.includes('etimedout') || msg.includes('econnrefused') || msg.includes('enotfound')) {
+          errorHint = `Sunucuya Bağlanılamadı (${cfg.host}:${cfg.port}): Port (587 veya 465) veya güvenlik duvarı ayarlarını kontrol ediniz.`;
+        }
         res.writeHead(500);
-        res.end(JSON.stringify({ success: false, error: err.message }));
+        res.end(JSON.stringify({ success: false, error: errorHint, rawError: err.message }));
       }
       return;
     }
