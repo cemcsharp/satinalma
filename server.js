@@ -601,34 +601,65 @@ function getAppBaseUrl(cfg) {
 }
 
 // ----------------------------------------------------
-// 📧 BİRİM OTOMATİK TALEP SÜREÇ BİLDİRİM FONKSİYONU
+// 📧 BİRİM VE KULLANICI OTOMATİK TALEP SÜREÇ BİLDİRİM FONKSİYONU
 // ----------------------------------------------------
 async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
   if (!demand || !demand.unit) return;
+  const barcode = demand.requestBarcode || demand.id;
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
   try {
     const cfg = await getSmtpConfig();
-    if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) return;
+    if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) {
+      console.log(`ℹ️ SMTP e-posta ayarları pasif veya yapılandırılmamış, talep #${barcode} bildirimi gönderilemedi.`);
+      await pool.query(
+        'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+        [dateStr, 'Sistem (E-Posta)', 'Bildirim Gönderilemedi', `Talep #${barcode} bildirimi gönderilemedi: E-Posta (SMTP) ayarları etkinleştirilmemiş veya yapılandırılmamış.`]
+      ).catch(() => {});
+      return;
+    }
 
-    const unitRes = await pool.query('SELECT email FROM units WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [demand.unit]);
+    // 1. Birim ve Birim Kullanıcılarının E-Posta Adreslerini Topla
+    const recipients = new Set();
+
+    // a) Birim tablosunda tanımlı e-posta
+    const unitRes = await pool.query('SELECT email FROM units WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [demand.unit]).catch(() => ({ rows: [] }));
     const unitEmail = unitRes.rows[0]?.email;
-    if (!unitEmail || !unitEmail.includes('@')) {
-      console.log(`ℹ️ "${demand.unit}" birimi için kayıtlı geçerli bir e-posta bulunamadı, bildirim gönderilmedi.`);
+    if (unitEmail && typeof unitEmail === 'string') {
+      unitEmail.split(/[,; ]+/).forEach(em => {
+        em = em.trim();
+        if (em.includes('@')) recipients.add(em);
+      });
+    }
+
+    // b) Bu birime bağlı ve e-posta bildirimi açık aktif kullanıcılar (users tablosu)
+    const unitUsersRes = await pool.query(
+      'SELECT email, name FROM users WHERE LOWER(TRIM(unit)) = LOWER(TRIM($1)) AND "isActive" = true AND email IS NOT NULL AND email LIKE \'%@%\' AND ("emailNotify" IS NULL OR "emailNotify" = true)',
+      [demand.unit]
+    ).catch(() => ({ rows: [] }));
+    unitUsersRes.rows.forEach(u => {
+      if (u.email && u.email.includes('@')) recipients.add(u.email.trim());
+    });
+
+    if (recipients.size === 0) {
+      console.log(`ℹ️ "${demand.unit}" birimi veya bağlı kullanıcılar için geçerli e-posta bulunamadı, bildirim gönderilmedi.`);
+      await pool.query(
+        'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+        [dateStr, 'Sistem (E-Posta)', 'E-Posta Bulunamadı', `Talep #${barcode} için "${demand.unit}" biriminde veya birim kullanıcılarında kayıtlı geçerli e-posta bulunamadı.`]
+      ).catch(() => {});
       return;
     }
 
     let expertInfo = demand.assignedTo || 'Satınalma Uzmanı';
     if (demand.assignedTo && demand.assignedTo !== 'Henüz Atanmadı') {
-      const userRes = await pool.query('SELECT name, title, email, phone FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [demand.assignedTo]);
+      const userRes = await pool.query('SELECT name, title, email, phone FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [demand.assignedTo]).catch(() => ({ rowCount: 0 }));
       if (userRes.rowCount > 0) {
         const u = userRes.rows[0];
         expertInfo = `${u.name} (${u.title || 'Satınalma Uzmanı'}${u.phone ? ` - Dahili: ${u.phone}` : ''}${u.email ? ` - E-posta: ${u.email}` : ''})`;
       }
     }
-
-    const barcode = demand.requestBarcode || demand.id;
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
     let subject = '';
     let headerTitle = '';
@@ -639,42 +670,40 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
       subject = `📋 Talebiniz Alındı — #${barcode} (${demand.subject || 'Satınalma Talebi'})`;
       headerTitle = 'Talebiniz Satınalma Müdürlüğü\'ne Ulaştı';
       badgeColor = '#3b82f6';
-      messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına oluşturulan <strong>#${barcode}</strong> numaralı satınalma talebiniz sistemimize başarıyla kaydedilmiş ve işleme alınmıştır. Talebinizin süreç adımları uzmanımız tarafından takip edilmektedir.`;
+      messageText = `Sayın Yetkili,<br><br><strong>${demand.unit}</strong> adına oluşturulan <strong>#${barcode}</strong> numaralı satınalma talebiniz sistemimize başarıyla kaydedilmiş ve işleme alınmıştır. Talebinizin süreç adımları uzmanımız tarafından takip edilmektedir.`;
     } else if (eventType === 'STATUS_CHANGED') {
       const status = demand.status || 'İşlemde';
-      if (status === 'Tamamlandı') {
+      if (status === 'Tamamlandı' || status === 'Teslim Edildi') {
         badgeColor = '#10b981';
-        subject = `✅ Satınalma Talebiniz Tamamlandı — #${barcode} (${demand.subject || ''})`;
-        headerTitle = `Talebiniz Başarıyla Tamamlandı`;
-        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin tüm teslimat ve fatura süreçleri tamamlanmıştır.`;
+        subject = `✅ Satınalma Talebiniz ${status === 'Teslim Edildi' ? 'Teslim Edildi' : 'Tamamlandı'} — #${barcode} (${demand.subject || ''})`;
+        headerTitle = `Talebiniz ${status === 'Teslim Edildi' ? 'Teslim Edildi' : 'Başarıyla Tamamlandı'}`;
+        messageText = `Sayın Yetkili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin süreçleri tamamlanmıştır.`;
       } else if (status === 'Revize İstendi') {
         badgeColor = '#ea580c';
         subject = `⚠️ Satınalma Talebiniz İçin Revize İsteği — #${barcode} (${demand.subject || ''})`;
         headerTitle = `Talep İçin Revize / Ek Bilgi İstendi`;
-        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz satınalma ekibimiz tarafından incelenmiş ve işleme devam edilebilmesi için <strong>revize / ek teknik şartname bilgisi</strong> talep edilmiştir.<br><br>
+        messageText = `Sayın Yetkili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz satınalma ekibimiz tarafından incelenmiş ve işleme devam edilebilmesi için <strong>revize / ek teknik şartname bilgisi</strong> talep edilmiştir.<br><br>
         ${demand.description ? `<div style="background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid #ea580c; border-radius:6px; padding:12px; margin:12px 0; font-size:0.88rem; color:#9a3412;"><strong>📝 Satınalma Uzmanının Revize Notu / Eksikler:</strong><br>${demand.description}</div>` : ''}
         Lütfen talep edilen eksik belgeleri veya bilgileri güncelleyerek satınalma sorumlusu ile iletişime geçiniz.`;
       } else if (status === 'Reddedildi' || status === 'İptal') {
         badgeColor = '#ef4444';
         subject = `❌ Talep İptal / Reddedildi: #${barcode} (${demand.subject || ''})`;
         headerTitle = `Talep Durumu: ${status}`;
-        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz <strong>${status}</strong> durumuna alınmıştır.<br><br>
+        messageText = `Sayın Yetkili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz <strong>${status}</strong> durumuna alınmıştır.<br><br>
         ${demand.description ? `<div style="background:#fef2f2; border:1px solid #fecaca; border-left:4px solid #ef4444; border-radius:6px; padding:12px; margin:12px 0; font-size:0.88rem; color:#991b1b;"><strong>Açıklama:</strong><br>${demand.description}</div>` : ''}`;
       } else if (status === 'Sipariş Verildi' || demand.orderBarcode) {
         badgeColor = '#8b5cf6';
         subject = `📦 Sipariş Verildi: #${barcode} (${demand.subject || ''})`;
         headerTitle = `Sipariş Sürecine Geçildi`;
-        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz için tedarikçi firmaya resmi sipariş geçilmiştir.`;
+        messageText = `Sayın Yetkili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebiniz için tedarikçi firmaya resmi sipariş geçilmiştir.`;
       } else {
         badgeColor = '#f59e0b';
         subject = `🔄 Talep Durumu Güncellendi: [${status}] — #${barcode} (${demand.subject || ''})`;
         headerTitle = `Talep Durumu: ${status}`;
-        messageText = `Sayın İlgili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin süreci güncellenmiştir.<br><br>
+        messageText = `Sayın Yetkili,<br><br><strong>${demand.unit}</strong> adına kayıtlı <strong>#${barcode}</strong> numaralı satınalma talebinizin süreci güncellenmiştir.<br><br>
         Önceki Durum: <strong>${oldStatus || 'Açık'}</strong> ➔ Güncel Durum: <strong style="color:${badgeColor}; font-size:1.05rem;">${status}</strong>`;
       }
     }
-
-    console.log(`✉️ "${demand.unit}" birimine durum bildirimi hazırlanıyor: [${demand.status || eventType}] -> ${unitEmail}`);
 
     const orderSection = demand.orderBarcode ? `
       <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-top:14px;">
@@ -690,7 +719,7 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
     ` : '';
 
     let ratingSection = '';
-    if (demand.status === 'Tamamlandı' && demand.supplier) {
+    if ((demand.status === 'Tamamlandı' || demand.status === 'Teslim Edildi') && demand.supplier) {
       const pType = demand.purchaseType || 'MAL';
       const typeLabel = pType === 'HIZMET' ? 'Hizmet' : 'Mal / Ürün';
       const baseUrl = getAppBaseUrl(cfg);
@@ -766,21 +795,27 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
     `;
 
     const transporter = createSmtpTransporter(cfg);
+    const recipientList = Array.from(recipients);
+
     await transporter.sendMail({
       from: `"${cfg.fromName || 'Piri Reis Üni. Satınalma'}" <${cfg.from || cfg.user}>`,
-      to: unitEmail,
+      to: recipientList.join(', '),
       subject: subject,
       html: html
     });
 
     await pool.query(
       'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
-      [dateStr, 'Sistem (E-Posta Servisi)', 'Birim Bilgilendirme E-Postası', `Talep #${barcode} için "${demand.unit}" birimine (${unitEmail}) e-posta gönderildi. [${eventType}]`]
+      [dateStr, 'Sistem (E-Posta Servisi)', 'Birim Bilgilendirme E-Postası', `Talep #${barcode} için "${demand.unit}" birimi alıcılarına (${recipientList.join(', ')}) e-posta gönderildi. [${eventType} - ${demand.status || 'Yeni'}]`]
     ).catch(() => {});
 
-    console.log(`✉️ Birim E-Postası Gönderildi -> ${demand.unit} (${unitEmail}) [${eventType} - #${barcode}]`);
+    console.log(`✉️ Birim E-Postası Gönderildi -> ${demand.unit} (${recipientList.join(', ')}) [${eventType} - #${barcode}]`);
   } catch (err) {
     console.error('Birim bilgilendirme e-posta hatası:', err.message);
+    await pool.query(
+      'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+      [dateStr, 'Sistem (E-Posta Servisi)', 'E-Posta Gönderim Hatası', `Talep #${barcode} e-postası gönderilemedi: ${err.message}`]
+    ).catch(() => {});
   }
 }
 
@@ -789,26 +824,39 @@ async function notifyUnitOnDemandEvent(demand, eventType, oldStatus = null) {
 // ----------------------------------------------------
 async function notifyStaffOnAssignment(demand, eventType, oldAssignedTo = null) {
   if (!demand || !demand.assignedTo || demand.assignedTo === 'Henüz Atanmadı') return;
+  const barcode = demand.requestBarcode || demand.id;
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
   try {
     const cfg = await getSmtpConfig();
-    if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) return;
-
-    const userRes = await pool.query(
-      'SELECT name, email FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND "isActive" = true',
-      [demand.assignedTo]
-    );
-    const staff = userRes.rows[0];
-    if (!staff || !staff.email || !staff.email.includes('@')) {
-      console.log(`ℹ️ Personel "${demand.assignedTo}" için kayıtlı e-posta bulunamadı, görev bildirim maili gönderilmedi.`);
+    if (!cfg || !cfg.isEnabled || !cfg.host || !cfg.user) {
+      console.log(`ℹ️ SMTP pasif olduğu için personel "${demand.assignedTo}" atama e-postası gönderilmedi.`);
       return;
     }
 
-    const barcode = demand.requestBarcode || demand.id;
+    const userRes = await pool.query(
+      'SELECT name, email, "emailNotify" FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND "isActive" = true',
+      [demand.assignedTo]
+    ).catch(() => ({ rows: [] }));
+    const staff = userRes.rows[0];
+    if (!staff || !staff.email || !staff.email.includes('@')) {
+      console.log(`ℹ️ Personel "${demand.assignedTo}" için kayıtlı e-posta bulunamadı, görev bildirim maili gönderilmedi.`);
+      await pool.query(
+        'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+        [dateStr, 'Sistem (E-Posta)', 'Personel E-Posta Bulunamadı', `Talep #${barcode} atama bildirimi gönderilemedi: "${demand.assignedTo}" personeline ait kayıtlı e-posta bulunamadı.`]
+      ).catch(() => {});
+      return;
+    }
+
+    if (staff.emailNotify === false) {
+      console.log(`ℹ️ Personel "${demand.assignedTo}" e-posta bildirimlerini kapattığı için bildirim gönderilmedi.`);
+      return;
+    }
+
     const baseUrl = getAppBaseUrl(cfg);
     const appDirectLink = `${baseUrl}/#request/${demand.id || ''}`;
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
     let subject = '';
     let headerTitle = '';
