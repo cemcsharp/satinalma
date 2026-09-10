@@ -2407,35 +2407,210 @@
       </section>
 
       <!-- 10. SETTINGS VIEW (COMPREHENSIVE USER MANAGEMENT) -->
+      <!-- 8. SETTINGS VIEW (SİSTEM VE KULLANICI AYARLARI) -->
       <section id="view-settings" class="view-section" style="display: none;">
-        <div class="grid-2">
-          <div class="glass-card">
-            <div class="card-header">
-              <h3>👤 Personel Yönetimi</h3>
-              <button class="btn-primary" id="btn-open-add-user" style="padding:0.4rem 0.8rem; font-size:0.8rem;">
-                <span>➕</span> Yeni Personel Ekle
-              </button>
+        
+        <!-- Settings Tabs Navigation -->
+        <div class="filter-bar" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.85rem;" id="settings-tabs">
+          <button class="btn-secondary active-date-tab" data-tab="users" onclick="App.setSettingsTab('users')" style="padding: 0.5rem 1rem; font-weight: 700;">
+            👥 Kullanıcı & Yetki Yönetimi
+          </button>
+          <button class="btn-secondary" data-tab="units" onclick="App.setSettingsTab('units')" style="padding: 0.5rem 1rem; font-weight: 700;">
+            🏢 Birimler & İhale Maddeleri
+          </button>
+          <button class="btn-secondary" data-tab="rates" onclick="App.setSettingsTab('rates')" style="padding: 0.5rem 1rem; font-weight: 700;">
+            💱 TCMB Canlı Kurlar
+          </button>
+          <button class="btn-secondary" data-tab="smtp" onclick="App.setSettingsTab('smtp')" style="padding: 0.5rem 1rem; font-weight: 700;">
+            📧 E-Posta (SMTP) Bildirimleri
+          </button>
+          <button class="btn-secondary" data-tab="workload" onclick="App.setSettingsTab('workload')" style="padding: 0.5rem 1rem; font-weight: 700;">
+            ⚖️ Personel İş Yükü Kotası
+          </button>
+          <button class="btn-secondary" data-tab="system" onclick="App.setSettingsTab('system')" style="padding: 0.5rem 1rem; font-weight: 700;">
+            🗄️ Veritabanı & Sistem
+          </button>
+        </div>
+
+        <!-- TAB 1: KULLANICI VE YETKİ YÖNETİMİ (DETAYLI PANEL) -->
+        <div class="settings-tab-content" data-tab="users" id="tab-content-users">
+          <!-- User KPIs -->
+          <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 1.25rem;">
+            <div class="kpi-card" style="padding: 1rem 1.25rem;">
+              <div class="kpi-header">
+                <span class="kpi-icon" style="background: rgba(99,102,241,0.15); color: #6366f1;">👥</span>
+                <span class="badge status-open">Toplam</span>
+              </div>
+              <h3 id="users-kpi-total" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Kayıtlı Kullanıcı</p>
             </div>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Personel ekleyebilir, unvan/şifre güncelleyebilir veya ayrılan personelleri <strong>Pasif</strong> duruma getirebilirsiniz. Pasif personellerin geçmiş verileri korunur.
-            </p>
-            <div class="table-container">
-              <table class="custom-table" id="table-users-settings">
-                <thead>
-                  <tr>
-                    <th>Ad Soyad</th>
-                    <th>Unvan</th>
-                    <th>Rol</th>
-                    <th>Durum</th>
-                    <th>İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
+
+            <div class="kpi-card" style="padding: 1rem 1.25rem;">
+              <div class="kpi-header">
+                <span class="kpi-icon" style="background: rgba(239,68,68,0.15); color: #ef4444;">🛡️</span>
+                <span class="badge priority-kritik">Yönetici</span>
+              </div>
+              <h3 id="users-kpi-admin" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Satınalma Yöneticisi</p>
+            </div>
+
+            <div class="kpi-card" style="padding: 1rem 1.25rem;">
+              <div class="kpi-header">
+                <span class="kpi-icon" style="background: rgba(245,158,11,0.15); color: #f59e0b;">👤</span>
+                <span class="badge priority-orta">Uzman</span>
+              </div>
+              <h3 id="users-kpi-staff" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Satınalma Uzmanı</p>
+            </div>
+
+            <div class="kpi-card" style="padding: 1rem 1.25rem;">
+              <div class="kpi-header">
+                <span class="kpi-icon" style="background: rgba(59,130,246,0.15); color: #3b82f6;">🏢</span>
+                <span class="badge status-completed">Birim</span>
+              </div>
+              <h3 id="users-kpi-unit" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Birim Kullanıcısı</p>
+            </div>
+
+            <div class="kpi-card" style="padding: 1rem 1.25rem;">
+              <div class="kpi-header">
+                <span class="kpi-icon" style="background: rgba(16,185,129,0.15); color: #10b981;">🟢</span>
+                <span class="badge status-completed">Durum</span>
+              </div>
+              <h3 id="users-kpi-active" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Aktif Hesap</p>
             </div>
           </div>
 
           <div class="glass-card">
+            <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+              <div>
+                <h3 style="font-size: 1.15rem; margin: 0;">👥 Personel & Kullanıcı Hesap Yönetimi</h3>
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+                  Satınalma uzmanları, yöneticiler ve fakülte/daire başkanlığı birim kullanıcılarının hesaplarını yönetin.
+                </p>
+              </div>
+              <button class="btn-primary" id="btn-open-add-user" style="padding: 0.55rem 1rem; font-size: 0.85rem;">
+                <span>➕</span> Yeni Kullanıcı / Personel Ekle
+              </button>
+            </div>
+
+            <!-- Users Filter Bar -->
+            <div class="filter-bar" style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; align-items: center;">
+              <div class="search-input-box" style="flex: 1; min-width: 240px;">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="filter-users-search" placeholder="Ad, unvan, birim veya e-posta ara...">
+              </div>
+
+              <select class="filter-select" id="filter-users-role" style="min-width: 180px;">
+                <option value="ALL">Tüm Sistem Rolleri</option>
+                <option value="ADMIN">🛡️ Satınalma Yöneticisi (ADMIN)</option>
+                <option value="STAFF">👤 Satınalma Uzmanı (STAFF)</option>
+                <option value="EXECUTIVE">🏛️ Üst Yönetim (EXECUTIVE)</option>
+                <option value="UNIT">🏢 Birim Kullanıcısı (UNIT)</option>
+              </select>
+
+              <select class="filter-select" id="filter-users-status" style="min-width: 140px;">
+                <option value="ALL">Tüm Durumlar</option>
+                <option value="ACTIVE">🟢 Aktif Çalışan</option>
+                <option value="PASSIVE">🔴 Pasif (Ayrıldı)</option>
+              </select>
+            </div>
+
+            <!-- Users Detailed Table -->
+            <div class="table-container">
+              <table class="custom-table" id="table-users-settings">
+                <thead>
+                  <tr>
+                    <th>Personel / Kullanıcı</th>
+                    <th>Unvan</th>
+                    <th>Sistem Rolü & Yetki</th>
+                    <th>Bağlı Olduğu Birim</th>
+                    <th>Hesap Durumu</th>
+                    <th style="text-align: center; width: 140px;">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="6" style="text-align:center;">Kullanıcılar yükleniyor...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: BİRİMLER & İHALE MADDELERİ -->
+        <div class="settings-tab-content" data-tab="units" id="tab-content-units" style="display: none;">
+          <div class="grid-2">
+            <!-- Birim Yönetimi Card -->
+            <div class="glass-card">
+              <div class="card-header">
+                <div>
+                  <h3>🏢 Birim & Fakülte Yönetimi</h3>
+                  <p style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600; margin: 0.2rem 0 0 0;">
+                    📧 E-Posta Tanımlı Birimlere Otomatik Süreç Bildirimi Gönderilir
+                  </p>
+                </div>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Sistemdeki aktif akademik ve idari birimleri tanımlayın, birim e-posta adreslerini girerek talep oluşturulduğunda ve durumu değiştiğinde otomatik bildirim gitmesini sağlayın.
+              </p>
+              <div style="display: grid; grid-template-columns: 1.5fr 1.5fr auto; gap: 0.5rem; margin-bottom: 1rem;">
+                <input type="text" id="input-new-unit-name" placeholder="Yeni Birim / Fakülte Adı..." style="padding: 0.45rem 0.75rem; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);">
+                <input type="email" id="input-new-unit-email" placeholder="Birim E-Postası (ör: muh@pirireis.edu.tr)..." style="padding: 0.45rem 0.75rem; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);">
+                <button class="btn-primary" id="btn-add-unit" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; white-space: nowrap;">
+                  <span>➕</span> Birim Ekle
+                </button>
+              </div>
+              <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+                <table class="custom-table" id="table-units-settings">
+                  <thead>
+                    <tr>
+                      <th>Birim Adı</th>
+                      <th>Kurumsal E-Posta (Bildirim Adresi)</th>
+                      <th style="width: 90px; text-align: center;">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-units-settings">
+                    <tr><td colspan="3" style="text-align:center;">Birimler yükleniyor...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Yönetmelik Maddeleri Yönetimi Card -->
+            <div class="glass-card">
+              <div class="card-header">
+                <h3>📜 İhale Yönetmelik Maddeleri</h3>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Satınalma taleplerinde kullanılan ihale usulü ve yönetmelik maddelerini tanımlayın.
+              </p>
+              <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                <input type="text" id="input-new-regulation-name" placeholder="Örn: 19-A, 18-C, 21-f..." style="flex: 1; padding: 0.45rem 0.75rem; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);">
+                <button class="btn-primary" id="btn-add-regulation" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; white-space: nowrap;">
+                  <span>➕</span> Madde Ekle
+                </button>
+              </div>
+              <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+                <table class="custom-table" id="table-regulations-settings">
+                  <thead>
+                    <tr>
+                      <th>Madde / Usül Adı</th>
+                      <th style="width: 80px; text-align: center;">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-regulations-settings">
+                    <tr><td colspan="2" style="text-align:center;">Maddeler yükleniyor...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: DÖVİZ KURLARI (TCMB) -->
+        <div class="settings-tab-content" data-tab="rates" id="tab-content-rates" style="display: none;">
+          <div class="glass-card" style="max-width: 680px;">
             <div class="card-header">
               <h3>💱 Canlı Döviz Kuru Ayarları (Merkez Bankası - TCMB)</h3>
               <span id="rate-last-updated" style="font-size:0.78rem; color:var(--accent-primary); font-weight:600;">Son Güncelleme: -</span>
@@ -2462,9 +2637,11 @@
               </button>
             </div>
           </div>
+        </div>
 
-          <!-- 📧 SMTP E-Posta Bildirim Ayarları Card -->
-          <div class="glass-card">
+        <!-- TAB 4: SMTP E-POSTA -->
+        <div class="settings-tab-content" data-tab="smtp" id="tab-content-smtp" style="display: none;">
+          <div class="glass-card" style="max-width: 840px;">
             <div class="card-header">
               <div>
                 <h3>📧 Kurumsal E-Posta (SMTP) Bildirimleri</h3>
@@ -2551,9 +2728,11 @@
               </div>
             </form>
           </div>
+        </div>
 
-          <!-- ⚖️ Personel İş Yükü & Açık Talep Kapasite Sınırı (WIP Kotası) -->
-          <div class="glass-card">
+        <!-- TAB 5: İŞ YÜKÜ KOTASI -->
+        <div class="settings-tab-content" data-tab="workload" id="tab-content-workload" style="display: none;">
+          <div class="glass-card" style="max-width: 680px;">
             <div class="card-header">
               <div>
                 <h3>⚖️ Personel İş Yükü & Açık Talep Kapasite Sınırı</h3>
@@ -2588,9 +2767,11 @@
               </button>
             </form>
           </div>
+        </div>
 
-          <!-- 🗄️ Veri Yönetimi & Otomatik Yedekleme Card -->
-          <div class="glass-card">
+        <!-- TAB 6: VERİTABANI & SİSTEM -->
+        <div class="settings-tab-content" data-tab="system" id="tab-content-system" style="display: none;">
+          <div class="glass-card" style="max-width: 840px;">
             <div class="card-header">
               <div>
                 <h3>🗄️ Veritabanı Yedekleme & Geri Yükleme</h3>
@@ -2606,7 +2787,7 @@
               Sistem veritabanı (<code>PostgreSQL</code>) tabloları JSON anlık görüntü olarak yedeklenir. İstediğiniz an tek tıkla geri yükleyebilir veya bilgisayarınıza indirebilirsiniz.
             </p>
             <div style="margin-bottom: 1rem;">
-              <div class="table-container" style="max-height: 220px; overflow-y: auto;">
+              <div class="table-container" style="max-height: 260px; overflow-y: auto;">
                 <table class="custom-table" id="table-backups-list">
                   <thead>
                     <tr>
@@ -2637,72 +2818,8 @@
               </button>
             </div>
           </div>
-
-          <!-- Birim Yönetimi Card -->
-          <div class="glass-card">
-            <div class="card-header">
-              <div>
-                <h3>🏢 Birim & Fakülte Yönetimi</h3>
-                <p style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600; margin: 0.2rem 0 0 0;">
-                  📧 E-Posta Tanımlı Birimlere Otomatik Süreç Bildirimi Gönderilir
-                </p>
-              </div>
-            </div>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Sistemdeki aktif akademik ve idari birimleri tanımlayın, birim e-posta adreslerini girerek talep oluşturulduğunda ve durumu değiştiğinde otomatik bildirim gitmesini sağlayın.
-            </p>
-            <div style="display: grid; grid-template-columns: 1.5fr 1.5fr auto; gap: 0.5rem; margin-bottom: 1rem;">
-              <input type="text" id="input-new-unit-name" placeholder="Yeni Birim / Fakülte Adı..." style="padding: 0.45rem 0.75rem; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);">
-              <input type="email" id="input-new-unit-email" placeholder="Birim E-Postası (ör: muh@pirireis.edu.tr)..." style="padding: 0.45rem 0.75rem; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);">
-              <button class="btn-primary" id="btn-add-unit" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; white-space: nowrap;">
-                <span>➕</span> Birim Ekle
-              </button>
-            </div>
-            <div class="table-container" style="max-height: 260px; overflow-y: auto;">
-              <table class="custom-table" id="table-units-settings">
-                <thead>
-                  <tr>
-                    <th>Birim Adı</th>
-                    <th>Kurumsal E-Posta (Bildirim Adresi)</th>
-                    <th style="width: 90px; text-align: center;">İşlem</th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-units-settings">
-                  <tr><td colspan="3" style="text-align:center;">Birimler yükleniyor...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Yönetmelik Maddeleri Yönetimi Card -->
-          <div class="glass-card">
-            <div class="card-header">
-              <h3>📜 İhale Yönetmelik Maddeleri</h3>
-            </div>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Satınalma taleplerinde kullanılan ihale usulü ve yönetmelik maddelerini tanımlayın.
-            </p>
-            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-              <input type="text" id="input-new-regulation-name" placeholder="Örn: 19-A, 18-C, 21-f..." style="flex: 1; padding: 0.45rem 0.75rem; font-size: 0.85rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);">
-              <button class="btn-primary" id="btn-add-regulation" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; white-space: nowrap;">
-                <span>➕</span> Madde Ekle
-              </button>
-            </div>
-            <div class="table-container" style="max-height: 240px; overflow-y: auto;">
-              <table class="custom-table" id="table-regulations-settings">
-                <thead>
-                  <tr>
-                    <th>Madde / Usül Adı</th>
-                    <th style="width: 80px; text-align: center;">İşlem</th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-regulations-settings">
-                  <tr><td colspan="2" style="text-align:center;">Maddeler yükleniyor...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
+
       </section>
 
       <!-- 9. ACTIVITY LOGS VIEW (İŞLEM GEÇMİŞİ) -->

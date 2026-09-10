@@ -1123,6 +1123,9 @@ const App = {
     document.getElementById('btn-open-new-request')?.addEventListener('click', () => this.openNewRequestModal());
     document.getElementById('btn-open-excel-import')?.addEventListener('click', () => this.openExcelImportModal());
     document.getElementById('btn-open-add-user')?.addEventListener('click', () => this.openUserModal());
+    document.getElementById('filter-users-search')?.addEventListener('input', () => this.renderUsersSettings());
+    document.getElementById('filter-users-role')?.addEventListener('change', () => this.renderUsersSettings());
+    document.getElementById('filter-users-status')?.addEventListener('change', () => this.renderUsersSettings());
     document.getElementById('btn-open-add-contract')?.addEventListener('click', () => this.openContractModal());
     document.getElementById('btn-open-add-guarantee')?.addEventListener('click', () => this.openGuaranteeModal());
     document.getElementById('btn-open-add-invoice')?.addEventListener('click', () => this.openInvoiceModal());
@@ -8078,42 +8081,125 @@ const App = {
     }
   },
 
-  // 8. SETTINGS RENDERER
-  renderSettings() {
-    const tbody = document.querySelector('#table-users-settings tbody');
-    if (tbody) {
-      tbody.innerHTML = this.state.users.map(u => {
+  // 8. SETTINGS RENDERER & TAB CONTROLLER
+  setSettingsTab(tabName) {
+    this.state.settingsTab = tabName || 'users';
+    document.querySelectorAll('#settings-tabs button').forEach(b => {
+      if (b.getAttribute('data-tab') === tabName) b.classList.add('active-date-tab');
+      else b.classList.remove('active-date-tab');
+    });
+    document.querySelectorAll('.settings-tab-content').forEach(sec => {
+      sec.style.display = (sec.getAttribute('data-tab') === tabName) ? 'block' : 'none';
+    });
+  },
+
+  renderUsersSettings() {
+    const users = this.state.users || [];
+
+    // 1. Calculate KPI Counts
+    const totalUsers = users.length;
+    const adminCount = users.filter(u => u.role === 'ADMIN').length;
+    const staffCount = users.filter(u => u.role === 'STAFF' || !u.role).length;
+    const unitCount = users.filter(u => u.role === 'UNIT').length;
+    const activeCount = users.filter(u => u.isActive !== false).length;
+
+    const elTotal = document.getElementById('users-kpi-total');
+    const elAdmin = document.getElementById('users-kpi-admin');
+    const elStaff = document.getElementById('users-kpi-staff');
+    const elUnit = document.getElementById('users-kpi-unit');
+    const elActive = document.getElementById('users-kpi-active');
+
+    if (elTotal) elTotal.innerText = totalUsers;
+    if (elAdmin) elAdmin.innerText = adminCount;
+    if (elStaff) elStaff.innerText = staffCount;
+    if (elUnit) elUnit.innerText = unitCount;
+    if (elActive) elActive.innerText = activeCount;
+
+    // 2. Filter Users
+    const searchVal = (document.getElementById('filter-users-search')?.value || '').toLowerCase().trim();
+    const roleVal = document.getElementById('filter-users-role')?.value || 'ALL';
+    const statusVal = document.getElementById('filter-users-status')?.value || 'ALL';
+
+    const filteredUsers = users.filter(u => {
+      // Role filter
+      if (roleVal !== 'ALL') {
+        const uRole = u.role || 'STAFF';
+        if (uRole !== roleVal) return false;
+      }
+      // Status filter
+      if (statusVal !== 'ALL') {
         const isActive = u.isActive !== false;
-        let roleBadge = '<span class="badge priority-orta">👤 Satınalma Uzmanı</span>';
-        if (u.role === 'ADMIN') {
-          roleBadge = '<span class="badge priority-kritik">🛡️ Satınalma Yöneticisi (ADMIN)</span>';
-        } else if (u.role === 'EXECUTIVE') {
-          roleBadge = '<span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:700; border:1px solid rgba(245,158,11,0.35);">🏛️ Yönetim</span>';
-        } else if (u.role === 'UNIT') {
-          roleBadge = `<span class="badge" style="background:rgba(59,130,246,0.15); color:#2563eb; font-weight:700; border:1px solid rgba(59,130,246,0.35);" title="Bağlı Birim: ${u.unit || '-'}">🏢 ${u.unit || 'Birim Kullanıcısı'}</span>`;
-        }
-        return `
-          <tr>
-            <td>
-              <div style="font-weight:700;">${u.name}</div>
-              <div style="font-size:0.75rem; color:var(--text-muted);">${u.email || '-'}</div>
-            </td>
-            <td style="font-weight:600;">${u.title}</td>
-            <td>${roleBadge}</td>
-            <td><span class="badge status-${isActive ? 'active' : 'passive'}">${isActive ? '🟢 Aktif' : '🔴 Pasif (Ayrıldı)'}</span></td>
-            <td>
-              <div class="action-btns">
-                <button class="btn-icon" onclick="App.openUserModal(${u.id})" title="Düzenle / Rol & Şifre Değiştir">✏️</button>
-                <button class="btn-icon" onclick="App.toggleUserStatus(${u.id})" title="${isActive ? 'Pasif Yap' : 'Aktif Yap'}">
-                  ${isActive ? '🔴' : '🟢'}
-                </button>
-                <button class="btn-icon" onclick="App.deleteUser(${u.id})" title="Kullanıcıyı Sil">🗑️</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
+        if (statusVal === 'ACTIVE' && !isActive) return false;
+        if (statusVal === 'PASSIVE' && isActive) return false;
+      }
+      // Search filter
+      if (searchVal) {
+        const nameMatch = (u.name || '').toLowerCase().includes(searchVal);
+        const titleMatch = (u.title || '').toLowerCase().includes(searchVal);
+        const emailMatch = (u.email || '').toLowerCase().includes(searchVal);
+        const unitMatch = (u.unit || '').toLowerCase().includes(searchVal);
+        const phoneMatch = (u.phone || '').toLowerCase().includes(searchVal);
+        if (!nameMatch && !titleMatch && !emailMatch && !unitMatch && !phoneMatch) return false;
+      }
+      return true;
+    });
+
+    // 3. Render Table Rows
+    const tbody = document.querySelector('#table-users-settings tbody');
+    if (!tbody) return;
+
+    if (filteredUsers.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-muted);">Arama kriterlerine uygun kullanıcı bulunamadı.</td></tr>';
+      return;
     }
+
+    tbody.innerHTML = filteredUsers.map(u => {
+      const isActive = u.isActive !== false;
+      let roleBadge = '<span class="badge priority-orta">👤 Satınalma Uzmanı</span>';
+      if (u.role === 'ADMIN') {
+        roleBadge = '<span class="badge priority-kritik">🛡️ Satınalma Yöneticisi</span>';
+      } else if (u.role === 'EXECUTIVE') {
+        roleBadge = '<span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:700; border:1px solid rgba(245,158,11,0.35);">🏛️ Üst Yönetim</span>';
+      } else if (u.role === 'UNIT') {
+        roleBadge = '<span class="badge" style="background:rgba(59,130,246,0.15); color:#2563eb; font-weight:700; border:1px solid rgba(59,130,246,0.35);">🏢 Birim Kullanıcısı</span>';
+      }
+
+      let unitDisplay = '<span style="color: var(--text-muted); font-size: 0.85rem;">Satınalma Md.</span>';
+      if (u.role === 'UNIT') {
+        unitDisplay = u.unit 
+          ? `<span class="badge" style="background: rgba(99,102,241,0.1); color: var(--accent-primary); border: 1px solid rgba(99,102,241,0.25);">🏢 ${u.unit}</span>`
+          : '<span style="color: #ef4444; font-size: 0.82rem; font-weight: 600;">⚠️ Tanımlanmamış</span>';
+      }
+
+      return `
+        <tr>
+          <td>
+            <div style="font-weight:700; color: var(--text-main);">${u.name}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.15rem;">
+              ${u.email ? `<span>✉️ ${u.email}</span>` : ''}
+              ${u.phone ? `<span>📞 ${u.phone}</span>` : ''}
+            </div>
+          </td>
+          <td style="font-weight:600;">${u.title || '-'}</td>
+          <td>${roleBadge}</td>
+          <td>${unitDisplay}</td>
+          <td><span class="badge status-${isActive ? 'completed' : 'cancelled'}">${isActive ? '🟢 Aktif' : '🔴 Pasif (Ayrıldı)'}</span></td>
+          <td style="text-align: center;">
+            <div class="action-btns" style="justify-content: center; gap: 0.35rem;">
+              <button class="btn-icon" onclick="App.openUserModal(${u.id})" title="Düzenle / Rol & Şifre Değiştir" style="font-size: 0.9rem; padding: 0.3rem 0.5rem;">✏️</button>
+              <button class="btn-icon" onclick="App.toggleUserStatus(${u.id})" title="${isActive ? 'Hesabı Pasife Al' : 'Hesabı Aktif Et'}" style="font-size: 0.9rem; padding: 0.3rem 0.5rem;">
+                ${isActive ? '🔴' : '🟢'}
+              </button>
+              <button class="btn-icon" onclick="App.deleteUser(${u.id})" title="Kullanıcıyı Sil" style="font-size: 0.9rem; padding: 0.3rem 0.5rem;">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  renderSettings() {
+    this.renderUsersSettings();
     this.syncRatesInputUI();
     this.renderWorkloadSettingsUI();
     this.renderUnitsSettings();
