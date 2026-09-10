@@ -2435,50 +2435,50 @@
         <!-- TAB 1: KULLANICI VE YETKİ YÖNETİMİ (DETAYLI PANEL) -->
         <div class="settings-tab-content" data-tab="users" id="tab-content-users">
           <!-- User KPIs -->
-          <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 1.25rem;">
-            <div class="kpi-card" style="padding: 1rem 1.25rem;">
-              <div class="kpi-header">
-                <span class="kpi-icon" style="background: rgba(99,102,241,0.15); color: #6366f1;">👥</span>
-                <span class="badge status-open">Toplam</span>
+          <div class="grid-4" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 1.25rem;">
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon purple">👥</div>
+              <div class="kpi-data">
+                <h3 id="users-kpi-total">0</h3>
+                <p>Toplam Kullanıcı</p>
+                <div class="kpi-sub">Kayıtlı Hesap</div>
               </div>
-              <h3 id="users-kpi-total" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
-              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Kayıtlı Kullanıcı</p>
             </div>
 
-            <div class="kpi-card" style="padding: 1rem 1.25rem;">
-              <div class="kpi-header">
-                <span class="kpi-icon" style="background: rgba(239,68,68,0.15); color: #ef4444;">🛡️</span>
-                <span class="badge priority-kritik">Yönetici</span>
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon red">🛡️</div>
+              <div class="kpi-data">
+                <h3 id="users-kpi-admin">0</h3>
+                <p>Satınalma Yöneticisi</p>
+                <div class="kpi-sub">ADMIN Yetkili</div>
               </div>
-              <h3 id="users-kpi-admin" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
-              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Satınalma Yöneticisi</p>
             </div>
 
-            <div class="kpi-card" style="padding: 1rem 1.25rem;">
-              <div class="kpi-header">
-                <span class="kpi-icon" style="background: rgba(245,158,11,0.15); color: #f59e0b;">👤</span>
-                <span class="badge priority-orta">Uzman</span>
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon yellow">👤</div>
+              <div class="kpi-data">
+                <h3 id="users-kpi-staff">0</h3>
+                <p>Satınalma Uzmanı</p>
+                <div class="kpi-sub">STAFF Yetkili</div>
               </div>
-              <h3 id="users-kpi-staff" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
-              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Satınalma Uzmanı</p>
             </div>
 
-            <div class="kpi-card" style="padding: 1rem 1.25rem;">
-              <div class="kpi-header">
-                <span class="kpi-icon" style="background: rgba(59,130,246,0.15); color: #3b82f6;">🏢</span>
-                <span class="badge status-completed">Birim</span>
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon blue">🏢</div>
+              <div class="kpi-data">
+                <h3 id="users-kpi-unit">0</h3>
+                <p>Birim Kullanıcısı</p>
+                <div class="kpi-sub">UNIT Rolü</div>
               </div>
-              <h3 id="users-kpi-unit" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
-              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Birim Kullanıcısı</p>
             </div>
 
-            <div class="kpi-card" style="padding: 1rem 1.25rem;">
-              <div class="kpi-header">
-                <span class="kpi-icon" style="background: rgba(16,185,129,0.15); color: #10b981;">🟢</span>
-                <span class="badge status-completed">Durum</span>
+            <div class="glass-card kpi-card">
+              <div class="kpi-icon green">🟢</div>
+              <div class="kpi-data">
+                <h3 id="users-kpi-active">0</h3>
+                <p>Aktif Hesap</p>
+                <div class="kpi-sub">Aktif Personel</div>
               </div>
-              <h3 id="users-kpi-active" style="font-size: 1.6rem; margin: 0.35rem 0;">0</h3>
-              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Aktif Hesap</p>
             </div>
           </div>
 
