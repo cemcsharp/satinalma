@@ -757,7 +757,7 @@ const App = {
         if (['requests', 'contracts', 'invoices', 'notifications', 'supplier-analysis'].includes(view)) {
           item.style.display = '';
           if (view === 'supplier-analysis') {
-            const btnSpan = item.querySelector('button span:last-child');
+            const btnSpan = item.querySelector('a span:last-child, button span:last-child');
             if (btnSpan) btnSpan.innerText = 'Çalışılan Firmalar';
             const iconSpan = item.querySelector('.nav-icon');
             if (iconSpan) iconSpan.innerText = '🏢';
@@ -767,7 +767,7 @@ const App = {
         }
       } else {
         if (view === 'supplier-analysis') {
-          const btnSpan = item.querySelector('button span:last-child');
+          const btnSpan = item.querySelector('a span:last-child, button span:last-child');
           if (btnSpan) btnSpan.innerText = 'Tedarikçi Analizi';
           const iconSpan = item.querySelector('.nav-icon');
           if (iconSpan) iconSpan.innerText = '🏭';
@@ -1912,8 +1912,8 @@ const App = {
     const isUnit = this.state.currentUser?.role === 'UNIT';
 
     // Restrict views for UNIT role
-    if (isUnit && !['requests', 'contracts', 'invoices', 'notifications'].includes(viewName)) {
-      this.showToast('Birim kullanıcıları yalnızca Talepler, Faturalar ve Sözleşmeler sayfalarına erişebilir.', 'info', '🏢');
+    if (isUnit && !['requests', 'contracts', 'invoices', 'notifications', 'supplier-analysis', 'vendor-profile'].includes(viewName)) {
+      this.showToast('Birim kullanıcıları yalnızca Talepler, Sözleşmeler, Faturalar ve Çalışılan Firmalar sayfalarına erişebilir.', 'info', '🏢');
       viewName = 'requests';
     }
 
