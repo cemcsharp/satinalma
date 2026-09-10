@@ -358,6 +358,7 @@ aside.sidebar.collapsed {
 
 aside.sidebar.collapsed .brand-text,
 aside.sidebar.collapsed .nav-section-title,
+aside.sidebar.collapsed .nav-item a span:not(.nav-icon),
 aside.sidebar.collapsed .nav-item button span:not(.nav-icon),
 aside.sidebar.collapsed .user-details,
 aside.sidebar.collapsed #btn-logout {
@@ -369,6 +370,7 @@ aside.sidebar.collapsed .brand {
   padding: 0.25rem 0 0.5rem;
 }
 
+aside.sidebar.collapsed .nav-item a,
 aside.sidebar.collapsed .nav-item button {
   justify-content: center;
   padding: 0.65rem 0;
@@ -448,6 +450,7 @@ body.sidebar-collapsed main.main-content {
   margin-top: 0;
 }
 
+.nav-item a,
 .nav-item button {
   width: 100%;
   display: flex;
@@ -464,6 +467,8 @@ body.sidebar-collapsed main.main-content {
   cursor: pointer;
   transition: var(--transition-fast);
   text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
 .nav-icon {
@@ -473,11 +478,13 @@ body.sidebar-collapsed main.main-content {
   text-align: center;
 }
 
+.nav-item a:hover,
 .nav-item button:hover {
   background: rgba(125, 125, 125, 0.08);
   color: var(--text-main);
 }
 
+.nav-item.active a,
 .nav-item.active button {
   background: var(--accent-primary-gradient);
   color: #ffffff;
@@ -3185,6 +3192,7 @@ th.sticky-col-left, th.sticky-col-right {
 
   aside.sidebar.collapsed .brand-text,
   aside.sidebar.collapsed .nav-section-title,
+  aside.sidebar.collapsed .nav-item a span:not(.nav-icon),
   aside.sidebar.collapsed .nav-item button span:not(.nav-icon),
   aside.sidebar.collapsed .user-details,
   aside.sidebar.collapsed #btn-logout {
@@ -3195,6 +3203,7 @@ th.sticky-col-left, th.sticky-col-right {
     justify-content: flex-start !important;
   }
 
+  aside.sidebar.collapsed .nav-item a,
   aside.sidebar.collapsed .nav-item button {
     justify-content: flex-start !important;
     padding: 0.65rem 0.8rem !important;
@@ -3380,6 +3389,7 @@ body.role-executive #btn-restore-backup,
 
   aside.sidebar.collapsed .brand-text,
   aside.sidebar.collapsed .nav-section-title,
+  aside.sidebar.collapsed .nav-item a span:not(.nav-icon),
   aside.sidebar.collapsed .nav-item button span:not(.nav-icon),
   aside.sidebar.collapsed .user-details,
   aside.sidebar.collapsed #btn-logout {
@@ -3390,6 +3400,7 @@ body.role-executive #btn-restore-backup,
     justify-content: flex-start !important;
   }
 
+  aside.sidebar.collapsed .nav-item a,
   aside.sidebar.collapsed .nav-item button {
     justify-content: flex-start !important;
     padding: 0.65rem 0.8rem !important;

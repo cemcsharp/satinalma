@@ -854,6 +854,24 @@ const App = {
         this.switchView('invoices', true);
         setTimeout(() => this.viewInvoiceDetails(invoiceId), 150);
       }
+    } else if (hash.startsWith('#guarantee/') || hash.startsWith('#/guarantee/')) {
+      const guaranteeId = hash.replace(/^#\/?guarantee\//, '');
+      if (guaranteeId) {
+        this.switchView('guarantees', true);
+        setTimeout(() => this.viewGuaranteeDetails(guaranteeId), 150);
+      }
+    } else if (hash.startsWith('#tender/') || hash.startsWith('#/tender/')) {
+      const tenderId = hash.replace(/^#\/?tender\//, '');
+      if (tenderId) {
+        this.switchView('tenders', true);
+        setTimeout(() => this.viewTenderDetails(tenderId), 150);
+      }
+    } else if (hash.startsWith('#vendor/') || hash.startsWith('#/vendor/')) {
+      const vendorName = decodeURIComponent(hash.replace(/^#\/?vendor\//, ''));
+      if (vendorName) {
+        this.switchView('supplier-analysis', true);
+        setTimeout(() => this.openVendorProfile(vendorName), 150);
+      }
     } else if (hash.startsWith('#/')) {
       const viewName = hash.replace(/^#\//, '').split('/')[0];
       if (viewName && viewName !== this.state.currentView) {
@@ -863,13 +881,18 @@ const App = {
   },
 
   _handleLinkClick(event, type, id) {
-    if (event.ctrlKey || event.metaKey || event.button === 1) {
+    if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1)) {
       return true;
     }
-    event.preventDefault();
+    if (event) event.preventDefault();
     if (type === 'request') this.viewRequestDetails(id);
     else if (type === 'contract') this.viewContractDetails(id);
     else if (type === 'invoice') this.viewInvoiceDetails(id);
+    else if (type === 'guarantee') this.viewGuaranteeDetails(id);
+    else if (type === 'tender') this.viewTenderDetails(id);
+    else if (type === 'vendor') this.openVendorProfile(id);
+    else if (type === 'view') this.switchView(id);
+    return false;
   },
 
   async handlePortalSearch(query) {
@@ -1051,6 +1074,8 @@ const App = {
     // Nav items
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
         const view = item.getAttribute('data-view');
         this.switchView(view);
       });
@@ -3833,9 +3858,9 @@ const App = {
       <tr>
         <td><input type="checkbox" class="chk-select-request" data-id="${r.id}" onchange="App._onRowCheckboxChange()"></td>
         <td>${r.sequenceNo || startIdx + i + 1}</td>
-        <td class="sticky-col-left"><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
+        <td class="sticky-col-left"><a href="#request/${r.id}" onclick="App._handleLinkClick(event, 'request', '${r.id}')" style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary); text-decoration:none;" title="Talebi Görüntüle (Sağ Tık / Scroll: Yeni Sekme)">${r.requestBarcode || '-'}</a></td>
         <td style="font-weight:600; min-width: 220px; max-width: 320px;">
-          <div>${r.subject}</div>
+          <div><a href="#request/${r.id}" onclick="App._handleLinkClick(event, 'request', '${r.id}')" style="color:var(--text-main); text-decoration:none;" title="Talebi Görüntüle (Sağ Tık / Scroll: Yeni Sekme)">${r.subject}</a></div>
           <div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">${r.description ? r.description.substring(0, 45) + '...' : ''}</div>
         </td>
         <td style="font-size:0.8rem; min-width: 140px;">${r.unit}</td>
@@ -4151,8 +4176,8 @@ const App = {
 
     tbody.innerHTML = requests.map(r => `
       <tr>
-        <td style="white-space:nowrap;"><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${r.requestBarcode || '-'}</span></td>
-        <td style="font-weight:600; min-width: 220px; max-width: 340px;">${r.subject}</td>
+        <td style="white-space:nowrap;"><a href="#request/${r.id}" onclick="App._handleLinkClick(event, 'request', '${r.id}')" style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary); text-decoration:none;" title="Talebi Görüntüle (Sağ Tık / Scroll: Yeni Sekme)">${r.requestBarcode || '-'}</a></td>
+        <td style="font-weight:600; min-width: 220px; max-width: 340px;"><a href="#request/${r.id}" onclick="App._handleLinkClick(event, 'request', '${r.id}')" style="color:var(--text-main); text-decoration:none;" title="Talebi Görüntüle (Sağ Tık / Scroll: Yeni Sekme)">${r.subject}</a></td>
         <td style="font-size:0.82rem; min-width: 140px;">${r.unit}</td>
         <td style="font-size:0.82rem; white-space:nowrap;">${r.arrivalDate || r.requestDate}</td>
         <td style="white-space:nowrap;">${this.getStatusBadge(r)}</td>
@@ -4296,9 +4321,9 @@ const App = {
 
       return `
         <tr>
-          <td><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${c.contractNo}</span></td>
-          <td style="font-weight:600; max-width:260px;">${c.title}</td>
-          <td style="font-weight:600;">${c.supplier}</td>
+          <td><a href="#contract/${c.id}" onclick="App._handleLinkClick(event, 'contract', '${c.id}')" style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary); text-decoration:none;" title="Sözleşmeyi Görüntüle (Sağ Tık / Scroll: Yeni Sekme)">${c.contractNo}</a></td>
+          <td style="font-weight:600; max-width:260px;"><a href="#contract/${c.id}" onclick="App._handleLinkClick(event, 'contract', '${c.id}')" style="color:var(--text-main); text-decoration:none;" title="Sözleşmeyi Görüntüle (Sağ Tık / Scroll: Yeni Sekme)">${c.title}</a></td>
+          <td style="font-weight:600;"><a href="#vendor/${encodeURIComponent(c.supplier)}" onclick="App._handleLinkClick(event, 'vendor', '${encodeURIComponent(c.supplier)}')" style="color:var(--text-main); text-decoration:none;" title="Tedarikçi Profilini Aç (Sağ Tık / Scroll: Yeni Sekme)">${c.supplier}</a></td>
           <td style="font-size:0.8rem;">${c.unit}</td>
           <td style="font-weight:700; font-family:var(--font-mono);">${this.formatMoney(c.totalAmount || 0, c.currency || 'TRY', 2)}</td>
           <td style="font-size:0.8rem; color:var(--text-muted);">${c.startDate} / ${c.endDate}</td>
@@ -5416,18 +5441,18 @@ const App = {
 
       return `
         <tr>
-          <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary);">${g.letterNo}</td>
+          <td style="font-family: var(--font-mono); font-weight: 700;"><a href="#guarantee/${g.id}" onclick="App._handleLinkClick(event, 'guarantee', '${g.id}')" style="color: var(--accent-primary); text-decoration:none;" title="Teminat Mektubunu Görüntüle (Sağ Tık / Scroll: Yeni Sekme)">${g.letterNo}</a></td>
           <td style="font-weight: 700;">🏦 ${g.bankName}</td>
           <td><span class="badge priority-orta" style="font-size:0.75rem;">${g.type}</span></td>
-          <td style="font-weight: 600; max-width:240px;" title="${g.title}">${g.title}</td>
-          <td style="font-weight: 600;">${g.supplier}</td>
+          <td style="font-weight: 600; max-width:240px;" title="${g.title}"><a href="#guarantee/${g.id}" onclick="App._handleLinkClick(event, 'guarantee', '${g.id}')" style="color:var(--text-main); text-decoration:none;" title="Teminat Mektubunu Görüntüle (Sağ Tık / Scroll: Yeni Sekme)">${g.title}</a></td>
+          <td style="font-weight: 600;"><a href="#vendor/${encodeURIComponent(g.supplier)}" onclick="App._handleLinkClick(event, 'vendor', '${encodeURIComponent(g.supplier)}')" style="color:var(--text-main); text-decoration:none;" title="Tedarikçi Profilini Aç (Sağ Tık / Scroll: Yeni Sekme)">${g.supplier}</a></td>
           <td style="font-weight: 800; color: var(--status-completed); font-family: var(--font-mono);">${this.formatMoney(g.amount || 0, g.currency || 'TRY', 2)}</td>
           <td style="font-weight: 600; color: ${badgeClass === 'priority-kritik' ? 'var(--status-rejected)' : 'var(--text-main)'};">${g.expiryDate || '-'}</td>
           <td style="font-size:0.8rem; color:var(--text-muted);">🔒 ${g.storageLocation || 'Kasada'}</td>
           <td><span class="badge ${badgeClass}">${statusStr}</span></td>
           <td style="text-align: center;">
             <div class="action-btns" style="justify-content: center;">
-              <button class="btn-icon" onclick="App.viewGuaranteeDetails('${g.id}')" title="Görüntüle">👁️</button>
+              <a href="#guarantee/${g.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'guarantee', '${g.id}')" title="Görüntüle (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('guarantee', '${g.id}', 'Teminat #${g.letterNo} — ${g.bankName?.replace(/'/g, "\\'")}')" title="Evraklar & Dijital Arşiv">📁</button>
               ${!isExec ? `<button class="btn-icon btn-edit-action" onclick="App.openGuaranteeModal('${g.id}')" title="Düzenle">✏️</button>` : ''}
               ${!isExec && g.status !== 'İade Edildi' ? `<button class="btn-icon" onclick="App.returnGuaranteeToFirm('${g.id}')" title="Firmaya İade Et">↩️</button>` : ''}
@@ -5733,8 +5758,8 @@ const App = {
 
       return `
         <tr>
-          <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-primary);">${t.tenderNo || '-'}</td>
-          <td style="font-weight:600; max-width:240px;">${t.title || '-'}</td>
+          <td style="font-weight:700; font-family:var(--font-mono);"><a href="#tender/${t.id}" onclick="App._handleLinkClick(event, 'tender', '${t.id}')" style="color:var(--accent-primary); text-decoration:none;" title="İhale Detayını İncele (Sağ Tık / Scroll: Yeni Sekme)">${t.tenderNo || '-'}</a></td>
+          <td style="font-weight:600; max-width:240px;"><a href="#tender/${t.id}" onclick="App._handleLinkClick(event, 'tender', '${t.id}')" style="color:var(--text-main); text-decoration:none;" title="İhale Detayını İncele (Sağ Tık / Scroll: Yeni Sekme)">${t.title || '-'}</a></td>
           <td>
             <div style="font-weight:600;">${t.tenderDate || '-'}</div>
             <div style="font-size:0.78rem; color:var(--text-muted);">${t.tenderTime || ''}</div>
@@ -5744,14 +5769,14 @@ const App = {
           <td><span style="font-size:0.82rem; font-weight:600;">${t.regulation || '-'}</span></td>
           <td style="font-weight:700;">${estText}</td>
           <td style="font-size:0.85rem;">
-            <div>${t.winnerSupplier || '-'}</div>
+            <div>${t.winnerSupplier ? `<a href="#vendor/${encodeURIComponent(t.winnerSupplier)}" onclick="App._handleLinkClick(event, 'vendor', '${encodeURIComponent(t.winnerSupplier)}')" style="color:var(--text-main); text-decoration:none;" title="Tedarikçi Profilini Aç (Sağ Tık / Scroll: Yeni Sekme)">${t.winnerSupplier}</a>` : '-'}</div>
             ${actText ? `<div style="font-size:0.78rem; color:var(--status-completed); font-weight:600;">${actText}</div>` : ''}
           </td>
           <td>${t.assignedTo || '-'}</td>
           <td><span class="badge ${stClass}">${stIcon} ${t.status || 'Planlandı'}</span></td>
           <td style="text-align: center;">
             <div class="action-btns" style="justify-content:center;">
-              <button class="btn-icon" onclick="App.viewTenderDetails('${t.id}')" title="Detayları İncele">👁️</button>
+              <a href="#tender/${t.id}" class="btn-icon" onclick="App._handleLinkClick(event, 'tender', '${t.id}')" title="Detayları İncele (Sağ Tık: Yeni Sekme)" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">👁️</a>
               <button class="btn-icon" onclick="App.openDocumentManager('tender', '${t.id}', 'İhale #${t.tenderNo || t.id} — ${t.title?.replace(/'/g, "\\'")}')" title="İhale Evrakları & Dijital Arşiv (${docCount} Belge)" style="position:relative;">
                 📁${docCount > 0 ? `<span style="position:absolute; top:-4px; right:-4px; background:var(--accent-primary); color:#fff; font-size:0.6rem; font-weight:800; border-radius:50%; width:14px; height:14px; display:flex; align-items:center; justify-content:center;">${docCount}</span>` : ''}
               </button>
@@ -6111,10 +6136,10 @@ const App = {
             <input type="checkbox" class="chk-select-invoice" data-id="${inv.id}" onchange="App._onInvoiceCheckboxChange()">
           </td>
           <td>
-            <span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary);">${inv.invoiceNo}</span>
+            <a href="#invoice/${inv.id}" onclick="App._handleLinkClick(event, 'invoice', ${inv.id})" style="font-family:var(--font-mono); font-weight:700; color:var(--accent-primary); text-decoration:none;" title="Faturayı Aç (Sağ Tık / Scroll: Yeni Sekme)">${inv.invoiceNo}</a>
             ${inv.relatedBarcode ? `<br><small style="font-size:0.75rem; color:var(--accent-purple); font-family:var(--font-mono);">#${inv.relatedBarcode}</small>` : ''}
           </td>
-          <td style="font-weight:600; min-width: 150px;">${inv.supplier}</td>
+          <td style="font-weight:600; min-width: 150px;"><a href="#vendor/${encodeURIComponent(inv.supplier)}" onclick="App._handleLinkClick(event, 'vendor', '${encodeURIComponent(inv.supplier)}')" style="color:var(--text-main); text-decoration:none;" title="Tedarikçi Profilini Aç (Sağ Tık / Scroll: Yeni Sekme)">${inv.supplier}</a></td>
           <td style="font-weight:800; font-family:var(--font-mono); color:var(--status-completed); font-size:0.92rem; white-space:nowrap;">${this.formatMoney(inv.amount || 0, inv.currency || 'TRY', 2)}</td>
           <td style="font-size:0.82rem; color:var(--text-muted); white-space:nowrap;">${inv.invoiceDate || '-'}</td>
           <td style="white-space:nowrap;">
@@ -7108,7 +7133,7 @@ const App = {
             <tr>
               <td style="font-weight:700; color:var(--text-muted);">${i + 1}</td>
               <td style="font-weight:700;">
-                <a href="javascript:void(0)" onclick="App.openVendorProfile('${safeName}')" style="color:var(--text-main); text-decoration:underline; text-decoration-color:var(--accent-primary);" title="360° Karnesini Aç">
+                <a href="#vendor/${encodeURIComponent(safeName)}" onclick="App._handleLinkClick(event, 'vendor', '${safeName}')" style="color:var(--text-main); text-decoration:underline; text-decoration-color:var(--accent-primary);" title="360° Karnesini Aç (Sağ Tık / Scroll: Yeni Sekme)">
                   🏢 ${sName}
                 </a>
               </td>
@@ -7120,9 +7145,9 @@ const App = {
               <td style="font-weight:600;">%${share}</td>
               <td style="text-align:center;">
                 <div style="display:flex; gap:0.35rem; justify-content:center;">
-                  <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--accent-primary); color:var(--accent-primary); font-weight:700;" onclick="App.openVendorProfile('${safeName}')" title="360° Firma Profili & Radar Karnesi">
+                  <a href="#vendor/${encodeURIComponent(safeName)}" class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--accent-primary); color:var(--accent-primary); font-weight:700; text-decoration:none; display:inline-flex; align-items:center;" onclick="App._handleLinkClick(event, 'vendor', '${safeName}')" title="360° Firma Profili & Radar Karnesi (Sağ Tık: Yeni Sekme)">
                     <span>🔍</span> Profil
-                  </button>
+                  </a>
                   ${this.state.currentUser?.role !== 'UNIT' ? `
                     <button class="btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-color:var(--status-completed); color:var(--status-completed); font-weight:700;" onclick="App.openEditSupplierByName('${safeName}')" title="Cari Kartı Düzenle / Tanımla">
                       <span>✏️</span> Düzenle
