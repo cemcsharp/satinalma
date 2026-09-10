@@ -8249,6 +8249,7 @@ const App = {
         const portEl = document.getElementById('smtp-port');
         const userEl = document.getElementById('smtp-user');
         const passEl = document.getElementById('smtp-pass');
+        const fromNameEl = document.getElementById('smtp-from-name');
         const fromEmailEl = document.getElementById('smtp-from-email');
         const appUrlEl = document.getElementById('smtp-app-url');
         const enabledEl = document.getElementById('smtp-is-enabled');
