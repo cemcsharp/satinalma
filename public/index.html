@@ -4403,9 +4403,14 @@
               <span style="font-weight: 800; font-size: 0.88rem; color: var(--text-main);">Aktif Bütçe Kalemleri Dağılımı</span>
               <span class="badge" id="ub-badge-summary" style="background: var(--bg-hover); font-size: 0.72rem; color: var(--text-muted);">Limitlerinizi belirleyin</span>
             </div>
-            <button type="button" class="btn-primary" onclick="App.addBudgetItemRowToUnitModal()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: 700; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.35rem;">
-              <span>➕</span> Kalem Ekle
-            </button>
+            <div style="display: flex; gap: 0.4rem;">
+              <button type="button" class="btn-secondary" id="ub-btn-copy-prev" onclick="App.copyPreviousYearBudgetItems()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: 700; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.35rem;" title="Bir önceki akademik yılın kalemlerini bu yıla kopyalar">
+                <span>🔄</span> Geçen Yılı Aktar
+              </button>
+              <button type="button" class="btn-primary" onclick="App.addBudgetItemRowToUnitModal()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: 700; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span>➕</span> Kalem Ekle
+              </button>
+            </div>
           </div>
 
           <!-- Table Header Labels -->

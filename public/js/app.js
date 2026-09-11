@@ -11575,6 +11575,73 @@ const App = {
     }
   },
 
+  getPreviousAcademicYear(yearStr) {
+    if (!yearStr || !yearStr.includes('-')) return '';
+    const parts = yearStr.split('-');
+    const y1 = parseInt(parts[0], 10);
+    const y2 = parseInt(parts[1], 10);
+    if (isNaN(y1) || isNaN(y2)) return '';
+    return `${y1 - 1}-${y2 - 1}`;
+  },
+
+  copyPreviousYearBudgetItems() {
+    const unitName = document.getElementById('ub-unit-name')?.value.trim();
+    const currentYear = this.state.selectedYear || getCurrentAcademicYear();
+    const prevYear = this.getPreviousAcademicYear(currentYear);
+
+    if (!unitName) {
+      this.showToast("Birim seçilmedi.", "warning");
+      return;
+    }
+    if (!prevYear) {
+      this.showToast("Önceki akademik yıl tespit edilemedi.", "warning");
+      return;
+    }
+
+    const unitObj = (this.state.units || []).find(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === unitName.toLowerCase().trim());
+    if (!unitObj) {
+      this.showToast("Birim kaydı bulunamadı.", "warning");
+      return;
+    }
+
+    let bData = {};
+    try {
+      if (unitObj.budgetData) bData = typeof unitObj.budgetData === 'string' ? JSON.parse(unitObj.budgetData) : unitObj.budgetData;
+    } catch (e) {}
+
+    const prevEntry = bData[prevYear];
+    let prevItems = [];
+    let prevTotal = 0;
+
+    if (typeof prevEntry === 'object' && prevEntry !== null) {
+      prevItems = Array.isArray(prevEntry.items) ? prevEntry.items : [];
+      prevTotal = prevEntry.totalBudget || 0;
+    } else if (typeof prevEntry === 'number') {
+      prevTotal = prevEntry;
+    }
+
+    if (prevItems.length === 0 && prevTotal <= 0) {
+      this.showToast(`"${unitName}" için önceki (${prevYear}) akademik yılında tanımlı bütçe kaydı bulunamadı.`, "info", "ℹ️");
+      return;
+    }
+
+    const container = document.getElementById('ub-items-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (prevItems.length > 0) {
+      prevItems.forEach(it => {
+        this.addBudgetItemRowToUnitModal(it.code, it.name, it.amount);
+      });
+      this.showToast(`Geçen yıldan (${prevYear}) ${prevItems.length} bütçe kalemi aktarıldı! Yeni yıl limitlerini düzenleyebilirsiniz.`, "success", "🔄");
+    } else if (prevTotal > 0) {
+      this.addBudgetItemRowToUnitModal('', '', prevTotal);
+      this.showToast(`Geçen yılın (${prevYear}) toplam bütçesi (${this.formatMoney(prevTotal, 'TRY', 0)}) aktarıldı!`, "success", "🔄");
+    }
+
+    this.recalcUnitModalBudget();
+  },
+
   openUnitBudgetModal(targetUnitName = null) {
     const isUnitUser = this.state.currentUser?.role === 'UNIT';
     const unitName = targetUnitName || (isUnitUser ? this.state.currentUser?.unit : document.getElementById('filter-unit')?.value) || this.state.currentUser?.unit;
