@@ -2453,6 +2453,99 @@ const App = {
       }
     });
 
+    // 5. 💰 BÜTÇE AŞIM VE KRİTİK EŞİK (%85+) ALARMLARI
+    const bgtYear = this.state.selectedYear || getCurrentAcademicYear();
+    (this.state.units || []).forEach(unitItem => {
+      const uName = (typeof unitItem === 'object' ? unitItem.name : unitItem)?.trim();
+      if (!uName) return;
+
+      let totalBudget = 0;
+      let budgetItems = [];
+      if (typeof unitItem === 'object') {
+        let bData = {};
+        try {
+          if (unitItem.budgetData) bData = typeof unitItem.budgetData === 'string' ? JSON.parse(unitItem.budgetData) : unitItem.budgetData;
+        } catch (e) {}
+
+        const yearEntry = bData[bgtYear];
+        if (typeof yearEntry === 'object' && yearEntry !== null) {
+          totalBudget = yearEntry.totalBudget || 0;
+          budgetItems = Array.isArray(yearEntry.items) ? yearEntry.items : [];
+        } else if (typeof yearEntry === 'number') {
+          totalBudget = yearEntry;
+        } else {
+          totalBudget = parseFloat(unitItem.annualBudget) || 0;
+        }
+      }
+
+      if (totalBudget <= 0 && budgetItems.length === 0) return;
+
+      // Unit requests in this academic year
+      const unitReqs = (this.state.requests || []).filter(r => {
+        const rYear = r.academicYear || this.getAcademicYear(r.arrivalDate || r.requestDate);
+        return rYear === bgtYear && (r.unit || '').trim().toLowerCase() === uName.toLowerCase();
+      });
+
+      let unitSpent = 0;
+      let unitPending = 0;
+      unitReqs.forEach(r => {
+        const amt = r.totalAmount || r.actualAmount || r.budgetAmount || r.estimatedAmount || 0;
+        if (r.status === 'Tamamlandı') unitSpent += amt;
+        else if (r.status !== 'Reddedildi' && r.status !== 'İptal' && r.status !== 'İptal Edildi') unitPending += amt;
+      });
+
+      const totalCommitted = unitSpent + unitPending;
+      const remainingBudget = totalBudget - totalCommitted;
+      const usageRatio = totalBudget > 0 ? (totalCommitted / totalBudget) * 100 : 0;
+
+      // Unit General Budget Alarms
+      if (totalBudget > 0) {
+        if (totalCommitted >= totalBudget) {
+          const id = `bgt_over_${uName}_${bgtYear}`;
+          allNotifs.push({
+            id,
+            category: 'BUDGET',
+            categoryName: 'Bütçe & Ödenek',
+            level: 'CRITICAL',
+            icon: '🚨',
+            title: `Bütçe Tükendi / Aşım: ${uName}`,
+            sub: `${bgtYear} Bütçesi: ${this.formatMoney(totalBudget, 'TRY', 0)} | Harcanan + Bloke: ${this.formatMoney(totalCommitted, 'TRY', 0)} (Kalan: ${this.formatMoney(remainingBudget, 'TRY', 0)})`,
+            date: bgtYear,
+            diffDays: -1,
+            tag: totalCommitted > totalBudget ? `%${usageRatio.toFixed(0)} Aşım!` : '%100 Tükendi',
+            tagClass: 'critical',
+            data: { unit: uName },
+            isRead: dismissed.includes(id),
+            action: () => {
+              this.switchView('budgets');
+              setTimeout(() => this.selectBudgetUnit(uName), 120);
+            }
+          });
+        } else if (usageRatio >= 85) {
+          const id = `bgt_warn_${uName}_${bgtYear}`;
+          allNotifs.push({
+            id,
+            category: 'BUDGET',
+            categoryName: 'Bütçe & Ödenek',
+            level: 'WARNING',
+            icon: '⚠️',
+            title: `Kritik Bütçe Seviyesi (%${usageRatio.toFixed(0)}): ${uName}`,
+            sub: `${bgtYear} Bütçesinden kalan kullanılabilir bakiye kritik: ${this.formatMoney(remainingBudget, 'TRY', 0)} (Kullanım: %${usageRatio.toFixed(1)})`,
+            date: bgtYear,
+            diffDays: 0,
+            tag: `%${usageRatio.toFixed(0)} Kullanıldı`,
+            tagClass: 'warning',
+            data: { unit: uName },
+            isRead: dismissed.includes(id),
+            action: () => {
+              this.switchView('budgets');
+              setTimeout(() => this.selectBudgetUnit(uName), 120);
+            }
+          });
+        }
+      }
+    });
+
     // Sort: CRITICAL first, then WARNING, then INFO; within level, by smallest diffDays
     const levelWeight = { 'CRITICAL': 1, 'WARNING': 2, 'INFO': 3 };
     allNotifs.sort((a, b) => {
@@ -2468,6 +2561,7 @@ const App = {
         if (n.category === 'GUARANTEE' || n.category === 'INVOICE') return false;
         if (n.category === 'CONTRACT' && n.data?.unit && myUnit && n.data.unit !== myUnit) return false;
         if (n.category === 'REQUEST' && n.data?.unit && myUnit && n.data.unit !== myUnit) return false;
+        if (n.category === 'BUDGET' && n.data?.unit && myUnit && n.data.unit !== myUnit) return false;
         return true;
       });
     }
@@ -2593,16 +2687,19 @@ const App = {
     if (elInfo) elInfo.innerText = countInfo;
 
     // Category Counts
+    const countBudget = allNotifs.filter(n => n.category === 'BUDGET').length;
     const countGuar = allNotifs.filter(n => n.category === 'GUARANTEE').length;
     const countCont = allNotifs.filter(n => n.category === 'CONTRACT').length;
     const countInv = allNotifs.filter(n => n.category === 'INVOICE').length;
     const countReq = allNotifs.filter(n => n.category === 'REQUEST').length;
 
+    const elCBudget = document.getElementById('notif-count-budget');
     const elCGuar = document.getElementById('notif-count-guarantee');
     const elCCont = document.getElementById('notif-count-contract');
     const elCInv = document.getElementById('notif-count-invoice');
     const elCReq = document.getElementById('notif-count-request');
 
+    if (elCBudget) elCBudget.innerText = countBudget;
     if (elCGuar) elCGuar.innerText = countGuar;
     if (elCCont) elCCont.innerText = countCont;
     if (elCInv) elCInv.innerText = countInv;
@@ -2612,6 +2709,7 @@ const App = {
     const catSelect = document.getElementById('filter-notif-category');
     if (catSelect) {
       catSelect.value = this.state.notifCategory || 'ALL';
+      const optBudget = catSelect.querySelector('option[value="BUDGET"]');
       const optGuar = catSelect.querySelector('option[value="GUARANTEE"]');
       const optCont = catSelect.querySelector('option[value="CONTRACT"]');
       const optInv = catSelect.querySelector('option[value="INVOICE"]');
@@ -2619,10 +2717,11 @@ const App = {
       const optAll = catSelect.querySelector('option[value="ALL"]');
 
       if (optAll) optAll.innerText = `📋 Tüm Bildirim Kategorileri (${countTotal})`;
+      if (optBudget) optBudget.innerText = `💰 Bütçe Alarmları (${countBudget})`;
       if (optGuar) optGuar.innerText = `🛡️ Teminat Mektupları (${countGuar})`;
       if (optCont) optCont.innerText = `📑 Sözleşmeler (${countCont})`;
       if (optInv) optInv.innerText = `🧾 Faturalar (${countInv})`;
-      if (optReq) optReq.innerText = `📋 Talepler (14+ Gün SLA: ${countReq})`;
+      if (optReq) optReq.innerText = `📋 Talepler & Teslimat (${countReq})`;
     }
 
     // Sync button active classes

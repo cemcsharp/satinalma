@@ -508,15 +508,19 @@
         <div class="filter-bar" style="gap: 0.75rem; flex-wrap: wrap;">
           <select class="filter-select" id="filter-notif-category" style="min-width: 220px; font-weight: 600;">
             <option value="ALL">📋 Tüm Bildirim Kategorileri</option>
+            <option value="BUDGET">💰 Bütçe & Limit Alarmları</option>
             <option value="GUARANTEE">🛡️ Teminat Mektupları</option>
             <option value="CONTRACT">📑 Sözleşmeler</option>
             <option value="INVOICE">🧾 Faturalar</option>
-            <option value="REQUEST">📋 Talepler (14+ Gün SLA)</option>
+            <option value="REQUEST">📋 Talepler & Teslimat</option>
           </select>
 
           <div style="display:flex; gap:0.4rem; flex-wrap:wrap;" id="notif-category-tabs">
             <button class="btn-secondary active-date-tab notif-cat-btn" data-category="ALL" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
               Tümü
+            </button>
+            <button class="btn-secondary notif-cat-btn" data-category="BUDGET" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
+              💰 Bütçe (<span id="notif-count-budget">0</span>)
             </button>
             <button class="btn-secondary notif-cat-btn" data-category="GUARANTEE" style="padding:0.45rem 0.8rem; font-size:0.8rem;">
               🛡️ Teminat (<span id="notif-count-guarantee">0</span>)
