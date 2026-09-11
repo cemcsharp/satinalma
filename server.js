@@ -124,7 +124,7 @@ const TABLE_COLUMNS = {
     'storageLocation', 'status', 'notes', 'description'
   ],
   logs: ['timestamp', 'user', 'action', 'details'],
-  units: ['name', 'email'],
+  units: ['name', 'email', 'annualBudget', 'budgetData'],
   regulations: ['name'],
   tenders: [
     'tenderNo', 'title', 'tenderDate', 'tenderTime', 'status', 'unit',
@@ -1406,7 +1406,7 @@ const server = http.createServer(async (req, res) => {
     return user && (user.role === 'EXECUTIVE' || user.role === 'UNIT');
   }
 
-  if (currentUser && isReadOnlyUser(currentUser) && method !== 'GET' && urlPath !== '/api/auth/logout' && urlPath !== '/api/auth/change-password' && urlPath !== '/api/auth/update-profile') {
+  if (currentUser && isReadOnlyUser(currentUser) && method !== 'GET' && urlPath !== '/api/auth/logout' && urlPath !== '/api/auth/change-password' && urlPath !== '/api/auth/update-profile' && urlPath !== '/api/units/my-budget') {
     const isPublicVendorRating = urlPath === '/api/vendor_ratings' && method === 'POST';
     if (!isPublicVendorRating) {
       return sendForbidden('Bu hesap güvenli salt-okunur (izleme) modundadır. Veri değiştirme yetkisi bulunmamaktadır.');
@@ -1675,9 +1675,53 @@ const server = http.createServer(async (req, res) => {
         [dateStr, dbUser.name, 'Şifre Değiştirildi', 'Kullanıcı kendi oturumundan şifresini başarıyla güncelledi.']
       ).catch(() => {});
 
-      res.writeHead(200);
-      res.end(JSON.stringify({ success: true, message: 'Şifreniz başarıyla değiştirildi.' }));
       return;
+    }
+
+    // ----------------------------------------------------
+    // 🏢 BİRİM BÜTÇESİ GÜNCELLEME (BİRİM & ADMİN)
+    // ----------------------------------------------------
+    if (urlPath === '/api/units/my-budget' && method === 'POST') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      if (!currentUser) return sendUnauthorized();
+      
+      const isUnitUser = currentUser.role === 'UNIT';
+      const body = await readBody(req);
+      const data = JSON.parse(body || '{}');
+      const unitName = (isUnitUser ? currentUser.unit : data.unitName || currentUser.unit || '').trim();
+      const budget = parseFloat(data.annualBudget) || 0;
+      const academicYear = data.academicYear || getCurrentAcademicYear();
+
+      if (!unitName) {
+        res.writeHead(400);
+        return res.end(JSON.stringify({ error: 'Birim adı belirlenemedi.' }));
+      }
+
+      const unitRes = await pool.query('SELECT id, name, "annualBudget", "budgetData" FROM units WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))', [unitName]);
+      if (unitRes.rows.length === 0) {
+        res.writeHead(404);
+        return res.end(JSON.stringify({ error: `"${unitName}" isimli birim kaydı bulunamadı.` }));
+      }
+
+      const u = unitRes.rows[0];
+      let bData = {};
+      try {
+        if (u.budgetData) bData = typeof u.budgetData === 'string' ? JSON.parse(u.budgetData) : u.budgetData;
+      } catch (e) {}
+      bData[academicYear] = budget;
+
+      await pool.query('UPDATE units SET "annualBudget" = $1, "budgetData" = $2 WHERE id = $3', [budget, JSON.stringify(bData), u.id]);
+
+      const pad = (n) => String(n).padStart(2, '0');
+      const now = new Date();
+      const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      await pool.query(
+        'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
+        [dateStr, currentUser.name, 'Birim Bütçesi Güncellendi', `Birim: ${u.name}, Dönem: ${academicYear}, Yeni Bütçe: ${budget.toLocaleString('tr-TR')} ₺`]
+      ).catch(() => {});
+
+      res.writeHead(200);
+      return res.end(JSON.stringify({ success: true, unitId: u.id, unitName: u.name, annualBudget: budget, budgetData: bData, academicYear }));
     }
 
     // ----------------------------------------------------
@@ -1905,7 +1949,7 @@ const server = http.createServer(async (req, res) => {
         getTableData('invoices'),
         getTableData('guarantees'),
         getTableData('logs'),
-        pool.query('SELECT id, name, email FROM units ORDER BY name ASC'),
+        pool.query('SELECT id, name, email, "annualBudget", "budgetData" FROM units ORDER BY name ASC'),
         pool.query('SELECT id, name FROM regulations ORDER BY id ASC'),
         pool.query('SELECT * FROM rates'),
         getTableData('tenders').catch(() => []),
@@ -3025,6 +3069,8 @@ async function initDatabaseSchema() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS "emailNotify" BOOLEAN DEFAULT true;
 
       ALTER TABLE units ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+      ALTER TABLE units ADD COLUMN IF NOT EXISTS "annualBudget" NUMERIC DEFAULT 0;
+      ALTER TABLE units ADD COLUMN IF NOT EXISTS "budgetData" TEXT;
 
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "sequenceNo" INTEGER;
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS "requestDate" VARCHAR(100);

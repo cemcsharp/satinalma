@@ -3795,6 +3795,9 @@ const App = {
       if (elSub4) elSub4.innerText = '⚡ Kapatılan İşleri Filtrele';
     }
 
+    // Render Unit Budget Summary Widget (3-Stage Budget, Committed & Spend Tracking)
+    this.renderUnitBudgetWidget();
+
     let requests = [...allFilteredRequests];
 
     const searchText = document.getElementById('filter-search')?.value.toLowerCase() || '';
@@ -10107,24 +10110,36 @@ const App = {
     const tbody = document.getElementById('tbody-units-settings');
     if (!tbody) return;
     if (!this.state.units || this.state.units.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding:1rem;">Tanımlı birim bulunamadı.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">Tanımlı birim bulunamadı.</td></tr>`;
       return;
     }
+    const currentYear = this.state.selectedYear || getCurrentAcademicYear();
     tbody.innerHTML = this.state.units.map(u => {
       const id = typeof u === 'object' ? u.id : u;
       const name = typeof u === 'object' ? u.name : u;
       const email = typeof u === 'object' ? (u.email || '') : '';
+      let bData = {};
+      try {
+        if (u.budgetData) bData = typeof u.budgetData === 'string' ? JSON.parse(u.budgetData) : u.budgetData;
+      } catch (e) {}
+      const budget = bData[currentYear] !== undefined ? bData[currentYear] : (parseFloat(u.annualBudget) || 0);
+
       const emailBadge = email
         ? `<span class="badge status-open" style="font-family:var(--font-mono); font-size:0.78rem;">📧 ${email}</span>`
         : `<span style="font-size:0.75rem; color:var(--text-muted); opacity:0.7;">E-Posta Yok</span>`;
+
+      const budgetBadge = budget > 0
+        ? `<span style="font-weight:700; font-family:var(--font-mono); color:var(--status-completed); font-size:0.88rem;">${this.formatMoney(budget, 'TRY', 0)}</span>`
+        : `<span style="font-size:0.75rem; color:var(--text-muted); opacity:0.7;">Bütçe Yok</span>`;
 
       return `
         <tr>
           <td style="font-weight:600; color:var(--text-main);">🏢 ${name}</td>
           <td>${emailBadge}</td>
+          <td style="text-align:right;">${budgetBadge}</td>
           <td style="text-align:center;">
             <div class="action-btns" style="justify-content:center; gap:0.25rem;">
-              <button class="btn-icon" onclick="App.openEditUnitModal(${id})" title="Birim Bilgilerini ve E-Postasını Düzenle">✏️</button>
+              <button class="btn-icon" onclick="App.openEditUnitModal(${id})" title="Birim Bilgilerini ve Bütçesini Düzenle">✏️</button>
               <button class="btn-icon" onclick="App.handleDeleteUnit(${id}, '${name.replace(/'/g, "\\'")}')" title="Birimi Sil">🗑️</button>
             </div>
           </td>
@@ -10157,19 +10172,25 @@ const App = {
   async handleAddUnit() {
     const nameInput = document.getElementById('input-new-unit-name');
     const emailInput = document.getElementById('input-new-unit-email');
+    const budgetInput = document.getElementById('input-new-unit-budget');
     const name = nameInput?.value.trim();
     const email = emailInput?.value.trim() || '';
+    const annualBudget = parseFloat(budgetInput?.value) || 0;
+    const academicYear = this.state.selectedYear || getCurrentAcademicYear();
 
     if (!name) {
       this.showToast("Lütfen eklenecek birim adını girin.", "warning");
       return;
     }
 
+    const budgetData = {};
+    if (annualBudget > 0) budgetData[academicYear] = annualBudget;
+
     try {
       const res = await this.authFetch('/api/units', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email })
+        body: JSON.stringify({ name, email, annualBudget, budgetData: JSON.stringify(budgetData) })
       });
 
       if (!res.ok) {
@@ -10181,10 +10202,12 @@ const App = {
       this.state.units.push(saved);
       if (nameInput) nameInput.value = '';
       if (emailInput) emailInput.value = '';
+      if (budgetInput) budgetInput.value = '';
       this.renderUnitsSettings();
       this.populateDropdowns();
+      this.renderUnitBudgetWidget();
       this.showToast(`"${name}" birimi başarıyla eklendi.`, "success", "🏢");
-      this.logAction('Yeni Birim Eklendi', `Birim: ${name}${email ? ` (${email})` : ''}`);
+      this.logAction('Yeni Birim Eklendi', `Birim: ${name}${email ? ` (${email})` : ''}${annualBudget > 0 ? `, Bütçe: ${annualBudget.toLocaleString('tr-TR')} ₺` : ''}`);
     } catch (err) {
       console.error('Birim ekleme hatası:', err);
       this.showToast(`Birim eklenemedi: ${err.message}`, "error");
@@ -10198,16 +10221,24 @@ const App = {
     const id = typeof unitObj === 'object' ? unitObj.id : unitObj;
     const name = typeof unitObj === 'object' ? unitObj.name : unitObj;
     const email = typeof unitObj === 'object' ? (unitObj.email || '') : '';
+    const currentYear = this.state.selectedYear || getCurrentAcademicYear();
+    let bData = {};
+    try {
+      if (unitObj.budgetData) bData = typeof unitObj.budgetData === 'string' ? JSON.parse(unitObj.budgetData) : unitObj.budgetData;
+    } catch (e) {}
+    const budget = bData[currentYear] !== undefined ? bData[currentYear] : (parseFloat(unitObj.annualBudget) || 0);
 
     const idEl = document.getElementById('ue-id');
     const nameEl = document.getElementById('ue-name');
     const emailEl = document.getElementById('ue-email');
+    const budgetEl = document.getElementById('ue-budget');
     const titleEl = document.getElementById('unit-edit-modal-title');
 
     if (idEl) idEl.value = id;
     if (nameEl) nameEl.value = name;
     if (emailEl) emailEl.value = email;
-    if (titleEl) titleEl.innerText = `🏢 ${name} — Bilgileri Düzenle`;
+    if (budgetEl) budgetEl.value = budget > 0 ? budget : '';
+    if (titleEl) titleEl.innerText = `🏢 ${name} — Bilgileri ve Bütçeyi Düzenle`;
 
     this.openModal('modal-unit-edit');
   },
@@ -10221,6 +10252,8 @@ const App = {
     const id = parseInt(idVal, 10);
     const newName = document.getElementById('ue-name')?.value.trim();
     const newEmail = document.getElementById('ue-email')?.value.trim() || '';
+    const newBudget = parseFloat(document.getElementById('ue-budget')?.value) || 0;
+    const currentYear = this.state.selectedYear || getCurrentAcademicYear();
 
     if (!id || !newName) {
       this.showToast("Lütfen birim adını eksiksiz giriniz.", "warning");
@@ -10231,11 +10264,17 @@ const App = {
     const oldUnit = unitIndex !== -1 ? this.state.units[unitIndex] : null;
     const oldName = oldUnit ? (typeof oldUnit === 'object' ? oldUnit.name : oldUnit) : null;
 
+    let bData = {};
+    try {
+      if (oldUnit && oldUnit.budgetData) bData = typeof oldUnit.budgetData === 'string' ? JSON.parse(oldUnit.budgetData) : oldUnit.budgetData;
+    } catch (e) {}
+    bData[currentYear] = newBudget;
+
     try {
       const res = await this.authFetch(`/api/units/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName, email: newEmail })
+        body: JSON.stringify({ name: newName, email: newEmail, annualBudget: newBudget, budgetData: JSON.stringify(bData) })
       });
 
       if (!res.ok) {
@@ -10243,11 +10282,9 @@ const App = {
         throw new Error(errData.error || `Sunucu hatası (${res.status})`);
       }
 
-      const updated = await res.json();
-      
       // Update in state
       if (unitIndex !== -1) {
-        this.state.units[unitIndex] = { id: id, name: newName, email: newEmail };
+        this.state.units[unitIndex] = { id: id, name: newName, email: newEmail, annualBudget: newBudget, budgetData: bData };
       }
 
       // Update unit name across all loaded requests in memory if changed
@@ -10260,12 +10297,236 @@ const App = {
       this.closeModal('modal-unit-edit');
       this.renderUnitsSettings();
       this.populateDropdowns();
+      this.renderUnitBudgetWidget();
       this.render();
-      this.showToast(`"${newName}" birim bilgileri başarıyla güncellendi!`, "success", "✏️");
-      this.logAction('Birim Güncellendi', `Birim: ${newName}${newEmail ? ` (${newEmail})` : ''}`);
+      this.showToast(`"${newName}" birim bilgileri ve bütçesi başarıyla kaydedildi!`, "success", "✏️");
+      this.logAction('Birim Güncellendi', `Birim: ${newName}${newEmail ? ` (${newEmail})` : ''}, Bütçe: ${newBudget.toLocaleString('tr-TR')} ₺`);
     } catch (err) {
       console.error('Birim güncelleme hatası:', err);
       this.showToast(`Birim güncellenemedi: ${err.message}`, "error");
+    }
+  },
+
+  openUnitBudgetModal(targetUnitName = null) {
+    const isUnitUser = this.state.currentUser?.role === 'UNIT';
+    const unitName = targetUnitName || (isUnitUser ? this.state.currentUser?.unit : document.getElementById('filter-unit')?.value) || this.state.currentUser?.unit;
+    
+    if (!unitName || unitName === 'ALL') {
+      this.showToast("Lütfen bütçesini belirlemek istediğiniz birimi seçin.", "warning");
+      return;
+    }
+
+    const currentYear = this.state.selectedYear || getCurrentAcademicYear();
+    const unitObj = (this.state.units || []).find(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === unitName.toLowerCase().trim());
+    
+    let currentBudget = 0;
+    if (unitObj) {
+      let bData = {};
+      try {
+        if (unitObj.budgetData) bData = typeof unitObj.budgetData === 'string' ? JSON.parse(unitObj.budgetData) : unitObj.budgetData;
+      } catch (e) {}
+      currentBudget = bData[currentYear] !== undefined ? bData[currentYear] : (parseFloat(unitObj.annualBudget) || 0);
+    }
+
+    const unitInput = document.getElementById('ub-unit-name');
+    const unitDisplay = document.getElementById('ub-unit-display-name');
+    const yearDisplay = document.getElementById('ub-year-display');
+    const budgetInput = document.getElementById('ub-budget-amount');
+
+    if (unitInput) unitInput.value = unitName;
+    if (unitDisplay) unitDisplay.innerText = unitName;
+    if (yearDisplay) yearDisplay.innerText = currentYear;
+    if (budgetInput) budgetInput.value = currentBudget > 0 ? currentBudget : '';
+
+    this.openModal('modal-unit-budget');
+  },
+
+  async handleSaveUnitBudget(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const unitName = document.getElementById('ub-unit-name')?.value.trim();
+    const budgetAmount = parseFloat(document.getElementById('ub-budget-amount')?.value) || 0;
+    const academicYear = this.state.selectedYear || getCurrentAcademicYear();
+
+    if (!unitName) {
+      this.showToast("Birim bilgisi eksik.", "warning");
+      return;
+    }
+
+    try {
+      const res = await this.authFetch('/api/units/my-budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unitName, annualBudget: budgetAmount, academicYear })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Sunucu hatası (${res.status})`);
+      }
+
+      const resData = await res.json();
+      
+      // Update local state
+      const unitIndex = (this.state.units || []).findIndex(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === unitName.toLowerCase().trim());
+      if (unitIndex !== -1 && typeof this.state.units[unitIndex] === 'object') {
+        this.state.units[unitIndex].annualBudget = budgetAmount;
+        this.state.units[unitIndex].budgetData = resData.budgetData;
+      }
+
+      this.closeModal('modal-unit-budget');
+      this.renderUnitBudgetWidget();
+      this.renderUnitsSettings();
+      this.showToast(`"${unitName}" birimi için ${academicYear} bütçesi (${this.formatMoney(budgetAmount, 'TRY', 0)}) kaydedildi!`, "success", "💰");
+    } catch (err) {
+      console.error('Bütçe kaydetme hatası:', err);
+      this.showToast(`Bütçe kaydedilemedi: ${err.message}`, "error");
+    }
+  },
+
+  renderUnitBudgetWidget() {
+    const card = document.getElementById('unit-budget-summary-card');
+    if (!card) return;
+
+    const currentUser = this.state.currentUser;
+    const isUnitUser = currentUser?.role === 'UNIT';
+    const filterUnitVal = document.getElementById('filter-unit')?.value || 'ALL';
+
+    // Target unit determination
+    let targetUnit = null;
+    if (isUnitUser) {
+      targetUnit = currentUser.unit;
+    } else if (filterUnitVal !== 'ALL') {
+      targetUnit = filterUnitVal;
+    }
+
+    if (!targetUnit) {
+      // For Admin/Staff with ALL selected, summarize institutional budget if any budgets are defined
+      const allUnits = this.state.units || [];
+      const currentYear = this.state.selectedYear || getCurrentAcademicYear();
+      let totalInstBudget = 0;
+      allUnits.forEach(u => {
+        let bData = {};
+        try {
+          if (u.budgetData) bData = typeof u.budgetData === 'string' ? JSON.parse(u.budgetData) : u.budgetData;
+        } catch (e) {}
+        totalInstBudget += bData[currentYear] !== undefined ? (parseFloat(bData[currentYear]) || 0) : (parseFloat(u.annualBudget) || 0);
+      });
+
+      if (totalInstBudget === 0) {
+        card.style.display = 'none';
+        return;
+      }
+      targetUnit = 'Tüm Kurum';
+    }
+
+    card.style.display = 'block';
+
+    const currentYear = this.state.selectedYear || getCurrentAcademicYear();
+    const isInstitutional = targetUnit === 'Tüm Kurum';
+
+    let totalBudget = 0;
+    if (isInstitutional) {
+      (this.state.units || []).forEach(u => {
+        let bData = {};
+        try {
+          if (u.budgetData) bData = typeof u.budgetData === 'string' ? JSON.parse(u.budgetData) : u.budgetData;
+        } catch (e) {}
+        totalBudget += bData[currentYear] !== undefined ? (parseFloat(bData[currentYear]) || 0) : (parseFloat(u.annualBudget) || 0);
+      });
+    } else {
+      const unitObj = (this.state.units || []).find(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === targetUnit.toLowerCase().trim());
+      if (unitObj) {
+        let bData = {};
+        try {
+          if (unitObj.budgetData) bData = typeof unitObj.budgetData === 'string' ? JSON.parse(unitObj.budgetData) : unitObj.budgetData;
+        } catch (e) {}
+        totalBudget = bData[currentYear] !== undefined ? (parseFloat(bData[currentYear]) || 0) : (parseFloat(unitObj.annualBudget) || 0);
+      }
+    }
+
+    // Filter requests for this unit and academic year
+    const allReqs = this.getFilteredRequests();
+    const unitReqs = isInstitutional ? allReqs : allReqs.filter(r => (r.unit || '').toLowerCase().trim() === targetUnit.toLowerCase().trim());
+
+    // Committed: Active/Open/In-progress demands not completed or cancelled
+    const committedReqs = unitReqs.filter(r => r.status !== 'Tamamlandı' && r.status !== 'İptal Edildi' && r.status !== 'Reddedildi');
+    const committedAmount = committedReqs.reduce((sum, r) => sum + (parseFloat(r.actualAmount || r.budgetAmount || r.estimatedAmount) || 0), 0);
+
+    // Spent: Completed demands
+    const completedReqs = unitReqs.filter(r => r.status === 'Tamamlandı');
+    const spentAmount = completedReqs.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
+
+    // Available: Total - (Spent + Committed)
+    const availableAmount = totalBudget - (spentAmount + committedAmount);
+
+    // DOM Updates
+    const titleEl = document.getElementById('ubs-unit-title');
+    const yearBadge = document.getElementById('ubs-year-badge');
+    const totalEl = document.getElementById('ubs-total-budget');
+    const commEl = document.getElementById('ubs-committed-amount');
+    const commSub = document.getElementById('ubs-committed-sub');
+    const spentEl = document.getElementById('ubs-spent-amount');
+    const spentSub = document.getElementById('ubs-spent-sub');
+    const availBox = document.getElementById('ubs-available-box');
+    const availIcon = document.getElementById('ubs-available-icon');
+    const availEl = document.getElementById('ubs-available-amount');
+    const availSub = document.getElementById('ubs-available-sub');
+
+    if (titleEl) titleEl.innerText = `${targetUnit} Bütçe ve Harcama Durumu`;
+    if (yearBadge) yearBadge.innerText = currentYear;
+    if (totalEl) totalEl.innerText = this.formatMoney(totalBudget, 'TRY', 2);
+    if (commEl) commEl.innerText = this.formatMoney(committedAmount, 'TRY', 2);
+    if (commSub) commSub.innerText = `${committedReqs.length} Açık / İşlemde Talep`;
+    if (spentEl) spentEl.innerText = this.formatMoney(spentAmount, 'TRY', 2);
+    if (spentSub) spentSub.innerText = `${completedReqs.length} Tamamlanan Talep / Fatura`;
+
+    if (availEl) {
+      if (totalBudget > 0 && availableAmount < 0) {
+        availEl.innerText = `${this.formatMoney(availableAmount, 'TRY', 2)} ⚠️`;
+        availEl.style.color = '#ef4444';
+        if (availIcon) availIcon.innerText = '🚨';
+        if (availSub) availSub.innerText = `Limit ${this.formatMoney(Math.abs(availableAmount), 'TRY', 2)} aşıldı!`;
+        if (availBox) {
+          availBox.style.background = 'rgba(239, 68, 68, 0.12)';
+          availBox.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        }
+      } else {
+        availEl.innerText = this.formatMoney(availableAmount, 'TRY', 2);
+        availEl.style.color = '#3b82f6';
+        if (availIcon) availIcon.innerText = '🟢';
+        if (availSub) availSub.innerText = totalBudget > 0 ? 'Harcanabilir serbest bütçe' : 'Bütçe henüz girilmedi';
+        if (availBox) {
+          availBox.style.background = 'rgba(59, 130, 246, 0.08)';
+          availBox.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+        }
+      }
+    }
+
+    // Progress Bar Calculations
+    const barSpent = document.getElementById('ubs-bar-spent');
+    const barComm = document.getElementById('ubs-bar-committed');
+    const barRem = document.getElementById('ubs-bar-remaining');
+    const usageTxt = document.getElementById('ubs-usage-percent');
+
+    if (totalBudget > 0) {
+      const spentPct = Math.min(100, Math.max(0, Math.round((spentAmount / totalBudget) * 100)));
+      const commPct = Math.min(100 - spentPct, Math.max(0, Math.round((committedAmount / totalBudget) * 100)));
+      const remPct = Math.max(0, 100 - spentPct - commPct);
+
+      if (barSpent) barSpent.style.width = `${spentPct}%`;
+      if (barComm) barComm.style.width = `${commPct}%`;
+      if (barRem) barRem.style.width = `${remPct}%`;
+      if (usageTxt) {
+        usageTxt.innerText = `Harcanan: %${spentPct} | Süreçte: %${commPct} | Kalan: %${remPct}`;
+      }
+    } else {
+      if (barSpent) barSpent.style.width = '0%';
+      if (barComm) barComm.style.width = '0%';
+      if (barRem) barRem.style.width = '100%';
+      if (usageTxt) usageTxt.innerText = 'Yıllık bütçe tanımlanmadı — Bütçeyi Düzenle butonundan tutar girebilirsiniz.';
     }
   },
 
