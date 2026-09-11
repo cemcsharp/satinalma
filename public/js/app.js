@@ -11382,7 +11382,7 @@ const App = {
     if (!container) return;
     const div = document.createElement('div');
     div.className = 'ub-item-row';
-    div.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; background: var(--bg-card); padding: 0.45rem 0.65rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);';
+    div.style.cssText = 'display: grid; grid-template-columns: 36px 1fr 170px 70px 36px; gap: 0.5rem; align-items: center; background: var(--bg-card); padding: 0.55rem 0.65rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.03); transition: all 0.2s ease;';
 
     const masterItems = (this.state.budgetItems || []).filter(b => b.isActive !== false);
     masterItems.sort((a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true }));
@@ -11393,17 +11393,25 @@ const App = {
     }).join('');
 
     div.innerHTML = `
-      <div style="flex: 2; min-width: 0;">
-        <select class="ub-item-select" style="width: 100%; font-size: 0.82rem;" onchange="App.recalcUnitModalBudget()">
+      <div style="display: flex; align-items: center; justify-content: center;">
+        <span class="ub-row-index" style="width: 24px; height: 24px; border-radius: 6px; background: var(--bg-hover); color: var(--text-muted); font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; justify-content: center;">1</span>
+      </div>
+      <div style="min-width: 0;">
+        <select class="ub-item-select" style="width: 100%; font-size: 0.82rem; font-weight: 600; padding: 0.45rem 0.65rem; border-radius: var(--radius-sm);" onchange="App.recalcUnitModalBudget()">
           <option value="">-- Bütçe Kalemi Seçin --</option>
           ${optionsHtml}
         </select>
       </div>
-      <div style="flex: 1; display: flex; align-items: center; gap: 0.25rem;">
-        <input type="number" class="ub-item-amount" min="0" step="100" placeholder="Tutar (₺)" value="${itemAmount || ''}" oninput="App.recalcUnitModalBudget()" style="width: 100%; font-family: var(--font-mono); font-weight: 700; text-align: right; font-size: 0.85rem;">
-        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">₺</span>
+      <div style="display: flex; align-items: center; position: relative;">
+        <input type="number" class="ub-item-amount" min="0" step="100" placeholder="0" value="${itemAmount || ''}" oninput="App.recalcUnitModalBudget()" style="width: 100%; font-family: var(--font-mono); font-weight: 800; text-align: right; font-size: 0.88rem; padding: 0.45rem 1.7rem 0.45rem 0.65rem; border-radius: var(--radius-sm); color: var(--accent-primary);">
+        <span style="position: absolute; right: 0.55rem; font-size: 0.8rem; font-weight: 800; color: var(--text-muted); pointer-events: none;">₺</span>
       </div>
-      <button type="button" class="btn-icon" onclick="this.closest('.ub-item-row').remove(); App.recalcUnitModalBudget();" title="Kalemi Kaldır" style="color: #ef4444; width: 30px; height: 30px; flex-shrink: 0;">🗑️</button>
+      <div style="text-align: center;">
+        <span class="ub-item-share badge" style="background: rgba(99,102,241,0.08); color: var(--accent-primary); font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.4rem;">% 0</span>
+      </div>
+      <div style="text-align: center;">
+        <button type="button" class="btn-icon" onclick="this.closest('.ub-item-row').remove(); App.recalcUnitModalBudget();" title="Kalemi Kaldır" style="color: #ef4444; width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15); transition: all 0.15s ease;">🗑️</button>
+      </div>
     `;
 
     container.appendChild(div);
@@ -11412,18 +11420,49 @@ const App = {
 
   recalcUnitModalBudget() {
     const rows = document.querySelectorAll('.ub-item-row');
+    const emptyState = document.getElementById('ub-empty-state');
+    const badgeSummary = document.getElementById('ub-badge-summary');
+    const itemCountDisplay = document.getElementById('ub-item-count-display');
+    const totalDisplay = document.getElementById('ub-total-display');
+    const totalInput = document.getElementById('ub-budget-amount');
+
     let total = 0;
-    let hasRows = false;
-    rows.forEach(r => {
-      hasRows = true;
+    const amounts = [];
+
+    rows.forEach((r, idx) => {
+      const indexSpan = r.querySelector('.ub-row-index');
+      if (indexSpan) indexSpan.innerText = idx + 1;
+
       const amtInput = r.querySelector('.ub-item-amount');
       const val = parseFloat(amtInput?.value) || 0;
+      amounts.push(val);
       total += val;
     });
 
-    const totalInput = document.getElementById('ub-budget-amount');
-    if (totalInput && hasRows) {
-      totalInput.value = total > 0 ? total : '';
+    // Update percentage shares
+    rows.forEach((r, idx) => {
+      const shareSpan = r.querySelector('.ub-item-share');
+      if (shareSpan) {
+        if (total > 0 && amounts[idx] > 0) {
+          const pct = ((amounts[idx] / total) * 100).toFixed(1);
+          shareSpan.innerText = `% ${pct}`;
+          shareSpan.style.background = 'rgba(99,102,241,0.12)';
+        } else {
+          shareSpan.innerText = '% 0';
+          shareSpan.style.background = 'var(--bg-hover)';
+        }
+      }
+    });
+
+    if (totalInput) totalInput.value = total;
+    if (totalDisplay) totalDisplay.innerText = this.formatMoney(total, 'TRY', 2);
+    if (itemCountDisplay) itemCountDisplay.innerText = `${rows.length} Kalem`;
+
+    if (emptyState) {
+      emptyState.style.display = rows.length === 0 ? 'block' : 'none';
+    }
+    if (badgeSummary) {
+      badgeSummary.innerText = rows.length > 0 ? `${rows.length} aktif kalem` : 'Henüz kalem yok';
     }
   },
 
@@ -11475,11 +11514,14 @@ const App = {
         currentItems.forEach(it => {
           this.addBudgetItemRowToUnitModal(it.code, it.name, it.amount);
         });
+      } else if (currentBudget > 0) {
+        this.addBudgetItemRowToUnitModal('', '', currentBudget);
       } else {
         this.addBudgetItemRowToUnitModal();
       }
     }
 
+    this.recalcUnitModalBudget();
     this.openModal('modal-unit-budget');
   },
 
@@ -11536,6 +11578,9 @@ const App = {
       }
 
       this.closeModal('modal-unit-budget');
+      if (this.state.currentView === 'budgets') {
+        this.renderBudgetsView();
+      }
       this.renderUnitBudgetWidget();
       this.renderUnitsSettings();
       this.populateDropdowns();

@@ -4343,49 +4343,99 @@
 
   <!-- Modal: Unit Budget & Itemized Line Allocation (Birim Kalem Bazlı Yıllık Bütçe Belirleme) -->
   <div class="modal-overlay" id="modal-unit-budget">
-    <div class="modal-content" style="max-width: 680px; max-height: 90vh; display: flex; flex-direction: column;">
-      <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
-        <h3 id="unit-budget-modal-title">💰 Birim Yıllık Bütçe & Kalem Dağılımı</h3>
-        <button type="button" class="btn-close-modal close-modal">&times;</button>
+    <div class="modal-content" style="max-width: 760px; max-height: 90vh; display: flex; flex-direction: column; border-radius: var(--radius-lg); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding: 1.1rem 1.5rem; background: var(--bg-hover);">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2)); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; border: 1px solid rgba(99,102,241,0.3);">
+            💰
+          </div>
+          <div>
+            <h3 id="unit-budget-modal-title" style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-main);">Birim Yıllık Bütçe & Kalem Dağılımı</h3>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+              <span class="badge" style="background: rgba(59,130,246,0.12); color: #2563eb; font-weight: 700; font-size: 0.75rem;" id="ub-unit-display-name">Biriminiz</span>
+              <span class="badge" style="background: rgba(16,185,129,0.12); color: #059669; font-weight: 700; font-size: 0.75rem;" id="ub-year-display">2026-2027</span>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal close-modal" style="font-size: 1.5rem;">&times;</button>
       </div>
+
       <form id="form-unit-budget" onsubmit="App.handleSaveUnitBudget(event)" style="display: flex; flex-direction: column; overflow: hidden; flex: 1;">
         <input type="hidden" id="ub-unit-name">
-        <div style="padding: 1rem 1.25rem 0.5rem;">
-          <div style="background: rgba(99,102,241,0.08); border-left: 4px solid var(--accent-primary); padding: 0.75rem 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem; font-size: 0.84rem; color: var(--text-main); line-height: 1.45;">
-            🏢 <strong id="ub-unit-display-name">Biriminiz</strong> için <strong><span id="ub-year-display">2026-2027</span></strong> akademik yılı bütçe kalemlerini ve tahsis edilen limitleri belirleyin.
+        
+        <!-- Top Executive KPI Strip -->
+        <div style="padding: 1.1rem 1.5rem 0.5rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1.4fr; gap: 0.85rem; margin-bottom: 0.5rem;">
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.85rem;">
+              <div style="width: 38px; height: 38px; border-radius: 8px; background: rgba(59,130,246,0.1); color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                📋
+              </div>
+              <div>
+                <span style="font-size: 0.74rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Tanımlı Kalem</span>
+                <div id="ub-item-count-display" style="font-size: 1.1rem; font-weight: 800; color: var(--text-main);">0 Kalem</div>
+              </div>
+            </div>
+
+            <div style="background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(16,185,129,0.06)); border: 1px solid rgba(99,102,241,0.25); border-radius: var(--radius-md); padding: 0.75rem 1.1rem; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 38px; height: 38px; border-radius: 8px; background: rgba(16,185,129,0.12); color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                  🎯
+                </div>
+                <div>
+                  <span style="font-size: 0.74rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Toplam Tahsisat Tavanı</span>
+                  <div id="ub-total-display" style="font-size: 1.25rem; font-weight: 900; font-family: var(--font-mono); color: var(--accent-primary);">0,00 ₺</div>
+                </div>
+              </div>
+              <input type="hidden" id="ub-budget-amount" value="0">
+            </div>
           </div>
         </div>
 
-        <div style="padding: 0 1.25rem; overflow-y: auto; flex: 1; max-height: 380px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-            <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-main); margin: 0;">
-              📋 Birimin Aktif Bütçe Kalemleri
-            </label>
-            <button type="button" class="btn-secondary" onclick="App.addBudgetItemRowToUnitModal()" style="padding: 0.3rem 0.75rem; font-size: 0.76rem; border-color: var(--accent-primary); color: var(--accent-primary); font-weight: 700;">
-              ➕ Kalem Ekle
+        <!-- Scrollable Items Container -->
+        <div style="padding: 0.5rem 1.5rem; overflow-y: auto; flex: 1; max-height: 420px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="font-weight: 800; font-size: 0.88rem; color: var(--text-main);">Aktif Bütçe Kalemleri Dağılımı</span>
+              <span class="badge" id="ub-badge-summary" style="background: var(--bg-hover); font-size: 0.72rem; color: var(--text-muted);">Limitlerinizi belirleyin</span>
+            </div>
+            <button type="button" class="btn-primary" onclick="App.addBudgetItemRowToUnitModal()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: 700; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.35rem;">
+              <span>➕</span> Kalem Ekle
             </button>
           </div>
 
-          <div id="ub-items-container" style="display: flex; flex-direction: column; gap: 0.6rem;">
+          <!-- Table Header Labels -->
+          <div style="display: grid; grid-template-columns: 36px 1fr 170px 70px 36px; gap: 0.5rem; padding: 0.35rem 0.6rem; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;">
+            <span>#</span>
+            <span>Bütçe Kalemi</span>
+            <span style="text-align: right;">Tahsis Limit (₺)</span>
+            <span style="text-align: center;">Pay</span>
+            <span style="text-align: center;">Sil</span>
+          </div>
+
+          <div id="ub-items-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
             <!-- Dynamically populated budget item rows -->
           </div>
 
-          <!-- Total Budget Calculation Card -->
-          <div style="margin-top: 1rem; margin-bottom: 1rem; background: var(--bg-hover); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 0.85rem 1rem; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-main);">🎯 Toplam Yıllık Tavan Bütçe:</span>
-              <small style="display: block; font-size: 0.74rem; color: var(--text-muted);">Tüm kalemlerin otomatik toplamı</small>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <input type="number" id="ub-budget-amount" min="0" step="100" placeholder="0" style="font-size: 1.15rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-primary); width: 160px; text-align: right; background: var(--bg-card);">
-              <span style="font-weight: 800; color: var(--accent-primary);">₺</span>
-            </div>
+          <div id="ub-empty-state" style="display: none; text-align: center; padding: 2.5rem 1rem; background: var(--bg-hover); border: 2px dashed var(--border-color); border-radius: var(--radius-md); margin-top: 0.5rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.6;">📦</div>
+            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main);">Henüz Bütçe Kalemi Eklenmemiş</div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.35rem 0 0.85rem;">Biriminiz için harcama kalemleri belirlemek üzere yukarıdaki "+ Kalem Ekle" butonuna tıklayın.</p>
+            <button type="button" class="btn-secondary" onclick="App.addBudgetItemRowToUnitModal()" style="font-size: 0.8rem; font-weight: 700;">
+              ➕ İlk Kalemi Ekle
+            </button>
           </div>
         </div>
 
-        <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.85rem 1.25rem; border-top: 1px solid var(--border-color); margin-top: auto;">
-          <button type="button" class="btn-secondary close-modal">İptal</button>
-          <button type="submit" class="btn-primary"><span>💾</span> Bütçeyi ve Kalemleri Kaydet</button>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.5rem; border-top: 1px solid var(--border-color); background: var(--bg-card); margin-top: auto;">
+          <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+            <span>💡</span> Kalem toplamları birimin o yılki harcama limitini oluşturur.
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" class="btn-secondary close-modal" style="padding: 0.5rem 1.1rem; font-weight: 600;">İptal</button>
+            <button type="submit" class="btn-primary" style="padding: 0.5rem 1.4rem; font-weight: 700; box-shadow: 0 4px 12px rgba(99,102,241,0.35);">
+              <span>💾</span> Bütçeyi ve Kalemleri Kaydet
+            </button>
+          </div>
         </div>
       </form>
     </div>
