@@ -88,6 +88,7 @@ const App = {
 
     const savedToken = localStorage.getItem('authToken');
     const savedUserRaw = localStorage.getItem('currentUser');
+    const validViews = ['dashboard', 'requests', 'budgets', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
     
     if (savedToken) {
       if (savedUserRaw) {
@@ -118,13 +119,17 @@ const App = {
           this.updateUserProfileCard();
           await this.fetchInitialData();
           await this.fetchUsersList();
-          const hashView = window.location.hash.replace(/^#\/?/, '').split('/')[0];
-          const validViews = ['dashboard', 'requests', 'budgets', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
-          let savedView = (hashView && validViews.includes(hashView)) ? hashView : (localStorage.getItem('activeView') || (meData.user.role === 'UNIT' ? 'requests' : 'dashboard'));
-          if (meData.user.role === 'UNIT' && !['requests', 'budgets', 'contracts', 'invoices', 'notifications', 'supplier-analysis', 'vendor-profile'].includes(savedView)) {
-            savedView = 'requests';
+          
+          const rawHash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+          let finalView = (rawHash && validViews.includes(rawHash)) ? rawHash : (localStorage.getItem('activeView') || (meData.user.role === 'UNIT' ? 'requests' : 'dashboard'));
+          
+          if (meData.user.role === 'UNIT' && !['requests', 'budgets', 'contracts', 'invoices', 'notifications', 'supplier-analysis', 'vendor-profile'].includes(finalView)) {
+            finalView = 'requests';
+          } else if (meData.user.role !== 'ADMIN' && finalView === 'settings') {
+            finalView = meData.user.role === 'UNIT' ? 'requests' : 'dashboard';
           }
-          this.switchView(savedView, true);
+
+          this.switchView(finalView, true);
           this.handleHashRoute();
           return;
         } else if (meRes && meRes.status === 401) {
@@ -135,8 +140,9 @@ const App = {
         console.error('Session validation network error:', e);
         if (this.state.currentUser) {
           await this.fetchInitialData().catch(() => {});
-          const savedView = localStorage.getItem('activeView') || 'dashboard';
-          this.switchView(savedView, true);
+          const rawHash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+          let finalView = (rawHash && validViews.includes(rawHash)) ? rawHash : (localStorage.getItem('activeView') || 'dashboard');
+          this.switchView(finalView, true);
           return;
         }
       }
@@ -888,9 +894,10 @@ const App = {
         this.switchView('supplier-analysis', true);
         setTimeout(() => this.openVendorProfile(vendorName), 150);
       }
-    } else if (hash.startsWith('#/')) {
-      const viewName = hash.replace(/^#\//, '').split('/')[0];
-      if (viewName && viewName !== this.state.currentView) {
+    } else {
+      const viewName = hash.replace(/^#\/?/, '').split('/')[0];
+      const validViews = ['dashboard', 'requests', 'budgets', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
+      if (viewName && validViews.includes(viewName) && viewName !== this.state.currentView) {
         this.switchView(viewName, true);
       }
     }
@@ -1010,12 +1017,11 @@ const App = {
     // 🌐 Tarayıcı Geri / İleri (Back / Forward) ve Sağ Tık Geri Desteği (SPA History Engine)
     window.addEventListener('popstate', (e) => {
       // Açık modal varsa önce modalı kapat
-      const openModals = document.querySelectorAll('.modal');
-      let closedAny = false;
+      const openModals = document.querySelectorAll('.modal, .modal-overlay');
       openModals.forEach(m => {
-        if (m.style.display === 'block' || m.style.display === 'flex') {
+        if (m.style.display === 'block' || m.style.display === 'flex' || m.classList.contains('active')) {
           m.style.display = 'none';
-          closedAny = true;
+          m.classList.remove('active');
         }
       });
 
@@ -1023,10 +1029,12 @@ const App = {
         this.switchView(e.state.view, true);
       } else {
         const hash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
-        if (hash && hash !== '') {
+        const validViews = ['dashboard', 'requests', 'budgets', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
+        if (hash && validViews.includes(hash)) {
           this.switchView(hash, true);
         } else {
-          this.switchView('dashboard', true);
+          const fallback = localStorage.getItem('activeView') || (this.state.currentUser?.role === 'UNIT' ? 'requests' : 'dashboard');
+          this.switchView(fallback, true);
         }
       }
     });
@@ -1948,11 +1956,15 @@ const App = {
       return;
     }
 
-    // Push browser history state for back/forward navigation
-    if (!fromHistory && window.history && window.history.pushState) {
-      const targetHash = `#/${viewName}`;
-      if (window.location.hash !== targetHash) {
+    // Push/replace browser history state for back/forward navigation and refresh persistence
+    const targetHash = `#/${viewName}`;
+    if (window.location.hash !== targetHash) {
+      if (!fromHistory && window.history && window.history.pushState) {
         window.history.pushState({ view: viewName }, '', targetHash);
+      } else if (window.history && window.history.replaceState) {
+        window.history.replaceState({ view: viewName }, '', targetHash);
+      } else {
+        window.location.hash = targetHash;
       }
     }
 
@@ -12115,8 +12127,13 @@ const App = {
     } else {
       document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     }
-    if (window.location.hash && (window.location.hash.startsWith('#request/') || window.location.hash.startsWith('#contract/') || window.location.hash.startsWith('#invoice/'))) {
-      history.replaceState(null, null, window.location.pathname + window.location.search);
+    if (window.location.hash && (window.location.hash.startsWith('#request/') || window.location.hash.startsWith('#contract/') || window.location.hash.startsWith('#invoice/') || window.location.hash.startsWith('#guarantee/') || window.location.hash.startsWith('#tender/') || window.location.hash.startsWith('#vendor/'))) {
+      const fallbackHash = `#/${this.state.currentView || 'requests'}`;
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ view: this.state.currentView }, '', fallbackHash);
+      } else {
+        window.location.hash = fallbackHash;
+      }
     }
   },
 
