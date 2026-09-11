@@ -597,9 +597,14 @@
               </span>
               <span class="badge" id="req-budget-year-badge" style="font-size: 0.7rem; padding: 0.1rem 0.4rem; background: rgba(99,102,241,0.15); color: var(--accent-primary);">2026-2027</span>
             </div>
-            <button type="button" class="btn-secondary" onclick="App.openUnitBudgetModal()" style="padding: 0.25rem 0.55rem; font-size: 0.74rem; border-color: var(--accent-primary); color: var(--accent-primary);" title="Yıllık Bütçeyi Düzenle">
-              <span>✏️</span> Bütçe Düzenle
-            </button>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <button type="button" class="btn-secondary" onclick="App.openBudgetBreakdownModal()" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-color: #8b5cf6; color: #8b5cf6; font-weight: 700;" title="Bütçe Kalemlerine Göre Harcama Dağılımını İncele">
+                <span>📊</span> Kalem Dağılımı
+              </button>
+              <button type="button" class="btn-secondary" onclick="App.openUnitBudgetModal()" style="padding: 0.25rem 0.55rem; font-size: 0.74rem; border-color: var(--accent-primary); color: var(--accent-primary);" title="Yıllık Bütçeyi Düzenle">
+                <span>✏️</span> Bütçe Düzenle
+              </button>
+            </div>
           </div>
 
           <div class="grid-4" style="margin-bottom: 0.65rem;">
@@ -2502,6 +2507,9 @@
           <button class="btn-secondary" data-tab="units" onclick="App.setSettingsTab('units')" style="padding: 0.5rem 1rem; font-weight: 700;">
             🏢 Birimler & İhale Maddeleri
           </button>
+          <button class="btn-secondary" data-tab="budget-items" onclick="App.setSettingsTab('budget-items')" style="padding: 0.5rem 1rem; font-weight: 700;">
+            📊 Bütçe & Muhasebe Kalemleri
+          </button>
           <button class="btn-secondary" data-tab="rates" onclick="App.setSettingsTab('rates')" style="padding: 0.5rem 1rem; font-weight: 700;">
             💱 TCMB Canlı Kurlar
           </button>
@@ -2693,6 +2701,46 @@
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: BÜTÇE VE MUHASEBE KALEMLERİ (HESAP PLANI) -->
+        <div class="settings-tab-content" data-tab="budget-items" id="tab-content-budget-items" style="display: none;">
+          <div class="glass-card">
+            <div class="card-header" style="margin-bottom: 1.25rem;">
+              <div>
+                <h3>📊 Analitik Bütçe ve Muhasebe Kalemleri (Hesap Planı)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">
+                  Birimlerin taleplerini ve satın alma harcamalarını muhasebe kodlarıyla ilişkilendirmek için kullanılan kurumsal bütçe kalemleri listesi
+                </p>
+              </div>
+              <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                <div class="search-input-box" style="width: 240px;">
+                  <span class="search-icon">🔍</span>
+                  <input type="text" id="filter-budget-items-search" oninput="App.renderBudgetItemsSettings()" placeholder="Kalem kodu veya adı ara...">
+                </div>
+                <button class="btn-primary" onclick="App.openBudgetItemModal()" style="font-size: 0.82rem; padding: 0.45rem 0.9rem;">
+                  <span>➕</span> Yeni Bütçe Kalemi Tanımla
+                </button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table" id="table-budget-items-settings">
+                <thead>
+                  <tr>
+                    <th style="width: 150px;">Bütçe Kodu</th>
+                    <th>Bütçe Kalem Adı</th>
+                    <th style="width: 280px;">Harcama Kategorisi</th>
+                    <th style="width: 110px; text-align: center;">Durum</th>
+                    <th style="width: 110px; text-align: center;">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-budget-items-settings">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -3145,6 +3193,13 @@
           </div>
 
           <div class="form-group full-width">
+            <label>📊 Muhasebe / Bütçe Kalemi <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(Opsiyonel - Analitik Bütçe Takibi)</span></label>
+            <select id="nr-budget-item">
+              <option value="">-- Bütçe Kalemi Seçiniz (Opsiyonel) --</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width">
             <label>Yönetmelik Maddesi</label>
             <select id="nr-regulation"></select>
           </div>
@@ -3294,6 +3349,13 @@
                 <div id="er-actual-amount-preview" class="amount-live-preview is-actual"></div>
               </div>
             </div>
+          </div>
+
+          <div class="form-group full-width">
+            <label>📊 Muhasebe / Bütçe Kalemi <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(Opsiyonel - Analitik Bütçe Takibi)</span></label>
+            <select id="er-budget-item">
+              <option value="">-- Bütçe Kalemi Seçiniz (Opsiyonel) --</option>
+            </select>
           </div>
 
           <div class="form-group full-width">
@@ -4609,9 +4671,121 @@
     </div>
   </div>
 
+  <!-- Modal: Budget Items Breakdown & Analysis (Bütçe Kalem Dağılımı ve Analizi) -->
+  <div class="modal-overlay" id="modal-budget-items-breakdown">
+    <div class="modal-content" style="max-width: 960px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+        <div>
+          <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+            <span>📊</span> <span id="bib-title">Bütçe Kalem Dağılımı ve Harcama Analizi</span>
+          </h3>
+          <p id="bib-subtitle" style="font-size: 0.8rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
+            İlgili birimin taleplerinin muhasebe/bütçe kalemlerine göre gerçekleşen ve rezerve tutar dağılımı
+          </p>
+        </div>
+        <button type="button" class="btn-close-modal close-modal">&times;</button>
+      </div>
+
+      <!-- Mini KPI Summary Strip -->
+      <div style="padding: 1rem 1.25rem; background: var(--bg-hover); border-bottom: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;">
+        <div style="background: var(--bg-card); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid var(--accent-primary);">
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">TOPLAM BİRİM BÜTÇESİ</div>
+          <div id="bib-kpi-total-budget" style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-primary); margin-top: 2px;">0 ₺</div>
+        </div>
+        <div style="background: var(--bg-card); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid #f59e0b;">
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">SÜREÇTEKİ / REZERVE</div>
+          <div id="bib-kpi-committed" style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #f59e0b; margin-top: 2px;">0 ₺</div>
+        </div>
+        <div style="background: var(--bg-card); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid var(--status-completed);">
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">GERÇEKLEŞEN HARCAMA</div>
+          <div id="bib-kpi-spent" style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: var(--status-completed); margin-top: 2px;">0 ₺</div>
+        </div>
+        <div style="background: var(--bg-card); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid #3b82f6;">
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">NET KULLANILABİLİR KALAN</div>
+          <div id="bib-kpi-available" style="font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); color: #3b82f6; margin-top: 2px;">0 ₺</div>
+        </div>
+      </div>
+
+      <div style="padding: 0.85rem 1.25rem 0.4rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <div class="search-input-box" style="width: 300px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="bib-search" oninput="App.filterBudgetBreakdownTable()" placeholder="Bütçe kalemi veya kod ara...">
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn-secondary" onclick="App.exportBudgetBreakdownToExcel()" style="padding: 0.4rem 0.85rem; font-size: 0.78rem;">
+            <span>📥</span> Excel İndir
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding: 0.5rem 1.25rem 1.25rem; overflow-y: auto; flex: 1;">
+        <div class="table-container" style="max-height: 420px;">
+          <table class="custom-table" id="table-budget-breakdown">
+            <thead>
+              <tr>
+                <th style="width: 120px;">Kalem Kodu</th>
+                <th>Bütçe Kalemi Adı</th>
+                <th style="width: 130px; text-align: right;">Süreçteki (₺)</th>
+                <th style="width: 130px; text-align: right;">Harcanan (₺)</th>
+                <th style="width: 140px; text-align: right;">Toplam Yük (₺)</th>
+                <th style="width: 140px;">Bütçe Payı (%)</th>
+                <th style="width: 90px; text-align: center;">Talep Sayısı</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-budget-breakdown">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 0.85rem 1.25rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+        <button type="button" class="btn-secondary close-modal">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Budget Item Add / Edit Form -->
+  <div class="modal-overlay" id="modal-budget-item-form">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="bif-modal-title">📊 Bütçe Kalemi Tanımla</h3>
+        <button type="button" class="btn-close-modal close-modal">&times;</button>
+      </div>
+      <form id="form-budget-item" onsubmit="App.handleSaveBudgetItem(event)">
+        <input type="hidden" id="bif-id">
+        <div class="form-grid" style="grid-template-columns: 1fr; gap: 0.9rem;">
+          <div class="form-group">
+            <label>Bütçe / Muhasebe Kodu <span class="required">*</span></label>
+            <input type="text" id="bif-code" required placeholder="ör: 2.02.06.01" style="font-family: var(--font-mono); font-weight: 700;">
+          </div>
+          <div class="form-group">
+            <label>Bütçe Kalem Adı <span class="required">*</span></label>
+            <input type="text" id="bif-name" required placeholder="ör: Kırtasiye Malzemesi Alımları">
+          </div>
+          <div class="form-group">
+            <label>Harcama Kategorisi / Grup</label>
+            <input type="text" id="bif-category" placeholder="ör: Tüketime Yönelik Mal ve Malzeme Alımları">
+          </div>
+          <div class="form-group">
+            <label>Durum</label>
+            <select id="bif-status">
+              <option value="true" selected>🟢 Aktif</option>
+              <option value="false">⚪ Pasif</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions" style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+          <button type="button" class="btn-secondary close-modal">İptal</button>
+          <button type="submit" class="btn-primary"><span>💾</span> Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Global Autocomplete Datalist for Suppliers across Forms -->
   <datalist id="supplier-datalist"></datalist>
 
-  <script src="/js/app.js?v=3.1"></script>
+  <script src="/js/app.js?v=3.2"></script>
 </body>
 </html>

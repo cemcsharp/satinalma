@@ -106,7 +106,7 @@ const TABLE_COLUMNS = {
     'sequenceNo', 'requestBarcode', 'subject', 'unit', 'arrivalDate', 'requestDate',
     'assignedTo', 'priority', 'status', 'estimatedAmount', 'budgetAmount', 'actualAmount',
     'currency', 'exchangeRate', 'supplier', 'orderBarcode', 'orderDate', 'estimatedDeliveryDate', 'regulation', 'description',
-    'purchaseType', 'academicYear', 'multiSuppliers'
+    'purchaseType', 'academicYear', 'multiSuppliers', 'budgetItem', 'budgetItemCode'
   ],
   contracts: [
     'contractNo', 'title', 'supplier', 'unit', 'assignedTo', 'startDate', 'endDate',
@@ -126,6 +126,7 @@ const TABLE_COLUMNS = {
   logs: ['timestamp', 'user', 'action', 'details'],
   units: ['name', 'email', 'annualBudget', 'budgetData'],
   regulations: ['name'],
+  budget_items: ['code', 'name', 'category', 'budgetAmount', 'isActive'],
   tenders: [
     'tenderNo', 'title', 'tenderDate', 'tenderTime', 'status', 'unit',
     'relatedBarcode', 'regulation', 'estimatedAmount', 'currency',
@@ -1942,7 +1943,7 @@ const server = http.createServer(async (req, res) => {
       }
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       
-      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders, documents, vendorRatings, settings, suppliers] = await Promise.all([
+      const [users, requests, contracts, invoices, guarantees, logs, units, regulations, rates, tenders, documents, vendorRatings, settings, suppliers, budgetItems] = await Promise.all([
         getTableData('users'), // Şifresiz döner
         getTableData('requests'),
         getTableData('contracts'),
@@ -1956,7 +1957,8 @@ const server = http.createServer(async (req, res) => {
         getTableData('documents').catch(() => []),
         getTableData('vendor_ratings').catch(() => []),
         getTableData('settings').catch(() => []),
-        getTableData('suppliers').catch(() => [])
+        getTableData('suppliers').catch(() => []),
+        getTableData('budget_items').catch(() => [])
       ]);
 
       const ratesObj = {};
@@ -1981,7 +1983,8 @@ const server = http.createServer(async (req, res) => {
         documents: documents || [],
         vendorRatings: vendorRatings || [],
         settings: settingsMap,
-        suppliers: suppliers || []
+        suppliers: suppliers || [],
+        budgetItems: budgetItems || []
       };
 
       res.writeHead(200);
@@ -3060,6 +3063,16 @@ async function initDatabaseSchema() {
         "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS budget_items (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(50) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(100) DEFAULT 'Genel',
+        "budgetAmount" NUMERIC DEFAULT 0,
+        "isActive" BOOLEAN DEFAULT true,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS extension VARCHAR(50);
@@ -3084,6 +3097,8 @@ async function initDatabaseSchema() {
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS supplier VARCHAR(255);
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS regulation VARCHAR(100);
       ALTER TABLE requests ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "budgetItem" TEXT;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS "budgetItemCode" VARCHAR(50);
 
       ALTER TABLE contracts ADD COLUMN IF NOT EXISTS "exchangeRate" NUMERIC;
       ALTER TABLE contracts ADD COLUMN IF NOT EXISTS "guaranteeAmount" NUMERIC;
@@ -3113,6 +3128,105 @@ async function initDatabaseSchema() {
       ALTER TABLE vendor_ratings ADD COLUMN IF NOT EXISTS "purchaseType" VARCHAR(50) DEFAULT 'MAL';
       ALTER TABLE vendor_ratings ADD COLUMN IF NOT EXISTS "requestId" INTEGER;
     `);
+
+    // Otomatik Bütçe Kalemleri Başlangıç Tohumlaması
+    const biCheck = await pool.query('SELECT COUNT(*) FROM budget_items').catch(() => ({ rows: [{ count: 0 }] }));
+    if (parseInt(biCheck.rows[0].count, 10) === 0) {
+      const DEFAULT_BUDGET_ITEMS = [
+        { code: '2.01.01.01', name: 'Brüt Ücretler', category: 'Personel Giderleri' },
+        { code: '2.01.01.02', name: 'Ek Ders Ücret Giderleri', category: 'Personel Giderleri' },
+        { code: '2.01.01.03', name: 'SGK İşveren Payları', category: 'Personel Giderleri' },
+        { code: '2.01.01.05', name: 'Kıdem Tazminatı Giderleri', category: 'Personel Giderleri' },
+        { code: '2.01.02.07', name: 'Mesai Giderleri', category: 'Personel Giderleri' },
+        { code: '2.02.01.01', name: 'Akademik Personel Yemek Giderleri', category: 'Beslenme ve Yemek' },
+        { code: '2.02.01.02', name: 'Öğrenci ve Kursiyer Yemek Giderleri', category: 'Beslenme ve Yemek' },
+        { code: '2.02.01.03', name: 'İdari Personel Yemek Giderleri', category: 'Beslenme ve Yemek' },
+        { code: '2.02.02.01', name: 'Elektrik Giderleri', category: 'Enerji ve Tüketim' },
+        { code: '2.02.02.03', name: 'Şebeke Suyu Giderleri (İSKİ)', category: 'Enerji ve Tüketim' },
+        { code: '2.02.02.04', name: 'İçme Suyu Giderleri', category: 'Enerji ve Tüketim' },
+        { code: '2.02.02.05', name: 'Doğalgaz Giderleri', category: 'Enerji ve Tüketim' },
+        { code: '2.02.06.01', name: 'Kırtasiye Giderleri', category: 'Kırtasiye ve Yayın' },
+        { code: '2.02.06.02', name: 'Öğrenci Kitap Giderleri', category: 'Kırtasiye ve Yayın' },
+        { code: '2.02.06.03', name: 'Kitap, Dergi ve E-Kaynak Giderleri', category: 'Kırtasiye ve Yayın' },
+        { code: '2.02.06.04', name: 'Fotokopi Çekim Giderleri', category: 'Kırtasiye ve Yayın' },
+        { code: '2.02.07.01', name: 'Matbaa ve Basım Giderleri', category: 'Basım ve Matbaa' },
+        { code: '2.02.08.01', name: 'Sabit Telefon Gideri (Türk Telekom)', category: 'Haberleşme ve Kargo' },
+        { code: '2.02.08.02', name: 'Cep Telefonu ve SMS Giderleri', category: 'Haberleşme ve Kargo' },
+        { code: '2.02.08.03', name: 'İnternet Giderleri', category: 'Haberleşme ve Kargo' },
+        { code: '2.02.08.04', name: 'Kargo ve Posta Giderleri', category: 'Haberleşme ve Kargo' },
+        { code: '2.02.09.01', name: 'Tesis Yönetim Hizmet Giderleri (Taşeron)', category: 'Hizmet Alımları' },
+        { code: '2.02.10.01', name: 'Akaryakıt ve Aidat Giderleri', category: 'Sarf ve İşletme' },
+        { code: '2.02.10.02', name: 'Temizlik Malzeme Alım ve Giderleri', category: 'Sarf ve İşletme' },
+        { code: '2.02.10.03', name: 'Sağlık Malzeme Alım ve Giderleri', category: 'Sarf ve İşletme' },
+        { code: '2.02.10.04', name: 'Mutfak Giderleri', category: 'Sarf ve İşletme' },
+        { code: '2.02.10.05', name: 'Nakliye ve Hammaliye Giderleri', category: 'Sarf ve İşletme' },
+        { code: '2.02.10.06', name: 'İş Sağlığı ve Güvenliği Giderleri', category: 'Sarf ve İşletme' },
+        { code: '2.02.11.01', name: 'Araç Kiralama Giderleri', category: 'Kira ve Lisans' },
+        { code: '2.02.11.02', name: 'Fotokopi Makinesi Kira Giderleri', category: 'Kira ve Lisans' },
+        { code: '2.02.11.03', name: 'Ofis, Salon ve Eğitim Yeri Kira Giderleri', category: 'Kira ve Lisans' },
+        { code: '2.02.11.05', name: 'Lisans Kiralama Giderleri', category: 'Kira ve Lisans' },
+        { code: '2.02.12.01', name: 'Yazılım/Programları Bakım Giderleri', category: 'Bakım ve Onarım' },
+        { code: '2.02.12.02', name: 'Ofis Bakım Giderleri', category: 'Bakım ve Onarım' },
+        { code: '2.02.12.04', name: 'Tesis, Saha ve Peyzaj Bakım Onarım Giderleri', category: 'Bakım ve Onarım' },
+        { code: '2.02.12.05', name: 'Makine Bakım Onarım Giderleri', category: 'Bakım ve Onarım' },
+        { code: '2.02.12.06', name: 'Tekne Bakım Onarım Gideri', category: 'Bakım ve Onarım' },
+        { code: '2.02.12.07', name: 'Binek Araç Bakım Onarım Giderleri', category: 'Bakım ve Onarım' },
+        { code: '2.02.13.01', name: 'Bilgisayar Malzeme Alım Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.02', name: 'Elektrik Malzeme Alım Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.03', name: 'Küçük Demirbaş Malzeme Alım Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.04', name: 'Ofis Malzeme Alım Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.05', name: 'Laboratuvar Malzeme Alım Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.06', name: 'Kütüphane, Doküman ve Yayın Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.07', name: 'Sportif Malzeme Alım Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.08', name: 'Öğrenci Üniforma Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.09', name: 'İdari Personel Kıyafet Gideri', category: 'Malzeme Alımları' },
+        { code: '2.02.13.10', name: 'Diğer Sarf Malzeme Alım Giderleri', category: 'Malzeme Alımları' },
+        { code: '2.02.14.01', name: 'Ar-Ge Giderleri', category: 'Ar-Ge ve Projeler' },
+        { code: '2.02.16.01', name: 'Akaryakıt Gideri (Araç)', category: 'Ulaşım ve Taşıma' },
+        { code: '2.02.16.02', name: 'Köprü, Otoyol, OGS Giderleri', category: 'Ulaşım ve Taşıma' },
+        { code: '2.02.16.04', name: 'Personel Servis Giderleri', category: 'Ulaşım ve Taşıma' },
+        { code: '2.02.16.05', name: 'Öğrenci Servis Giderleri', category: 'Ulaşım ve Taşıma' },
+        { code: '2.02.17.01', name: 'Gazete ve İlan Giderleri', category: 'Tanıtım ve Reklam' },
+        { code: '2.02.17.02', name: 'Reklam ve Tanıtım Giderleri', category: 'Tanıtım ve Reklam' },
+        { code: '2.02.17.03', name: 'Promosyon ve Eşantiyon Giderleri', category: 'Tanıtım ve Reklam' },
+        { code: '2.02.18.01', name: 'Temsil Ağırlama Giderleri', category: 'Temsil ve Organizasyon' },
+        { code: '2.02.19.01', name: 'Yurtiçi Seyahat ve Konaklama Giderleri', category: 'Seyahat ve Organizasyon' },
+        { code: '2.02.19.02', name: 'Yurtdışı Seyahat ve Konaklama Giderleri', category: 'Seyahat ve Organizasyon' },
+        { code: '2.02.19.05', name: 'Konferans, Panel ve Seminer Giderleri', category: 'Seyahat ve Organizasyon' },
+        { code: '2.02.20.01', name: 'Kasko Sigorta Giderleri', category: 'Sigorta Giderleri' },
+        { code: '2.02.20.02', name: 'Trafik Sigorta Giderleri', category: 'Sigorta Giderleri' },
+        { code: '2.02.20.03', name: 'İşyeri Paket Sigortası', category: 'Sigorta Giderleri' },
+        { code: '2.02.20.05', name: 'Elektronik Cihaz Sigorta Giderleri', category: 'Sigorta Giderleri' },
+        { code: '2.02.20.06', name: 'Yangın Sigorta Giderleri', category: 'Sigorta Giderleri' },
+        { code: '2.02.21.01', name: 'Damga Vergisi', category: 'Vergi ve Harçlar' },
+        { code: '2.02.21.02', name: 'Diğer Vergi, Resim ve Harçlar', category: 'Vergi ve Harçlar' },
+        { code: '2.02.23.01', name: 'Noter Giderleri', category: 'Hukuk ve Noter' },
+        { code: '2.02.23.02', name: 'İcra ve Mahkeme Giderleri', category: 'Hukuk ve Noter' },
+        { code: '2.02.24.01', name: 'Müşavirlik Giderleri', category: 'Danışmanlık ve Müşavirlik' },
+        { code: '2.02.24.02', name: 'Hukuk Müşavirliği Giderleri', category: 'Danışmanlık ve Müşavirlik' },
+        { code: '2.02.24.03', name: 'Diğer Danışmanlık Giderleri', category: 'Danışmanlık ve Müşavirlik' },
+        { code: '2.02.25.01', name: 'Büro Demirbaş Alımları', category: 'Demirbaş ve Yatırım' },
+        { code: '2.02.25.03', name: 'Büro Makineleri Alımları', category: 'Demirbaş ve Yatırım' },
+        { code: '2.02.25.04', name: 'Lab. Stüdyo ve Atölye Demirbaş Alımları', category: 'Demirbaş ve Yatırım' },
+        { code: '2.02.25.07', name: 'Bilgisayar Programı Alımları', category: 'Demirbaş ve Yatırım' },
+        { code: '2.02.25.08', name: 'Taşıt Alımları', category: 'Demirbaş ve Yatırım' },
+        { code: '2.02.25.09', name: 'Kütüphane Demirbaş Alımları', category: 'Demirbaş ve Yatırım' },
+        { code: '2.02.25.10', name: 'Diğer Demirbaş Alımları', category: 'Demirbaş ve Yatırım' },
+        { code: '2.02.26.01', name: 'Avrupa Birliği Projeleri', category: 'Projeler' },
+        { code: '2.02.26.06', name: 'TÜBİTAK Proje Giderleri', category: 'Projeler' },
+        { code: '2.02.26.08', name: 'BAP Proje Giderleri', category: 'Projeler' },
+        { code: '2.02.27.01', name: 'Erasmus Öğrenci Giderleri', category: 'Erasmus ve Uluslararası' },
+        { code: '2.02.28.01', name: 'Banka Giderleri vb.', category: 'Finansman ve Banka' }
+      ];
+
+      for (const item of DEFAULT_BUDGET_ITEMS) {
+        await pool.query(
+          'INSERT INTO budget_items (code, name, category, "budgetAmount", "isActive") VALUES ($1, $2, $3, $4, $5)',
+          [item.code, item.name, item.category, 0, true]
+        ).catch(() => {});
+      }
+      console.log(`🌱 ${DEFAULT_BUDGET_ITEMS.length} adet varsayılan bütçe kalemi veritabanına yüklendi.`);
+    }
 
     // Otomatik Şifre Göçü (Mevcut düz metin şifreleri PBKDF2 tuzlu hash'e dönüştürür)
     const existingUsers = await pool.query('SELECT id, password FROM users');
