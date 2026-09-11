@@ -542,64 +542,119 @@
       <!-- 2. REQUESTS MANAGEMENT VIEW -->
       <section id="view-requests" class="view-section" style="display: none;">
         
-        <!-- Request Management / Unit Budget KPI Cards (Single Unified Row) -->
-        <div class="grid-4" style="margin-bottom: 1rem;" id="req-kpi-container">
-          <div class="glass-card kpi-card" id="card-req-kpi-total" style="cursor: pointer;" title="Tüm talepleri listelemek için tıklayın">
-            <div class="kpi-icon blue" id="req-kpi-icon-1">📋</div>
-            <div class="kpi-data">
-              <h3 id="req-kpi-total">0</h3>
-              <p id="req-kpi-label-1">Toplam Talep</p>
-              <div class="kpi-sub" id="req-kpi-sub-1">⚡ Tüm Talepleri Listele</div>
-            </div>
+        <!-- BÖLÜM 1: 📋 TALEP OPERASYON KARTLARI -->
+        <div style="margin-bottom: 0.85rem;" id="req-ops-section">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
+            <span style="font-size: 0.76rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase;" id="req-ops-title">
+              📋 Talep Operasyon Durumu
+            </span>
           </div>
-
-          <div class="glass-card kpi-card" id="card-req-kpi-open" style="cursor: pointer;" title="Devam eden açık talepleri filtrelemek için tıklayın">
-            <div class="kpi-icon yellow" id="req-kpi-icon-2">⏳</div>
-            <div class="kpi-data">
-              <h3 id="req-kpi-open">0</h3>
-              <p id="req-kpi-label-2">Açık / Devam Eden</p>
-              <div class="kpi-sub" id="req-kpi-sub-2">⚡ İşlem Bekleyenler</div>
+          <div class="grid-4" id="req-kpi-container">
+            <div class="glass-card kpi-card" id="card-req-kpi-total" style="cursor: pointer;" title="Tüm talepleri listelemek için tıklayın">
+              <div class="kpi-icon blue" id="req-kpi-icon-1">📋</div>
+              <div class="kpi-data">
+                <h3 id="req-kpi-total">0</h3>
+                <p id="req-kpi-label-1">Toplam Talep</p>
+                <div class="kpi-sub" id="req-kpi-sub-1">⚡ Tüm Talepleri Listele</div>
+              </div>
             </div>
-          </div>
 
-          <div class="glass-card kpi-card sla-alarm-card" id="card-req-kpi-overdue" style="cursor: pointer;" title="14 günden fazla bekleyen talepleri filtrelemek için tıklayın">
-            <div class="kpi-icon red" id="req-kpi-icon-3">🚨</div>
-            <div class="kpi-data">
-              <h3 id="req-kpi-overdue" style="color: var(--status-rejected);">0</h3>
-              <p id="req-kpi-label-3" style="color: var(--status-rejected); font-weight:700;">14+ Gün Bekleyen (SLA)</p>
-              <div class="kpi-sub" id="req-kpi-sub-3" style="color: var(--status-rejected); font-weight:600;">⚡ Acil Talepleri Filtrele</div>
+            <div class="glass-card kpi-card" id="card-req-kpi-open" style="cursor: pointer;" title="Devam eden açık talepleri filtrelemek için tıklayın">
+              <div class="kpi-icon yellow" id="req-kpi-icon-2">⏳</div>
+              <div class="kpi-data">
+                <h3 id="req-kpi-open">0</h3>
+                <p id="req-kpi-label-2">Açık / Devam Eden</p>
+                <div class="kpi-sub" id="req-kpi-sub-2">⚡ İşlem Bekleyenler</div>
+              </div>
             </div>
-          </div>
 
-          <div class="glass-card kpi-card" id="card-req-kpi-completed" style="cursor: pointer;" title="Tamamlanan talepleri filtrelemek için tıklayın">
-            <div class="kpi-icon green" id="req-kpi-icon-4">✅</div>
-            <div class="kpi-data">
-              <h3 id="req-kpi-completed">0</h3>
-              <p id="req-kpi-label-4">Tamamlanan Talep</p>
-              <div class="kpi-sub" id="req-kpi-sub-4">⚡ Kapatılan İşleri Filtrele</div>
+            <div class="glass-card kpi-card sla-alarm-card" id="card-req-kpi-overdue" style="cursor: pointer;" title="14 günden fazla bekleyen talepleri filtrelemek için tıklayın">
+              <div class="kpi-icon red" id="req-kpi-icon-3">🚨</div>
+              <div class="kpi-data">
+                <h3 id="req-kpi-overdue" style="color: var(--status-rejected);">0</h3>
+                <p id="req-kpi-label-3" style="color: var(--status-rejected); font-weight:700;">14+ Gün Bekleyen (SLA)</p>
+                <div class="kpi-sub" id="req-kpi-sub-3" style="color: var(--status-rejected); font-weight:600;">⚡ Acil Talepleri Filtrele</div>
+              </div>
+            </div>
+
+            <div class="glass-card kpi-card" id="card-req-kpi-completed" style="cursor: pointer;" title="Tamamlanan talepleri filtrelemek için tıklayın">
+              <div class="kpi-icon green" id="req-kpi-icon-4">✅</div>
+              <div class="kpi-data">
+                <h3 id="req-kpi-completed">0</h3>
+                <p id="req-kpi-label-4">Tamamlanan Talep</p>
+                <div class="kpi-sub" id="req-kpi-sub-4">⚡ Kapatılan İşleri Filtrele</div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Sleek Unit Budget Allocation & Progress Strip (Visible for Units or when a unit is filtered) -->
-        <div id="unit-budget-progress-strip" class="glass-card" style="display: none; padding: 0.65rem 1rem; margin-bottom: 1.25rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; margin-bottom: 0.45rem; flex-wrap: wrap; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <span>🏢</span>
-              <span id="ub-strip-title" style="font-weight: 700; color: var(--text-main);">Birim Bütçe Durumu</span>
-              <span class="badge" id="ub-strip-year" style="font-size: 0.72rem; padding: 0.15rem 0.45rem; background: rgba(99,102,241,0.15); color: var(--accent-primary);">2026-2027</span>
+        <!-- BÖLÜM 2: 💰 BÜTÇE & HARCAMA DENGESİ KARTLARI -->
+        <div style="margin-bottom: 1.25rem;" id="req-budget-section">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
+            <div style="display: flex; align-items: center; gap: 0.45rem;">
+              <span style="font-size: 0.76rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase;" id="req-budget-title">
+                💰 Bütçe ve Harcama Dengesi
+              </span>
+              <span class="badge" id="req-budget-year-badge" style="font-size: 0.7rem; padding: 0.1rem 0.4rem; background: rgba(99,102,241,0.15); color: var(--accent-primary);">2026-2027</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <span id="ubs-usage-percent" style="color: var(--text-muted); font-size: 0.74rem; font-weight: 600;">Harcanan: %0 | Süreçte: %0 | Kalan: %100</span>
-              <button type="button" class="btn-secondary" onclick="App.openUnitBudgetModal()" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; border-color: var(--accent-primary); color: var(--accent-primary);" title="Yıllık Bütçeyi Düzenle">
-                ✏️ Bütçe Tanımla
-              </button>
+            <button type="button" class="btn-secondary" onclick="App.openUnitBudgetModal()" style="padding: 0.25rem 0.55rem; font-size: 0.74rem; border-color: var(--accent-primary); color: var(--accent-primary);" title="Yıllık Bütçeyi Düzenle">
+              <span>✏️</span> Bütçe Düzenle
+            </button>
+          </div>
+
+          <div class="grid-4" style="margin-bottom: 0.65rem;">
+            <!-- Budget Card 1: Toplam Tanımlı Bütçe -->
+            <div class="glass-card kpi-card" style="border-left: 4px solid var(--accent-primary); cursor: pointer;" onclick="App.openUnitBudgetModal()" title="Bütçeyi düzenlemek için tıklayın">
+              <div class="kpi-icon blue">🎯</div>
+              <div class="kpi-data">
+                <h3 id="req-bgt-total">0 ₺</h3>
+                <p>Yıllık Tanımlı Bütçe</p>
+                <div class="kpi-sub" id="req-bgt-total-sub">Tanımlanan Tavan Limit</div>
+              </div>
+            </div>
+
+            <!-- Budget Card 2: Süreçteki / Rezerve Tutar -->
+            <div class="glass-card kpi-card" style="border-left: 4px solid #f59e0b; cursor: pointer;" onclick="App.filterRequestsByStatus('Açık')" title="Süreçteki açık talepleri filtreleyin">
+              <div class="kpi-icon yellow">⏳</div>
+              <div class="kpi-data">
+                <h3 id="req-bgt-committed" style="color: #f59e0b;">0 ₺</h3>
+                <p style="color: #f59e0b; font-weight: 700;">Süreçteki / Rezerve</p>
+                <div class="kpi-sub" id="req-bgt-committed-sub">0 Açık Talepte Bloke</div>
+              </div>
+            </div>
+
+            <!-- Budget Card 3: Harcanan / Faturalaşan Tutar -->
+            <div class="glass-card kpi-card" style="border-left: 4px solid var(--status-completed); background: rgba(16, 185, 129, 0.04); cursor: pointer;" onclick="App.filterRequestsByStatus('Tamamlandı')" title="Tamamlanan harcamaları filtreleyin">
+              <div class="kpi-icon green">🧾</div>
+              <div class="kpi-data">
+                <h3 id="req-bgt-spent" style="color: var(--status-completed);">0 ₺</h3>
+                <p style="color: var(--status-completed); font-weight: 700;">Gerçekleşen Harcama</p>
+                <div class="kpi-sub" id="req-bgt-spent-sub">0 Fatura / Alım Kapandı</div>
+              </div>
+            </div>
+
+            <!-- Budget Card 4: Kullanılabilir Net Kalan -->
+            <div class="glass-card kpi-card" id="card-req-bgt-available" style="border-left: 4px solid #3b82f6;">
+              <div class="kpi-icon blue" id="req-bgt-avail-icon">🟢</div>
+              <div class="kpi-data">
+                <h3 id="req-bgt-available" style="color: #3b82f6;">0 ₺</h3>
+                <p id="req-bgt-avail-label" style="font-weight: 700;">Kullanılabilir Net Kalan</p>
+                <div class="kpi-sub" id="req-bgt-avail-sub">%100 Harcanabilir Limit</div>
+              </div>
             </div>
           </div>
-          <div style="width: 100%; height: 8px; background: rgba(148, 163, 184, 0.15); border-radius: 999px; overflow: hidden; display: flex;">
-            <div id="ubs-bar-spent" style="height: 100%; width: 0%; background: var(--status-completed); transition: width 0.3s ease;" title="Harcanan"></div>
-            <div id="ubs-bar-committed" style="height: 100%; width: 0%; background: #f59e0b; transition: width 0.3s ease;" title="Süreçteki / Rezerve"></div>
-            <div id="ubs-bar-remaining" style="height: 100%; width: 100%; background: #3b82f6; transition: width 0.3s ease;" title="Kullanılabilir Net Kalan"></div>
+
+          <!-- Progress Bar Strip -->
+          <div class="glass-card" style="padding: 0.5rem 0.85rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; margin-bottom: 0.35rem; color: var(--text-muted); font-weight: 600;">
+              <span>Bütçe Kullanım Dağılımı:</span>
+              <span id="ubs-usage-percent">Harcanan: %0 | Süreçte: %0 | Kalan: %100</span>
+            </div>
+            <div style="width: 100%; height: 7px; background: rgba(148, 163, 184, 0.15); border-radius: 999px; overflow: hidden; display: flex;">
+              <div id="ubs-bar-spent" style="height: 100%; width: 0%; background: var(--status-completed); transition: width 0.3s ease;" title="Harcanan"></div>
+              <div id="ubs-bar-committed" style="height: 100%; width: 0%; background: #f59e0b; transition: width 0.3s ease;" title="Süreçteki / Rezerve"></div>
+              <div id="ubs-bar-remaining" style="height: 100%; width: 100%; background: #3b82f6; transition: width 0.3s ease;" title="Kullanılabilir Net Kalan"></div>
+            </div>
           </div>
         </div>
 
