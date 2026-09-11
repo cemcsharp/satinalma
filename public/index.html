@@ -118,7 +118,7 @@
       <button id="btn-mobile-menu" onclick="document.getElementById('main-sidebar').classList.toggle('mobile-open'); document.getElementById('sidebar-overlay').classList.toggle('show');" style="display:none; margin-left:auto; background:transparent; border:1px solid var(--border-color); border-radius:6px; color:var(--text-main); padding:0.4rem 0.6rem; font-size:1.2rem; cursor:pointer;">☰</button>
 
       <ul class="nav-menu">
-        <li class="nav-section-title">🏠 Ana Sayfa</li>
+        <li class="nav-section-title">🏠 Genel & Kişisel</li>
         <li class="nav-item active" data-view="dashboard">
           <a href="#/dashboard"><span class="nav-icon">📊</span><span>Dashboard</span></a>
         </li>
@@ -129,16 +129,23 @@
           <a href="#/my-requests"><span class="nav-icon">👤</span><span>Taleplerim</span></a>
         </li>
 
-
-        <li class="nav-section-title">📋 Operasyon</li>
+        <li class="nav-section-title">📋 Talep & Süreç</li>
         <li class="nav-item" data-view="requests">
           <a href="#/requests"><span class="nav-icon">📋</span><span>Talep Yönetimi</span></a>
         </li>
+        <li class="nav-item" data-view="workload">
+          <a href="#/workload"><span class="nav-icon">⚖️</span><span>İş Yükü & Devir</span></a>
+        </li>
+        <li class="nav-item" data-view="tenders">
+          <a href="#/tenders"><span class="nav-icon">🏛️</span><span>İhale Planlayıcısı</span></a>
+        </li>
+
+        <li class="nav-section-title">💰 Bütçe & Finans</li>
         <li class="nav-item" data-view="budgets">
           <a href="#/budgets"><span class="nav-icon">💰</span><span>Bütçe Yönetimi</span></a>
         </li>
-        <li class="nav-item" data-view="workload">
-          <a href="#/workload"><span class="nav-icon">⚖️</span><span>İş Yükü & Devir</span></a>
+        <li class="nav-item" data-view="invoices">
+          <a href="#/invoices"><span class="nav-icon">🧾</span><span>Fatura & Ödemeler</span></a>
         </li>
         <li class="nav-item" data-view="contracts">
           <a href="#/contracts"><span class="nav-icon">📑</span><span>Sözleşmeler</span></a>
@@ -146,14 +153,8 @@
         <li class="nav-item" data-view="guarantees">
           <a href="#/guarantees"><span class="nav-icon">🛡️</span><span>Teminat Mektupları</span></a>
         </li>
-        <li class="nav-item" data-view="invoices">
-          <a href="#/invoices"><span class="nav-icon">🧾</span><span>Faturalar</span></a>
-        </li>
-        <li class="nav-item" data-view="tenders">
-          <a href="#/tenders"><span class="nav-icon">🏛️</span><span>İhale Planlayıcısı</span></a>
-        </li>
 
-        <li class="nav-section-title">📈 Analizler</li>
+        <li class="nav-section-title">📈 Rapor & Analiz</li>
         <li class="nav-item" data-view="unit-analysis">
           <a href="#/unit-analysis"><span class="nav-icon">🏢</span><span>Birim Analizi</span></a>
         </li>
