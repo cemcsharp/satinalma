@@ -542,83 +542,8 @@
       <!-- 2. REQUESTS MANAGEMENT VIEW -->
       <section id="view-requests" class="view-section" style="display: none;">
         
-        <!-- UNIT BUDGET COMMITMENT TRACKING CARD (3-AŞAMALI BÜTÇE & REZERVE TAKİP) -->
-        <div id="unit-budget-summary-card" class="glass-card" style="display: none; margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: var(--radius-md); padding: 1.25rem 1.5rem; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem;">
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-              <span style="font-size: 1.6rem;">📊</span>
-              <div>
-                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
-                  <span id="ubs-unit-title">Birim Bütçe ve Harcama Durumu</span>
-                  <span class="badge" id="ubs-year-badge" style="background: rgba(99,102,241,0.2); color: var(--accent-primary); font-size: 0.75rem; font-family: var(--font-mono);">2025-2026</span>
-                </h3>
-                <p style="margin: 0.15rem 0 0 0; font-size: 0.78rem; color: var(--text-muted);">
-                  Tahsis edilen bütçe, süreçteki açık talepler ve kesinleşen faturaların anlık bütçe dengesi
-                </p>
-              </div>
-            </div>
-            <div>
-              <button class="btn-secondary" onclick="App.openUnitBudgetModal()" style="padding: 0.4rem 0.85rem; font-size: 0.82rem; font-weight: 700; border-color: var(--accent-primary); color: var(--accent-primary); display: inline-flex; align-items: center; gap: 0.35rem;" title="Birim Bütçe Limitini Güncelle">
-                <span>✏️</span> Bütçeyi Düzenle
-              </button>
-            </div>
-          </div>
-
-          <!-- 4 KPI Boxes -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
-            <!-- Box 1: Total Budget -->
-            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-sm); padding: 0.85rem 1rem;">
-              <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.35rem;">
-                <span>🎯</span> Toplam Yıllık Bütçe
-              </div>
-              <div id="ubs-total-budget" style="font-size: 1.35rem; font-weight: 800; font-family: var(--font-mono); color: var(--text-main); margin-top: 0.35rem;">0,00 ₺</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Tanımlanan tavan limit</div>
-            </div>
-
-            <!-- Box 2: Committed / In Progress -->
-            <div style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-sm); padding: 0.85rem 1rem;">
-              <div style="font-size: 0.75rem; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.35rem;">
-                <span>⏳</span> Süreçteki / Rezerve Tutar
-              </div>
-              <div id="ubs-committed-amount" style="font-size: 1.35rem; font-weight: 800; font-family: var(--font-mono); color: #f59e0b; margin-top: 0.35rem;">0,00 ₺</div>
-              <div id="ubs-committed-sub" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">0 Açık / İşlemde Talep</div>
-            </div>
-
-            <!-- Box 3: Actual / Invoiced -->
-            <div style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 0.85rem 1rem;">
-              <div style="font-size: 0.75rem; font-weight: 700; color: var(--status-completed); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.35rem;">
-                <span>🧾</span> Harcanan / Faturalaşan
-              </div>
-              <div id="ubs-spent-amount" style="font-size: 1.35rem; font-weight: 800; font-family: var(--font-mono); color: var(--status-completed); margin-top: 0.35rem;">0,00 ₺</div>
-              <div id="ubs-spent-sub" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">0 Tamamlanan Talep / Fatura</div>
-            </div>
-
-            <!-- Box 4: Remaining / Available -->
-            <div id="ubs-available-box" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-sm); padding: 0.85rem 1rem;">
-              <div style="font-size: 0.75rem; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.35rem;">
-                <span id="ubs-available-icon">🟢</span> Kullanılabilir Net Kalan
-              </div>
-              <div id="ubs-available-amount" style="font-size: 1.35rem; font-weight: 800; font-family: var(--font-mono); color: #3b82f6; margin-top: 0.35rem;">0,00 ₺</div>
-              <div id="ubs-available-sub" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Harcanabilir serbest bütçe</div>
-            </div>
-          </div>
-
-          <!-- Progress Bar & Breakdown -->
-          <div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.4rem; color: var(--text-muted); font-weight: 600;">
-              <span>Bütçe Kullanım Dağılımı:</span>
-              <span id="ubs-usage-percent">Harcanan: %0 | Süreçte: %0 | Kalan: %100</span>
-            </div>
-            <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; display: flex;">
-              <div id="ubs-bar-spent" style="height: 100%; width: 0%; background: var(--status-completed); transition: width 0.4s ease;" title="Harcanan"></div>
-              <div id="ubs-bar-committed" style="height: 100%; width: 0%; background: #f59e0b; transition: width 0.4s ease;" title="Süreçteki / Bloke"></div>
-              <div id="ubs-bar-remaining" style="height: 100%; width: 100%; background: rgba(59, 130, 246, 0.5); transition: width 0.4s ease;" title="Kullanılabilir Kalan"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Request Management KPI Cards -->
-        <div class="grid-4" style="margin-bottom: 1.5rem;" id="req-kpi-container">
+        <!-- Request Management / Unit Budget KPI Cards (Single Unified Row) -->
+        <div class="grid-4" style="margin-bottom: 1rem;" id="req-kpi-container">
           <div class="glass-card kpi-card" id="card-req-kpi-total" style="cursor: pointer;" title="Tüm talepleri listelemek için tıklayın">
             <div class="kpi-icon blue" id="req-kpi-icon-1">📋</div>
             <div class="kpi-data">
@@ -653,6 +578,28 @@
               <p id="req-kpi-label-4">Tamamlanan Talep</p>
               <div class="kpi-sub" id="req-kpi-sub-4">⚡ Kapatılan İşleri Filtrele</div>
             </div>
+          </div>
+        </div>
+
+        <!-- Sleek Unit Budget Allocation & Progress Strip (Visible for Units or when a unit is filtered) -->
+        <div id="unit-budget-progress-strip" class="glass-card" style="display: none; padding: 0.65rem 1rem; margin-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; margin-bottom: 0.45rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span>🏢</span>
+              <span id="ub-strip-title" style="font-weight: 700; color: var(--text-main);">Birim Bütçe Durumu</span>
+              <span class="badge" id="ub-strip-year" style="font-size: 0.72rem; padding: 0.15rem 0.45rem; background: rgba(99,102,241,0.15); color: var(--accent-primary);">2026-2027</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span id="ubs-usage-percent" style="color: var(--text-muted); font-size: 0.74rem; font-weight: 600;">Harcanan: %0 | Süreçte: %0 | Kalan: %100</span>
+              <button type="button" class="btn-secondary" onclick="App.openUnitBudgetModal()" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; border-color: var(--accent-primary); color: var(--accent-primary);" title="Yıllık Bütçeyi Düzenle">
+                ✏️ Bütçe Tanımla
+              </button>
+            </div>
+          </div>
+          <div style="width: 100%; height: 8px; background: rgba(148, 163, 184, 0.15); border-radius: 999px; overflow: hidden; display: flex;">
+            <div id="ubs-bar-spent" style="height: 100%; width: 0%; background: var(--status-completed); transition: width 0.3s ease;" title="Harcanan"></div>
+            <div id="ubs-bar-committed" style="height: 100%; width: 0%; background: #f59e0b; transition: width 0.3s ease;" title="Süreçteki / Rezerve"></div>
+            <div id="ubs-bar-remaining" style="height: 100%; width: 100%; background: #3b82f6; transition: width 0.3s ease;" title="Kullanılabilir Net Kalan"></div>
           </div>
         </div>
 

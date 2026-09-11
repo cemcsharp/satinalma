@@ -1124,6 +1124,13 @@ const App = {
 
     // Clickable KPI Cards for Requests Management (Talep Yönetimi)
     document.getElementById('card-req-kpi-total')?.addEventListener('click', () => {
+      const isUnitUser = this.state.currentUser?.role === 'UNIT';
+      const filterUnitVal = document.getElementById('filter-unit')?.value || 'ALL';
+      if (isUnitUser || filterUnitVal !== 'ALL') {
+        const targetUnit = isUnitUser ? this.state.currentUser?.unit : filterUnitVal;
+        this.openUnitBudgetModal(targetUnit);
+        return;
+      }
       const statusSelect = document.getElementById('filter-status');
       if (statusSelect) {
         statusSelect.value = 'ALL';
@@ -1144,12 +1151,22 @@ const App = {
     });
 
     document.getElementById('card-req-kpi-overdue')?.addEventListener('click', () => {
+      const isUnitUser = this.state.currentUser?.role === 'UNIT';
+      const filterUnitVal = document.getElementById('filter-unit')?.value || 'ALL';
       const statusSelect = document.getElementById('filter-status');
       if (statusSelect) {
-        statusSelect.value = 'OVERDUE_14';
-        this.state.currentPage = 1;
-        this.renderRequestsTable();
-        this.showToast("🚨 14 günden fazla süredir bekleyen kurum talepleri filtrelendi.", "info", "🚨");
+        if (isUnitUser || filterUnitVal !== 'ALL') {
+          // In unit focus mode, Card 3 is completed/invoiced spend
+          statusSelect.value = 'Tamamlandı';
+          this.state.currentPage = 1;
+          this.renderRequestsTable();
+          this.showToast("Tamamlanan harcamalar ve faturalar filtrelendi.", "info", "🧾");
+        } else {
+          statusSelect.value = 'OVERDUE_14';
+          this.state.currentPage = 1;
+          this.renderRequestsTable();
+          this.showToast("🚨 14 günden fazla süredir bekleyen kurum talepleri filtrelendi.", "info", "🚨");
+        }
       }
     });
 
@@ -3691,66 +3708,124 @@ const App = {
       }
     });
 
-    // Update Request Management / Unit Spending KPI Totals
+    // Update Request Management / Unit Budget KPI Cards
     const isUnitUser = this.state.currentUser?.role === 'UNIT';
+    const filterUnitVal = document.getElementById('filter-unit')?.value || 'ALL';
+    const isUnitFocused = isUnitUser || filterUnitVal !== 'ALL';
+    const targetUnit = isUnitUser ? this.state.currentUser?.unit : filterUnitVal;
 
-    if (isUnitUser) {
-      // 1. Completed Spending (Tamamlanan / Faturası kesilmiş harcamalar)
-      const completedRequests = allFilteredRequests.filter(r => r.status === 'Tamamlandı');
-      const completedSpendTRY = completedRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
+    const elIcon1 = document.getElementById('req-kpi-icon-1');
+    const elVal1 = document.getElementById('req-kpi-total');
+    const elLbl1 = document.getElementById('req-kpi-label-1');
+    const elSub1 = document.getElementById('req-kpi-sub-1');
 
-      // 2. Ordered Spending (Siparişteki / Yoldaki harcamalar)
-      const orderedRequests = allFilteredRequests.filter(r => r.status === 'Sipariş Verildi' || (r.orderBarcode && r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal'));
-      const orderedSpendTRY = orderedRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0), 0);
+    const elIcon2 = document.getElementById('req-kpi-icon-2');
+    const elVal2 = document.getElementById('req-kpi-open');
+    const elLbl2 = document.getElementById('req-kpi-label-2');
+    const elSub2 = document.getElementById('req-kpi-sub-2');
 
-      // 3. Pending In-Process Budget (Onay / Teklif aşamasında bekleyen yaklaşık maliyet)
-      const pendingRequests = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Sipariş Verildi' && !r.orderBarcode && r.status !== 'Reddedildi' && r.status !== 'İptal');
-      const pendingSpendTRY = pendingRequests.reduce((sum, r) => sum + (parseFloat(r.budgetAmount) || parseFloat(r.estimatedAmount) || 0), 0);
+    const elIcon3 = document.getElementById('req-kpi-icon-3');
+    const elVal3 = document.getElementById('req-kpi-overdue');
+    const elLbl3 = document.getElementById('req-kpi-label-3');
+    const elSub3 = document.getElementById('req-kpi-sub-3');
 
-      // 4. Total Demands
-      const reqTotal = allFilteredRequests.length;
-      const reqCompletedCount = completedRequests.length;
-      const reqOpenCount = reqTotal - reqCompletedCount;
+    const elIcon4 = document.getElementById('req-kpi-icon-4');
+    const elVal4 = document.getElementById('req-kpi-completed');
+    const elLbl4 = document.getElementById('req-kpi-label-4');
+    const elSub4 = document.getElementById('req-kpi-sub-4');
 
-      // Update Card 1: Tamamlanan Harcama
-      const elIcon1 = document.getElementById('req-kpi-icon-1');
-      const elVal1 = document.getElementById('req-kpi-total');
-      const elLbl1 = document.getElementById('req-kpi-label-1');
-      const elSub1 = document.getElementById('req-kpi-sub-1');
-      if (elIcon1) { elIcon1.className = 'kpi-icon green'; elIcon1.innerText = '💰'; }
-      if (elVal1) { elVal1.innerText = this.formatMoney(completedSpendTRY, 'TRY', 0); elVal1.style.color = '#10b981'; }
-      if (elLbl1) elLbl1.innerText = 'Tamamlanan Harcamamız';
-      if (elSub1) elSub1.innerText = `✅ ${reqCompletedCount} Alım Tamamlandı`;
+    const progressStrip = document.getElementById('unit-budget-progress-strip');
 
-      // Update Card 2: Siparişteki Tutar
-      const elIcon2 = document.getElementById('req-kpi-icon-2');
-      const elVal2 = document.getElementById('req-kpi-open');
-      const elLbl2 = document.getElementById('req-kpi-label-2');
-      const elSub2 = document.getElementById('req-kpi-sub-2');
-      if (elIcon2) { elIcon2.className = 'kpi-icon purple'; elIcon2.innerText = '📦'; }
-      if (elVal2) { elVal2.innerText = this.formatMoney(orderedSpendTRY, 'TRY', 0); elVal2.style.color = '#8b5cf6'; }
-      if (elLbl2) elLbl2.innerText = 'Siparişteki / Yoldaki Tutar';
-      if (elSub2) elSub2.innerText = `🚚 ${orderedRequests.length} Sipariş Teslim Bekliyor`;
+    if (isUnitFocused && targetUnit && targetUnit !== 'ALL') {
+      const currentYear = this.state.selectedYear || getCurrentAcademicYear();
+      const unitObj = (this.state.units || []).find(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === targetUnit.toLowerCase().trim());
+      
+      let totalBudget = 0;
+      if (unitObj) {
+        let bData = {};
+        try {
+          if (unitObj.budgetData) bData = typeof unitObj.budgetData === 'string' ? JSON.parse(unitObj.budgetData) : unitObj.budgetData;
+        } catch (e) {}
+        totalBudget = bData[currentYear] !== undefined ? (parseFloat(bData[currentYear]) || 0) : (parseFloat(unitObj.annualBudget) || 0);
+      }
 
-      // Update Card 3: Süreçteki Tutar
-      const elIcon3 = document.getElementById('req-kpi-icon-3');
-      const elVal3 = document.getElementById('req-kpi-overdue');
-      const elLbl3 = document.getElementById('req-kpi-label-3');
-      const elSub3 = document.getElementById('req-kpi-sub-3');
-      if (elIcon3) { elIcon3.className = 'kpi-icon yellow'; elIcon3.innerText = '⏳'; }
-      if (elVal3) { elVal3.innerText = this.formatMoney(pendingSpendTRY, 'TRY', 0); elVal3.style.color = '#f59e0b'; }
-      if (elLbl3) { elLbl3.innerText = 'Süreçteki / Bekleyen Tutar'; elLbl3.style.color = 'var(--text-muted)'; elLbl3.style.fontWeight = '500'; }
-      if (elSub3) { elSub3.innerText = `📋 Onay & Teklif Aşamasında`; elSub3.style.color = 'var(--text-muted)'; }
+      // Unit specific requests
+      const unitRequests = allFilteredRequests.filter(r => (r.unit || '').toLowerCase().trim() === targetUnit.toLowerCase().trim());
+      
+      // Committed / In Progress
+      const committedRequests = unitRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'İptal Edildi' && r.status !== 'Reddedildi');
+      const committedAmount = committedRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount || r.budgetAmount || r.estimatedAmount) || 0), 0);
 
-      // Update Card 4: Toplam Talep Sayısı
-      const elIcon4 = document.getElementById('req-kpi-icon-4');
-      const elVal4 = document.getElementById('req-kpi-completed');
-      const elLbl4 = document.getElementById('req-kpi-label-4');
-      const elSub4 = document.getElementById('req-kpi-sub-4');
-      if (elIcon4) { elIcon4.className = 'kpi-icon blue'; elIcon4.innerText = '📋'; }
-      if (elVal4) { elVal4.innerText = reqTotal; elVal4.style.color = 'var(--text-main)'; }
-      if (elLbl4) elLbl4.innerText = 'Birim Toplam Talebi';
-      if (elSub4) elSub4.innerText = `⚡ ${reqOpenCount} Açık • ${reqCompletedCount} Kapalı`;
+      // Completed / Spent
+      const completedRequests = unitRequests.filter(r => r.status === 'Tamamlandı');
+      const spentAmount = completedRequests.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
+
+      // Net Available
+      const availableAmount = totalBudget - (spentAmount + committedAmount);
+
+      let spentPct = 0, commPct = 0, remPct = 100;
+      if (totalBudget > 0) {
+        spentPct = Math.min(100, Math.max(0, Math.round((spentAmount / totalBudget) * 100)));
+        commPct = Math.min(100 - spentPct, Math.max(0, Math.round((committedAmount / totalBudget) * 100)));
+        remPct = Math.max(0, 100 - spentPct - commPct);
+      }
+
+      // Card 1: Toplam Tanımlı Bütçe
+      if (elIcon1) { elIcon1.className = 'kpi-icon blue'; elIcon1.innerText = '🎯'; }
+      if (elVal1) { elVal1.innerText = totalBudget > 0 ? this.formatMoney(totalBudget, 'TRY', 0) : '0 ₺'; elVal1.style.color = 'var(--text-main)'; }
+      if (elLbl1) elLbl1.innerText = 'Yıllık Tanımlı Bütçe';
+      if (elSub1) elSub1.innerText = `✏️ Bütçeyi Düzenle (${currentYear})`;
+
+      // Card 2: Süreçteki / Rezerve Tutar
+      if (elIcon2) { elIcon2.className = 'kpi-icon yellow'; elIcon2.innerText = '⏳'; }
+      if (elVal2) { elVal2.innerText = this.formatMoney(committedAmount, 'TRY', 0); elVal2.style.color = '#f59e0b'; }
+      if (elLbl2) elLbl2.innerText = 'Süreçteki / Rezerve';
+      if (elSub2) elSub2.innerText = `⚡ ${committedRequests.length} Açık Talepte Bloke`;
+
+      // Card 3: Harcanan / Faturalaşan Tutar
+      if (elIcon3) { elIcon3.className = 'kpi-icon green'; elIcon3.innerText = '🧾'; }
+      if (elVal3) { elVal3.innerText = this.formatMoney(spentAmount, 'TRY', 0); elVal3.style.color = 'var(--status-completed)'; }
+      if (elLbl3) { elLbl3.innerText = 'Tamamlanan Harcama'; elLbl3.style.color = 'var(--text-muted)'; elLbl3.style.fontWeight = '500'; }
+      if (elSub3) { elSub3.innerText = `✅ ${completedRequests.length} Fatura / Alım Kapandı`; elSub3.style.color = 'var(--text-muted)'; }
+
+      // Card 4: Kullanılabilir Net Kalan Bütçe
+      if (elVal4) {
+        if (totalBudget > 0 && availableAmount < 0) {
+          if (elIcon4) { elIcon4.className = 'kpi-icon red'; elIcon4.innerText = '🚨'; }
+          elVal4.innerText = `${this.formatMoney(availableAmount, 'TRY', 0)} ⚠️`;
+          elVal4.style.color = 'var(--status-rejected)';
+          if (elLbl4) { elLbl4.innerText = '🚨 Bütçe Aşımı!'; elLbl4.style.color = 'var(--status-rejected)'; }
+          if (elSub4) { elSub4.innerText = `⚠️ Limit ${this.formatMoney(Math.abs(availableAmount), 'TRY', 0)} aşıldı`; elSub4.style.color = 'var(--status-rejected)'; }
+        } else {
+          if (elIcon4) { elIcon4.className = 'kpi-icon blue'; elIcon4.innerText = '🟢'; }
+          elVal4.innerText = this.formatMoney(availableAmount, 'TRY', 0);
+          elVal4.style.color = '#3b82f6';
+          if (elLbl4) { elLbl4.innerText = 'Kullanılabilir Net Kalan'; elLbl4.style.color = 'var(--text-muted)'; }
+          if (elSub4) { elSub4.innerText = totalBudget > 0 ? `⚡ %${remPct} Harcanabilir Limit` : 'Bütçe henüz tanımlanmadı'; elSub4.style.color = 'var(--text-muted)'; }
+        }
+      }
+
+      // Update Progress Strip
+      if (progressStrip) {
+        progressStrip.style.display = 'block';
+        const stripTitle = document.getElementById('ub-strip-title');
+        const stripYear = document.getElementById('ub-strip-year');
+        const usageTxt = document.getElementById('ubs-usage-percent');
+        const barSpent = document.getElementById('ubs-bar-spent');
+        const barComm = document.getElementById('ubs-bar-committed');
+        const barRem = document.getElementById('ubs-bar-remaining');
+
+        if (stripTitle) stripTitle.innerText = `${targetUnit} Bütçe Dengesi`;
+        if (stripYear) stripYear.innerText = currentYear;
+        if (usageTxt) {
+          usageTxt.innerText = totalBudget > 0 
+            ? `Harcanan: %${spentPct} | Süreçte: %${commPct} | Kalan: %${remPct}`
+            : 'Yıllık bütçe tanımlanmadı — Bütçe Tanımla butonuyla limit belirleyebilirsiniz.';
+        }
+        if (barSpent) barSpent.style.width = `${spentPct}%`;
+        if (barComm) barComm.style.width = `${commPct}%`;
+        if (barRem) barRem.style.width = `${remPct}%`;
+      }
     } else {
       // Standard Admin/Staff Request Management KPI Totals
       const reqTotal = allFilteredRequests.length;
@@ -3758,45 +3833,30 @@ const App = {
       const reqCompleted = allFilteredRequests.filter(r => r.status === 'Tamamlandı').length;
       const reqOverdue = allFilteredRequests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal' && r._diffDays >= 14).length;
 
-      const elIcon1 = document.getElementById('req-kpi-icon-1');
-      const elVal1 = document.getElementById('req-kpi-total');
-      const elLbl1 = document.getElementById('req-kpi-label-1');
-      const elSub1 = document.getElementById('req-kpi-sub-1');
       if (elIcon1) { elIcon1.className = 'kpi-icon blue'; elIcon1.innerText = '📋'; }
       if (elVal1) { elVal1.innerText = reqTotal; elVal1.style.color = 'var(--text-main)'; }
       if (elLbl1) elLbl1.innerText = 'Toplam Talep';
       if (elSub1) elSub1.innerText = '⚡ Tüm Talepleri Listele';
 
-      const elIcon2 = document.getElementById('req-kpi-icon-2');
-      const elVal2 = document.getElementById('req-kpi-open');
-      const elLbl2 = document.getElementById('req-kpi-label-2');
-      const elSub2 = document.getElementById('req-kpi-sub-2');
       if (elIcon2) { elIcon2.className = 'kpi-icon yellow'; elIcon2.innerText = '⏳'; }
       if (elVal2) { elVal2.innerText = reqOpen; elVal2.style.color = 'var(--text-main)'; }
       if (elLbl2) elLbl2.innerText = 'Açık / Devam Eden';
       if (elSub2) elSub2.innerText = '⚡ İşlem Bekleyenler';
 
-      const elIcon3 = document.getElementById('req-kpi-icon-3');
-      const elVal3 = document.getElementById('req-kpi-overdue');
-      const elLbl3 = document.getElementById('req-kpi-label-3');
-      const elSub3 = document.getElementById('req-kpi-sub-3');
       if (elIcon3) { elIcon3.className = 'kpi-icon red'; elIcon3.innerText = '🚨'; }
       if (elVal3) { elVal3.innerText = reqOverdue; elVal3.style.color = 'var(--status-rejected)'; }
       if (elLbl3) { elLbl3.innerText = '14+ Gün Bekleyen (SLA)'; elLbl3.style.color = 'var(--status-rejected)'; elLbl3.style.fontWeight = '700'; }
       if (elSub3) { elSub3.innerText = '⚡ Acil Talepleri Filtrele'; elSub3.style.color = 'var(--status-rejected)'; elSub3.style.fontWeight = '600'; }
 
-      const elIcon4 = document.getElementById('req-kpi-icon-4');
-      const elVal4 = document.getElementById('req-kpi-completed');
-      const elLbl4 = document.getElementById('req-kpi-label-4');
-      const elSub4 = document.getElementById('req-kpi-sub-4');
       if (elIcon4) { elIcon4.className = 'kpi-icon green'; elIcon4.innerText = '✅'; }
       if (elVal4) { elVal4.innerText = reqCompleted; elVal4.style.color = 'var(--text-main)'; }
-      if (elLbl4) elLbl4.innerText = 'Tamamlanan Talep';
-      if (elSub4) elSub4.innerText = '⚡ Kapatılan İşleri Filtrele';
-    }
+      if (elLbl4) { elLbl4.innerText = 'Tamamlanan Talep'; elLbl4.style.color = 'var(--text-muted)'; }
+      if (elSub4) { elSub4.innerText = '⚡ Kapatılan İşleri Filtrele'; elSub4.style.color = 'var(--text-muted)'; }
 
-    // Render Unit Budget Summary Widget (3-Stage Budget, Committed & Spend Tracking)
-    this.renderUnitBudgetWidget();
+      if (progressStrip) {
+        progressStrip.style.display = 'none';
+      }
+    }
 
     let requests = [...allFilteredRequests];
 
@@ -10387,146 +10447,8 @@ const App = {
   },
 
   renderUnitBudgetWidget() {
-    const card = document.getElementById('unit-budget-summary-card');
-    if (!card) return;
-
-    const currentUser = this.state.currentUser;
-    const isUnitUser = currentUser?.role === 'UNIT';
-    const filterUnitVal = document.getElementById('filter-unit')?.value || 'ALL';
-
-    // Target unit determination
-    let targetUnit = null;
-    if (isUnitUser) {
-      targetUnit = currentUser.unit;
-    } else if (filterUnitVal !== 'ALL') {
-      targetUnit = filterUnitVal;
-    }
-
-    if (!targetUnit) {
-      // For Admin/Staff with ALL selected, summarize institutional budget if any budgets are defined
-      const allUnits = this.state.units || [];
-      const currentYear = this.state.selectedYear || getCurrentAcademicYear();
-      let totalInstBudget = 0;
-      allUnits.forEach(u => {
-        let bData = {};
-        try {
-          if (u.budgetData) bData = typeof u.budgetData === 'string' ? JSON.parse(u.budgetData) : u.budgetData;
-        } catch (e) {}
-        totalInstBudget += bData[currentYear] !== undefined ? (parseFloat(bData[currentYear]) || 0) : (parseFloat(u.annualBudget) || 0);
-      });
-
-      if (totalInstBudget === 0) {
-        card.style.display = 'none';
-        return;
-      }
-      targetUnit = 'Tüm Kurum';
-    }
-
-    card.style.display = 'block';
-
-    const currentYear = this.state.selectedYear || getCurrentAcademicYear();
-    const isInstitutional = targetUnit === 'Tüm Kurum';
-
-    let totalBudget = 0;
-    if (isInstitutional) {
-      (this.state.units || []).forEach(u => {
-        let bData = {};
-        try {
-          if (u.budgetData) bData = typeof u.budgetData === 'string' ? JSON.parse(u.budgetData) : u.budgetData;
-        } catch (e) {}
-        totalBudget += bData[currentYear] !== undefined ? (parseFloat(bData[currentYear]) || 0) : (parseFloat(u.annualBudget) || 0);
-      });
-    } else {
-      const unitObj = (this.state.units || []).find(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === targetUnit.toLowerCase().trim());
-      if (unitObj) {
-        let bData = {};
-        try {
-          if (unitObj.budgetData) bData = typeof unitObj.budgetData === 'string' ? JSON.parse(unitObj.budgetData) : unitObj.budgetData;
-        } catch (e) {}
-        totalBudget = bData[currentYear] !== undefined ? (parseFloat(bData[currentYear]) || 0) : (parseFloat(unitObj.annualBudget) || 0);
-      }
-    }
-
-    // Filter requests for this unit and academic year
-    const allReqs = this.getFilteredRequests();
-    const unitReqs = isInstitutional ? allReqs : allReqs.filter(r => (r.unit || '').toLowerCase().trim() === targetUnit.toLowerCase().trim());
-
-    // Committed: Active/Open/In-progress demands not completed or cancelled
-    const committedReqs = unitReqs.filter(r => r.status !== 'Tamamlandı' && r.status !== 'İptal Edildi' && r.status !== 'Reddedildi');
-    const committedAmount = committedReqs.reduce((sum, r) => sum + (parseFloat(r.actualAmount || r.budgetAmount || r.estimatedAmount) || 0), 0);
-
-    // Spent: Completed demands
-    const completedReqs = unitReqs.filter(r => r.status === 'Tamamlandı');
-    const spentAmount = completedReqs.reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
-
-    // Available: Total - (Spent + Committed)
-    const availableAmount = totalBudget - (spentAmount + committedAmount);
-
-    // DOM Updates
-    const titleEl = document.getElementById('ubs-unit-title');
-    const yearBadge = document.getElementById('ubs-year-badge');
-    const totalEl = document.getElementById('ubs-total-budget');
-    const commEl = document.getElementById('ubs-committed-amount');
-    const commSub = document.getElementById('ubs-committed-sub');
-    const spentEl = document.getElementById('ubs-spent-amount');
-    const spentSub = document.getElementById('ubs-spent-sub');
-    const availBox = document.getElementById('ubs-available-box');
-    const availIcon = document.getElementById('ubs-available-icon');
-    const availEl = document.getElementById('ubs-available-amount');
-    const availSub = document.getElementById('ubs-available-sub');
-
-    if (titleEl) titleEl.innerText = `${targetUnit} Bütçe ve Harcama Durumu`;
-    if (yearBadge) yearBadge.innerText = currentYear;
-    if (totalEl) totalEl.innerText = this.formatMoney(totalBudget, 'TRY', 2);
-    if (commEl) commEl.innerText = this.formatMoney(committedAmount, 'TRY', 2);
-    if (commSub) commSub.innerText = `${committedReqs.length} Açık / İşlemde Talep`;
-    if (spentEl) spentEl.innerText = this.formatMoney(spentAmount, 'TRY', 2);
-    if (spentSub) spentSub.innerText = `${completedReqs.length} Tamamlanan Talep / Fatura`;
-
-    if (availEl) {
-      if (totalBudget > 0 && availableAmount < 0) {
-        availEl.innerText = `${this.formatMoney(availableAmount, 'TRY', 2)} ⚠️`;
-        availEl.style.color = '#ef4444';
-        if (availIcon) availIcon.innerText = '🚨';
-        if (availSub) availSub.innerText = `Limit ${this.formatMoney(Math.abs(availableAmount), 'TRY', 2)} aşıldı!`;
-        if (availBox) {
-          availBox.style.background = 'rgba(239, 68, 68, 0.12)';
-          availBox.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-        }
-      } else {
-        availEl.innerText = this.formatMoney(availableAmount, 'TRY', 2);
-        availEl.style.color = '#3b82f6';
-        if (availIcon) availIcon.innerText = '🟢';
-        if (availSub) availSub.innerText = totalBudget > 0 ? 'Harcanabilir serbest bütçe' : 'Bütçe henüz girilmedi';
-        if (availBox) {
-          availBox.style.background = 'rgba(59, 130, 246, 0.08)';
-          availBox.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-        }
-      }
-    }
-
-    // Progress Bar Calculations
-    const barSpent = document.getElementById('ubs-bar-spent');
-    const barComm = document.getElementById('ubs-bar-committed');
-    const barRem = document.getElementById('ubs-bar-remaining');
-    const usageTxt = document.getElementById('ubs-usage-percent');
-
-    if (totalBudget > 0) {
-      const spentPct = Math.min(100, Math.max(0, Math.round((spentAmount / totalBudget) * 100)));
-      const commPct = Math.min(100 - spentPct, Math.max(0, Math.round((committedAmount / totalBudget) * 100)));
-      const remPct = Math.max(0, 100 - spentPct - commPct);
-
-      if (barSpent) barSpent.style.width = `${spentPct}%`;
-      if (barComm) barComm.style.width = `${commPct}%`;
-      if (barRem) barRem.style.width = `${remPct}%`;
-      if (usageTxt) {
-        usageTxt.innerText = `Harcanan: %${spentPct} | Süreçte: %${commPct} | Kalan: %${remPct}`;
-      }
-    } else {
-      if (barSpent) barSpent.style.width = '0%';
-      if (barComm) barComm.style.width = '0%';
-      if (barRem) barRem.style.width = '100%';
-      if (usageTxt) usageTxt.innerText = 'Yıllık bütçe tanımlanmadı — Bütçeyi Düzenle butonundan tutar girebilirsiniz.';
+    if (this.state.currentView === 'requests') {
+      this.renderRequestsTable();
     }
   },
 
