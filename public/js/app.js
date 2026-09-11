@@ -120,7 +120,10 @@ const App = {
           await this.fetchUsersList();
           const hashView = window.location.hash.replace(/^#\/?/, '').split('/')[0];
           const validViews = ['dashboard', 'requests', 'budgets', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
-          const savedView = (hashView && validViews.includes(hashView)) ? hashView : (localStorage.getItem('activeView') || 'dashboard');
+          let savedView = (hashView && validViews.includes(hashView)) ? hashView : (localStorage.getItem('activeView') || (meData.user.role === 'UNIT' ? 'requests' : 'dashboard'));
+          if (meData.user.role === 'UNIT' && !['requests', 'budgets', 'contracts', 'invoices', 'notifications', 'supplier-analysis', 'vendor-profile'].includes(savedView)) {
+            savedView = 'requests';
+          }
           this.switchView(savedView, true);
           this.handleHashRoute();
           return;
@@ -410,7 +413,7 @@ const App = {
     if (filterPersonEl) {
       const prevPerson = filterPersonEl.value;
       filterPersonEl.innerHTML = '<option value="ALL">Tüm Personel (Aktif + Pasif)</option>';
-      this.state.users.filter(u => u.role !== 'EXECUTIVE').forEach(u => {
+      this.state.users.filter(u => u.role !== 'EXECUTIVE' && u.role !== 'UNIT').forEach(u => {
         const statusLabel = u.isActive !== false ? '' : ' (Pasif)';
         filterPersonEl.innerHTML += `<option value="${u.name}">${u.name}${statusLabel}</option>`;
       });
@@ -425,7 +428,7 @@ const App = {
       const unassignedCount = (this.state.requests || []).filter(r => (!r.assignedTo || r.assignedTo === 'Henüz Atanmadı') && r.status === 'Açık').length;
       delegateFromEl.innerHTML = '<option value="ALL">Tüm Açık Talepler</option>' +
         `<option value="Henüz Atanmadı">⏳ Henüz Atanmamış (${unassignedCount} Talep Havuzda)</option>`;
-      this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE').forEach(u => {
+      this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE' && u.role !== 'UNIT').forEach(u => {
         const openCount = (this.state.requests || []).filter(r => r.assignedTo === u.name && r.status === 'Açık').length;
         delegateFromEl.innerHTML += `<option value="${u.name}">👤 ${u.name} (${openCount} Açık İş)</option>`;
       });
@@ -435,7 +438,7 @@ const App = {
     }
 
     // Active personnel only for assignments with LIVE WORKLOAD INDICATORS (🟢 Müsait / 🟡 Yoğun / 🔴 Kapasite Dolu)
-    const activeUsers = this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE');
+    const activeUsers = this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE' && u.role !== 'UNIT');
     const maxQuota = parseInt(this.state.settings?.maxOpenRequestsPerUser || 15);
     const assignSelects = ['nr-assigned-to', 'er-assigned-to', 'delegate-to-person', 'cm-assigned-to', 'bulk-delegate-person'];
     
@@ -803,11 +806,6 @@ const App = {
     allSectionTitles.forEach(title => {
       title.style.display = isUnit ? 'none' : '';
     });
-
-    // If unit user is currently on an unauthorized view, redirect to requests
-    if (isUnit && (!['requests', 'budgets', 'contracts', 'invoices', 'notifications', 'supplier-analysis', 'vendor-profile'].includes(this.state.currentView))) {
-      this.switchView('requests');
-    }
 
     // Topbar new request button
     const btnNewReq = document.getElementById('btn-open-new-request');
@@ -3421,7 +3419,7 @@ const App = {
     });
 
     // 5. Active Personnel Workload
-    const activeUsers = (this.state.users || []).filter(u => u.isActive !== false && u.role !== 'EXECUTIVE');
+    const activeUsers = (this.state.users || []).filter(u => u.isActive !== false && u.role !== 'EXECUTIVE' && u.role !== 'UNIT');
     const openDemands = requests.filter(r => r.status !== 'Tamamlandı' && r.status !== 'Reddedildi' && r.status !== 'İptal');
     const avgLoad = activeUsers.length > 0 ? (openDemands.length / activeUsers.length).toFixed(1) : '0';
 
@@ -3864,7 +3862,7 @@ const App = {
   renderWorkloadView() {
     const requests = this.getFilteredRequests();
     
-    const activeUsers = this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE');
+    const activeUsers = this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE' && u.role !== 'UNIT');
     const personMap = {};
     activeUsers.forEach(u => {
       personMap[u.name] = {
@@ -5840,7 +5838,7 @@ const App = {
 
     const assignedSelect = document.getElementById('tm-assigned-to');
     if (assignedSelect && this.state.users) {
-      assignedSelect.innerHTML = '<option value="">Sorumlu Uzman Seçin</option>' + this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE').map(u => {
+      assignedSelect.innerHTML = '<option value="">Sorumlu Uzman Seçin</option>' + this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE' && u.role !== 'UNIT').map(u => {
         return `<option value="${u.name}">${u.name} (${u.title})</option>`;
       }).join('');
     }
@@ -7847,7 +7845,7 @@ const App = {
 
     // TAB 4: PERSONEL PAZARLIK TASARRUFU & 12 AYLIK MATRİS RAPORU
     else if (activeTab === 'savings') {
-      const activeUsers = this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE');
+      const activeUsers = this.state.users.filter(u => u.isActive !== false && u.role !== 'EXECUTIVE' && u.role !== 'UNIT');
       const personMap = {};
 
       activeUsers.forEach(u => {
@@ -8406,7 +8404,7 @@ const App = {
 
   openPersonnelSavingsDetailView(userName, acadMonthIdx = 'ALL') {
     if (!userName) {
-      const firstActive = (this.state.users || []).find(u => u.isActive !== false && u.role !== 'EXECUTIVE');
+      const firstActive = (this.state.users || []).find(u => u.isActive !== false && u.role !== 'EXECUTIVE' && u.role !== 'UNIT');
       if (firstActive) userName = firstActive.name;
     }
     this.state.currentSavingsUser = userName;
