@@ -1398,6 +1398,8 @@ const App = {
     // Form Submissions
     document.getElementById('form-new-request')?.addEventListener('submit', (e) => this.handleNewRequest(e));
     document.getElementById('form-edit-request')?.addEventListener('submit', (e) => this.handleEditRequest(e));
+    document.getElementById('nr-unit')?.addEventListener('change', () => this.populateRequestBudgetItemDropdown('nr-unit', 'nr-budget-item'));
+    document.getElementById('er-unit')?.addEventListener('change', () => this.populateRequestBudgetItemDropdown('er-unit', 'er-budget-item'));
     document.getElementById('form-user-manage')?.addEventListener('submit', (e) => this.handleSaveUser(e));
     document.getElementById('form-unit-edit')?.addEventListener('submit', (e) => this.handleSaveEditUnit(e));
     document.getElementById('form-contract-manage')?.addEventListener('submit', (e) => this.handleSaveContract(e));
@@ -10412,15 +10414,31 @@ const App = {
     const currentYear = this.state.currentBreakdownYear || getCurrentAcademicYear();
     const isAll = unitName === 'ALL' || !unitName;
 
-    // 1. Calculate Total Budget
+    // 1. Calculate Total Budget & Collect Defined Budget Items for this unit/year
     let totalBudget = 0;
+    const definedItemMap = {}; // key -> { code, name, allocated }
+
     if (isAll) {
       (this.state.units || []).forEach(u => {
         let bData = {};
         try {
           if (u.budgetData) bData = typeof u.budgetData === 'string' ? JSON.parse(u.budgetData) : u.budgetData;
         } catch (e) {}
-        totalBudget += (bData[currentYear] !== undefined ? bData[currentYear] : (parseFloat(u.annualBudget) || 0));
+        const yEntry = bData[currentYear];
+        if (typeof yEntry === 'object' && yEntry !== null) {
+          totalBudget += (yEntry.totalBudget || 0);
+          if (Array.isArray(yEntry.items)) {
+            yEntry.items.forEach(it => {
+              const k = (it.code || it.name).trim();
+              if (!definedItemMap[k]) definedItemMap[k] = { code: it.code || '-', name: it.name, allocated: 0 };
+              definedItemMap[k].allocated += (parseFloat(it.amount) || 0);
+            });
+          }
+        } else if (typeof yEntry === 'number') {
+          totalBudget += yEntry;
+        } else {
+          totalBudget += (parseFloat(u.annualBudget) || 0);
+        }
       });
     } else {
       const uObj = (this.state.units || []).find(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === unitName.toLowerCase().trim());
@@ -10429,7 +10447,20 @@ const App = {
         try {
           if (uObj.budgetData) bData = typeof uObj.budgetData === 'string' ? JSON.parse(uObj.budgetData) : uObj.budgetData;
         } catch (e) {}
-        totalBudget = (bData[currentYear] !== undefined ? bData[currentYear] : (parseFloat(uObj.annualBudget) || 0));
+        const yEntry = bData[currentYear];
+        if (typeof yEntry === 'object' && yEntry !== null) {
+          totalBudget = (yEntry.totalBudget || 0);
+          if (Array.isArray(yEntry.items)) {
+            yEntry.items.forEach(it => {
+              const k = (it.code || it.name).trim();
+              definedItemMap[k] = { code: it.code || '-', name: it.name, allocated: parseFloat(it.amount) || 0 };
+            });
+          }
+        } else if (typeof yEntry === 'number') {
+          totalBudget = yEntry;
+        } else {
+          totalBudget = (parseFloat(uObj.annualBudget) || 0);
+        }
       }
     }
 
@@ -10463,9 +10494,22 @@ const App = {
       kpiAvail.style.color = (totalBudget > 0 && available < 0) ? 'var(--status-rejected)' : '#3b82f6';
     }
 
-    // 3. Group by Budget Item
+    // 3. Initialize breakdown map with defined items
     const breakdownMap = {};
+    Object.keys(definedItemMap).forEach(k => {
+      const def = definedItemMap[k];
+      breakdownMap[k] = {
+        code: def.code || '-',
+        name: def.name,
+        allocated: def.allocated || 0,
+        committed: 0,
+        spent: 0,
+        total: 0,
+        count: 0
+      };
+    });
 
+    // 4. Process requests into items
     reqs.forEach(r => {
       if (r.status === 'İptal Edildi' || r.status === 'Reddedildi') return;
       const bCode = (r.budgetItemCode || '').trim();
@@ -10476,6 +10520,7 @@ const App = {
         breakdownMap[key] = {
           code: bCode || '-',
           name: bName,
+          allocated: 0,
           committed: 0,
           spent: 0,
           total: 0,
@@ -10503,8 +10548,11 @@ const App = {
       list = list.filter(it => it.code.toLowerCase().includes(q) || it.name.toLowerCase().includes(q));
     }
 
-    // Sort by Total Amount DESC
-    list.sort((a, b) => b.total - a.total);
+    // Sort by Allocated Limit DESC, then Total Amount DESC
+    list.sort((a, b) => {
+      if (b.allocated !== a.allocated) return b.allocated - a.allocated;
+      return b.total - a.total;
+    });
 
     this.state.lastBudgetBreakdownData = {
       unitName,
@@ -10520,13 +10568,30 @@ const App = {
     if (!tbody) return;
 
     if (list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:2rem;">Bu kriterlere uygun bütçe kalemi hareketi bulunamadı.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem;">Bu kriterlere uygun bütçe kalemi hareketi bulunamadı.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = list.map(it => {
-      const sharePct = totalLoad > 0 ? Math.round((it.total / totalLoad) * 100) : 0;
       const isUncategorized = it.name.includes('Etiketsiz');
+      const hasLimit = it.allocated > 0;
+      const remaining = hasLimit ? (it.allocated - it.total) : -it.total;
+      const usagePct = hasLimit ? Math.round((it.total / it.allocated) * 100) : (totalLoad > 0 ? Math.round((it.total / totalLoad) * 100) : 0);
+
+      let statusBadge = '';
+      if (hasLimit) {
+        if (remaining < 0) {
+          statusBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#ef4444; font-weight:800; font-size:0.75rem;">🚨 Aşım (%${usagePct})</span>`;
+        } else if (usagePct >= 85) {
+          statusBadge = `<span class="badge" style="background:rgba(245,158,11,0.15); color:#d97706; font-weight:800; font-size:0.75rem;">⚠️ %${usagePct} Dolu</span>`;
+        } else {
+          statusBadge = `<span class="badge" style="background:rgba(16,185,129,0.12); color:#059669; font-weight:700; font-size:0.75rem;">🟢 %${usagePct}</span>`;
+        }
+      } else {
+        statusBadge = `<span class="badge" style="background:rgba(148,163,184,0.12); color:var(--text-muted); font-size:0.72rem;">Limitsiz</span>`;
+      }
+
+      const barColor = remaining < 0 ? '#ef4444' : (usagePct >= 85 ? '#f59e0b' : '#10b981');
 
       return `
         <tr>
@@ -10535,26 +10600,31 @@ const App = {
             ${it.name}
             ${isUncategorized ? '<small style="display:block; color:#f59e0b; font-size:0.72rem;">⚠️ Taleplerde henüz bütçe kalemi seçilmemiş</small>' : ''}
           </td>
+          <td style="text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--text-main);">
+            ${hasLimit ? this.formatMoney(it.allocated, 'TRY', 0) : '<span style="color:var(--text-muted);">-</span>'}
+          </td>
           <td style="text-align:right; font-family:var(--font-mono); color:#f59e0b; font-weight:600;">
             ${it.committed > 0 ? this.formatMoney(it.committed, 'TRY', 0) : '-'}
           </td>
           <td style="text-align:right; font-family:var(--font-mono); color:var(--status-completed); font-weight:700;">
             ${it.spent > 0 ? this.formatMoney(it.spent, 'TRY', 0) : '-'}
           </td>
-          <td style="text-align:right; font-family:var(--font-mono); font-weight:800; color:var(--text-main);">
-            ${this.formatMoney(it.total, 'TRY', 0)}
+          <td style="text-align:right; font-family:var(--font-mono); font-weight:800; color:${remaining < 0 ? '#ef4444' : (hasLimit ? '#3b82f6' : 'var(--text-muted)')};">
+            ${hasLimit ? this.formatMoney(remaining, 'TRY', 0) : '-'}
           </td>
           <td>
-            <div style="display:flex; align-items:center; gap:0.5rem;">
-              <div style="flex:1; height:8px; background:var(--bg-hover); border-radius:4px; overflow:hidden; border:1px solid var(--border-color);">
-                <div style="height:100%; width:${Math.min(100, sharePct)}%; background:linear-gradient(90deg, #6366f1, #10b981); border-radius:4px;"></div>
+            <div style="display:flex; flex-direction:column; gap:3px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                ${statusBadge}
               </div>
-              <span style="font-size:0.75rem; font-weight:700; font-family:var(--font-mono); width:35px; text-align:right;">%${sharePct}</span>
+              <div style="height:6px; background:var(--bg-hover); border-radius:3px; overflow:hidden; border:1px solid var(--border-color);">
+                <div style="height:100%; width:${Math.min(100, usagePct)}%; background:${barColor}; border-radius:3px;"></div>
+              </div>
             </div>
           </td>
           <td style="text-align:center;">
             <span class="badge" style="background:rgba(99,102,241,0.1); color:var(--accent-primary); font-weight:700; font-size:0.78rem;">
-              ${it.count} Talep
+              ${it.count}
             </span>
           </td>
         </tr>
@@ -10579,18 +10649,20 @@ const App = {
       ['Birim:', data.unitName === 'ALL' ? 'Kurum Geneli (Tüm Birimler)' : data.unitName, 'Akademik Yıl:', data.academicYear],
       ['Toplam Tanımlı Bütçe (₺):', data.totalBudget, 'Süreçteki / Rezerve (₺):', data.totalCommitted, 'Gerçekleşen Harcama (₺):', data.totalSpent, 'Net Kalan (₺):', (data.totalBudget - data.totalLoad)],
       [],
-      ['Bütçe Kodu', 'Bütçe Kalem Adı', 'Süreçteki / Rezerve Tutar (₺)', 'Gerçekleşen Harcama (₺)', 'Toplam Kalem Yükü (₺)', 'Harcama Payı (%)', 'Talep Adedi']
+      ['Bütçe Kodu', 'Bütçe Kalem Adı', 'Tanımlı Limit (₺)', 'Süreçteki / Rezerve (₺)', 'Gerçekleşen Harcama (₺)', 'Kalan Bütçe (₺)', 'Kullanım Oranı (%)', 'Talep Adedi']
     ];
 
     data.items.forEach(it => {
-      const share = data.totalLoad > 0 ? (it.total / data.totalLoad) : 0;
+      const rem = it.allocated > 0 ? (it.allocated - it.total) : 0;
+      const usage = it.allocated > 0 ? Number(((it.total / it.allocated) * 100).toFixed(1)) : 0;
       rows.push([
         it.code,
         it.name,
+        it.allocated || 0,
         it.committed,
         it.spent,
-        it.total,
-        Number((share * 100).toFixed(1)),
+        rem,
+        usage,
         it.count
       ]);
     });
@@ -10745,6 +10817,56 @@ const App = {
     }
   },
 
+  addBudgetItemRowToUnitModal(itemCode = '', itemName = '', itemAmount = '') {
+    const container = document.getElementById('ub-items-container');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = 'ub-item-row';
+    div.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; background: var(--bg-card); padding: 0.45rem 0.65rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);';
+
+    const masterItems = (this.state.budgetItems || []).filter(b => b.isActive !== false);
+    masterItems.sort((a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true }));
+
+    const optionsHtml = masterItems.map(b => {
+      const isSel = (itemCode && b.code === itemCode) || (itemName && b.name === itemName);
+      return `<option value="${b.name}" data-code="${b.code}" ${isSel ? 'selected' : ''}>${b.code} - ${b.name}</option>`;
+    }).join('');
+
+    div.innerHTML = `
+      <div style="flex: 2; min-width: 0;">
+        <select class="ub-item-select" style="width: 100%; font-size: 0.82rem;" onchange="App.recalcUnitModalBudget()">
+          <option value="">-- Bütçe Kalemi Seçin --</option>
+          ${optionsHtml}
+        </select>
+      </div>
+      <div style="flex: 1; display: flex; align-items: center; gap: 0.25rem;">
+        <input type="number" class="ub-item-amount" min="0" step="100" placeholder="Tutar (₺)" value="${itemAmount || ''}" oninput="App.recalcUnitModalBudget()" style="width: 100%; font-family: var(--font-mono); font-weight: 700; text-align: right; font-size: 0.85rem;">
+        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">₺</span>
+      </div>
+      <button type="button" class="btn-icon" onclick="this.closest('.ub-item-row').remove(); App.recalcUnitModalBudget();" title="Kalemi Kaldır" style="color: #ef4444; width: 30px; height: 30px; flex-shrink: 0;">🗑️</button>
+    `;
+
+    container.appendChild(div);
+    this.recalcUnitModalBudget();
+  },
+
+  recalcUnitModalBudget() {
+    const rows = document.querySelectorAll('.ub-item-row');
+    let total = 0;
+    let hasRows = false;
+    rows.forEach(r => {
+      hasRows = true;
+      const amtInput = r.querySelector('.ub-item-amount');
+      const val = parseFloat(amtInput?.value) || 0;
+      total += val;
+    });
+
+    const totalInput = document.getElementById('ub-budget-amount');
+    if (totalInput && hasRows) {
+      totalInput.value = total > 0 ? total : '';
+    }
+  },
+
   openUnitBudgetModal(targetUnitName = null) {
     const isUnitUser = this.state.currentUser?.role === 'UNIT';
     const unitName = targetUnitName || (isUnitUser ? this.state.currentUser?.unit : document.getElementById('filter-unit')?.value) || this.state.currentUser?.unit;
@@ -10758,23 +10880,45 @@ const App = {
     const unitObj = (this.state.units || []).find(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === unitName.toLowerCase().trim());
     
     let currentBudget = 0;
+    let currentItems = [];
     if (unitObj) {
       let bData = {};
       try {
         if (unitObj.budgetData) bData = typeof unitObj.budgetData === 'string' ? JSON.parse(unitObj.budgetData) : unitObj.budgetData;
       } catch (e) {}
-      currentBudget = bData[currentYear] !== undefined ? bData[currentYear] : (parseFloat(unitObj.annualBudget) || 0);
+
+      const yearEntry = bData[currentYear];
+      if (typeof yearEntry === 'object' && yearEntry !== null) {
+        currentBudget = yearEntry.totalBudget || 0;
+        currentItems = Array.isArray(yearEntry.items) ? yearEntry.items : [];
+      } else if (typeof yearEntry === 'number') {
+        currentBudget = yearEntry;
+      } else {
+        currentBudget = parseFloat(unitObj.annualBudget) || 0;
+      }
     }
 
     const unitInput = document.getElementById('ub-unit-name');
     const unitDisplay = document.getElementById('ub-unit-display-name');
     const yearDisplay = document.getElementById('ub-year-display');
     const budgetInput = document.getElementById('ub-budget-amount');
+    const container = document.getElementById('ub-items-container');
 
     if (unitInput) unitInput.value = unitName;
     if (unitDisplay) unitDisplay.innerText = unitName;
     if (yearDisplay) yearDisplay.innerText = currentYear;
     if (budgetInput) budgetInput.value = currentBudget > 0 ? currentBudget : '';
+
+    if (container) {
+      container.innerHTML = '';
+      if (currentItems.length > 0) {
+        currentItems.forEach(it => {
+          this.addBudgetItemRowToUnitModal(it.code, it.name, it.amount);
+        });
+      } else {
+        this.addBudgetItemRowToUnitModal();
+      }
+    }
 
     this.openModal('modal-unit-budget');
   },
@@ -10785,8 +10929,25 @@ const App = {
       e.stopPropagation();
     }
     const unitName = document.getElementById('ub-unit-name')?.value.trim();
-    const budgetAmount = parseFloat(document.getElementById('ub-budget-amount')?.value) || 0;
     const academicYear = this.state.selectedYear || getCurrentAcademicYear();
+
+    const rows = document.querySelectorAll('.ub-item-row');
+    const budgetItems = [];
+    rows.forEach(r => {
+      const sel = r.querySelector('.ub-item-select');
+      const amtInput = r.querySelector('.ub-item-amount');
+      const name = sel?.value?.trim();
+      const code = sel?.options[sel.selectedIndex]?.getAttribute('data-code') || '';
+      const amount = parseFloat(amtInput?.value) || 0;
+      if (name && amount > 0) {
+        budgetItems.push({ code, name, amount });
+      }
+    });
+
+    let totalBudget = budgetItems.reduce((sum, it) => sum + it.amount, 0);
+    if (totalBudget === 0) {
+      totalBudget = parseFloat(document.getElementById('ub-budget-amount')?.value) || 0;
+    }
 
     if (!unitName) {
       this.showToast("Birim bilgisi eksik.", "warning");
@@ -10797,7 +10958,7 @@ const App = {
       const res = await this.authFetch('/api/units/my-budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ unitName, annualBudget: budgetAmount, academicYear })
+        body: JSON.stringify({ unitName, annualBudget: totalBudget, academicYear, budgetItems })
       });
 
       if (!res.ok) {
@@ -10810,17 +10971,79 @@ const App = {
       // Update local state
       const unitIndex = (this.state.units || []).findIndex(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === unitName.toLowerCase().trim());
       if (unitIndex !== -1 && typeof this.state.units[unitIndex] === 'object') {
-        this.state.units[unitIndex].annualBudget = budgetAmount;
+        this.state.units[unitIndex].annualBudget = totalBudget;
         this.state.units[unitIndex].budgetData = resData.budgetData;
       }
 
       this.closeModal('modal-unit-budget');
       this.renderUnitBudgetWidget();
       this.renderUnitsSettings();
-      this.showToast(`"${unitName}" birimi için ${academicYear} bütçesi (${this.formatMoney(budgetAmount, 'TRY', 0)}) kaydedildi!`, "success", "💰");
+      this.populateDropdowns();
+      const itemsCountInfo = budgetItems.length > 0 ? ` (${budgetItems.length} Kalem Dağılımı)` : '';
+      this.showToast(`"${unitName}" için ${academicYear} bütçesi (${this.formatMoney(totalBudget, 'TRY', 0)})${itemsCountInfo} kaydedildi!`, "success", "💰");
     } catch (err) {
       console.error('Bütçe kaydetme hatası:', err);
       this.showToast(`Bütçe kaydedilemedi: ${err.message}`, "error");
+    }
+  },
+
+  populateRequestBudgetItemDropdown(unitSelectId, budgetItemSelectId, preselectedVal = '') {
+    const unitEl = document.getElementById(unitSelectId);
+    const itemEl = document.getElementById(budgetItemSelectId);
+    if (!itemEl) return;
+
+    const selectedUnit = unitEl?.value?.trim() || '';
+    const currentYear = this.state.selectedYear || getCurrentAcademicYear();
+    const currentVal = preselectedVal || itemEl.value;
+
+    let unitItems = [];
+    if (selectedUnit) {
+      const uObj = (this.state.units || []).find(u => (typeof u === 'object' ? u.name : u)?.toLowerCase().trim() === selectedUnit.toLowerCase().trim());
+      if (uObj) {
+        let bData = {};
+        try {
+          if (uObj.budgetData) bData = typeof uObj.budgetData === 'string' ? JSON.parse(uObj.budgetData) : uObj.budgetData;
+        } catch (e) {}
+        const yEntry = bData[currentYear];
+        if (typeof yEntry === 'object' && yEntry !== null && Array.isArray(yEntry.items) && yEntry.items.length > 0) {
+          unitItems = yEntry.items;
+        }
+      }
+    }
+
+    itemEl.innerHTML = '<option value="">-- Bütçe Kalemi Seçiniz (Opsiyonel) --</option>';
+
+    if (unitItems.length > 0) {
+      const unitReqs = (this.state.requests || []).filter(r => {
+        const rYear = r.academicYear || this.getAcademicYear(r.arrivalDate || r.requestDate);
+        return rYear === currentYear && (r.unit || '').trim().toLowerCase() === selectedUnit.toLowerCase();
+      });
+
+      unitItems.forEach(it => {
+        const itemReqs = unitReqs.filter(r => {
+          if (r.status === 'İptal Edildi' || r.status === 'Reddedildi') return false;
+          return (r.budgetItemCode === it.code) || (r.budgetItem === it.name);
+        });
+
+        const spent = itemReqs.filter(r => r.status === 'Tamamlandı').reduce((sum, r) => sum + (parseFloat(r.actualAmount) || 0), 0);
+        const committed = itemReqs.filter(r => r.status !== 'Tamamlandı').reduce((sum, r) => sum + (parseFloat(r.actualAmount || r.budgetAmount || r.estimatedAmount) || 0), 0);
+        const rem = it.amount - (spent + committed);
+
+        const isSelected = (currentVal === it.name) || (currentVal === it.code);
+        const remStr = rem < 0 ? `⚠️ Aşım: ${this.formatMoney(Math.abs(rem), 'TRY', 0)}` : `Kalan: ${this.formatMoney(rem, 'TRY', 0)}`;
+        itemEl.innerHTML += `<option value="${it.name}" data-code="${it.code}" ${isSelected ? 'selected' : ''}>🎯 ${it.code} - ${it.name} [${remStr} / Bütçe: ${this.formatMoney(it.amount, 'TRY', 0)}]</option>`;
+      });
+    } else {
+      const items = (this.state.budgetItems || []).filter(b => b.isActive !== false);
+      items.sort((a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true }));
+      items.forEach(b => {
+        const isSelected = (currentVal === b.name) || (currentVal === b.code);
+        itemEl.innerHTML += `<option value="${b.name}" data-code="${b.code}" ${isSelected ? 'selected' : ''}>${b.code} - ${b.name}</option>`;
+      });
+    }
+
+    if (currentVal && Array.from(itemEl.options).some(o => o.value === currentVal)) {
+      itemEl.value = currentVal;
     }
   },
 
@@ -11436,6 +11659,7 @@ const App = {
       this.onAmountInput(estInput, 'nr-currency');
     }
 
+    this.populateRequestBudgetItemDropdown('nr-unit', 'nr-budget-item');
     this.openModal('modal-new-request');
   },
 
@@ -11627,8 +11851,7 @@ const App = {
       regSelect.value = regVal;
     }
 
-    const elBudgetItem = document.getElementById('er-budget-item');
-    if (elBudgetItem) elBudgetItem.value = req.budgetItem || '';
+    this.populateRequestBudgetItemDropdown('er-unit', 'er-budget-item', req.budgetItem || req.budgetItemCode || '');
 
     const elDesc = document.getElementById('er-description');
     if (elDesc) elDesc.value = req.description || '';

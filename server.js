@@ -1709,20 +1709,37 @@ const server = http.createServer(async (req, res) => {
       try {
         if (u.budgetData) bData = typeof u.budgetData === 'string' ? JSON.parse(u.budgetData) : u.budgetData;
       } catch (e) {}
-      bData[academicYear] = budget;
 
-      await pool.query('UPDATE units SET "annualBudget" = $1, "budgetData" = $2 WHERE id = $3', [budget, JSON.stringify(bData), u.id]);
+      const budgetItems = Array.isArray(data.budgetItems) ? data.budgetItems.map(it => ({
+        code: (it.code || '').trim(),
+        name: (it.name || '').trim(),
+        amount: parseFloat(it.amount) || 0
+      })).filter(it => it.name && it.amount > 0) : [];
+
+      const totalFromItems = budgetItems.reduce((sum, it) => sum + it.amount, 0);
+      const finalBudget = budgetItems.length > 0 ? totalFromItems : budget;
+
+      bData[academicYear] = {
+        totalBudget: finalBudget,
+        items: budgetItems
+      };
+
+      await pool.query('UPDATE units SET "annualBudget" = $1, "budgetData" = $2 WHERE id = $3', [finalBudget, JSON.stringify(bData), u.id]);
 
       const pad = (n) => String(n).padStart(2, '0');
       const now = new Date();
       const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const logDetails = budgetItems.length > 0 
+        ? `Birim: ${u.name}, Dönem: ${academicYear}, Toplam Bütçe: ${finalBudget.toLocaleString('tr-TR')} ₺ (${budgetItems.length} Kalem Dağılımı)`
+        : `Birim: ${u.name}, Dönem: ${academicYear}, Yeni Bütçe: ${finalBudget.toLocaleString('tr-TR')} ₺`;
+
       await pool.query(
         'INSERT INTO logs (timestamp, "user", action, details) VALUES ($1, $2, $3, $4)',
-        [dateStr, currentUser.name, 'Birim Bütçesi Güncellendi', `Birim: ${u.name}, Dönem: ${academicYear}, Yeni Bütçe: ${budget.toLocaleString('tr-TR')} ₺`]
+        [dateStr, currentUser.name, 'Birim Bütçesi Güncellendi', logDetails]
       ).catch(() => {});
 
       res.writeHead(200);
-      return res.end(JSON.stringify({ success: true, unitId: u.id, unitName: u.name, annualBudget: budget, budgetData: bData, academicYear }));
+      return res.end(JSON.stringify({ success: true, unitId: u.id, unitName: u.name, annualBudget: finalBudget, budgetData: bData, academicYear, budgetItems }));
     }
 
     // ----------------------------------------------------
