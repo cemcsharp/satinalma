@@ -119,7 +119,7 @@ const App = {
           await this.fetchInitialData();
           await this.fetchUsersList();
           const hashView = window.location.hash.replace(/^#\/?/, '').split('/')[0];
-          const validViews = ['dashboard', 'requests', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
+          const validViews = ['dashboard', 'requests', 'budgets', 'workload', 'my-requests', 'notifications', 'contracts', 'guarantees', 'invoices', 'tenders', 'unit-analysis', 'supplier-analysis', 'yearly-report', 'personnel-savings-detail', 'activity-logs', 'settings', 'vendor-profile'];
           const savedView = (hashView && validViews.includes(hashView)) ? hashView : (localStorage.getItem('activeView') || 'dashboard');
           this.switchView(savedView, true);
           this.handleHashRoute();
@@ -772,7 +772,7 @@ const App = {
     allNavItems.forEach(item => {
       const view = item.getAttribute('data-view');
       if (isUnit) {
-        if (['requests', 'contracts', 'invoices', 'notifications', 'supplier-analysis'].includes(view)) {
+        if (['requests', 'budgets', 'contracts', 'invoices', 'notifications', 'supplier-analysis'].includes(view)) {
           item.style.display = '';
           if (view === 'supplier-analysis') {
             const btnSpan = item.querySelector('a span:last-child, button span:last-child');
